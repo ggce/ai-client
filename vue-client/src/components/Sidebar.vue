@@ -27,26 +27,18 @@
     </div>
     
     <div class="sidebar-footer">
-      <div class="current-model-display">
-        当前模型: {{ currentProvider }}
-      </div>
+      <!-- 移除了当前模型显示 -->
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useSettingsStore } from '@/store/settings'
+import { useSettingsStore } from '../store/settings'
 
 const settingsStore = useSettingsStore()
 
 const isSidebarCollapsed = computed(() => settingsStore.isSidebarCollapsed)
-const currentProvider = computed(() => {
-  const provider = settingsStore.currentProvider
-  return provider === 'deepseek' ? 'Deepseek' : 
-         provider === 'openai' ? 'OpenAI' : 
-         provider
-})
 
 const toggleSidebar = () => {
   settingsStore.toggleSidebar()
@@ -169,13 +161,5 @@ const toggleSidebar = () => {
 
 .sidebar.collapsed .sidebar-footer {
   padding: 15px 5px;
-}
-
-.current-model-display {
-  font-size: 12px;
-  color: #666;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 </style> 

@@ -32,7 +32,7 @@
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
-              <span v-if="hoveredButton === index" class="hover-tooltip">复制</span>
+              <span v-if="hoveredButton === index" class="hover-tooltip">复制Markdown格式</span>
               <span v-if="copiedIndex === index" class="copy-tooltip">已复制</span>
             </button>
           </div>
@@ -80,6 +80,7 @@
 
 <script setup lang="ts">
 import { defineProps, ref, watch, onMounted, nextTick } from 'vue'
+import MarkdownIt from 'markdown-it'
 
 interface ChatMessage {
   type: 'user' | 'ai' | 'system'
@@ -92,6 +93,13 @@ const props = defineProps<{
   streamingMessage?: string
 }>()
 
+// 初始化markdown解析器实例
+const md = new MarkdownIt({
+  breaks: true,      // 将 \n 转换为 <br>
+  linkify: true,     // 自动识别链接
+  typographer: true  // 启用一些排版替换
+})
+
 const messagesContainer = ref<HTMLElement | null>(null)
 // 记录当前复制的消息索引，用于显示复制成功提示
 const copiedIndex = ref<number | null>(null)
@@ -101,12 +109,8 @@ const hoveredButton = ref<number | null>(null)
 // 复制内容到剪贴板
 const copyToClipboard = (text: string, index?: number) => {
   if (text) {
-    // 清除HTML标签，获取纯文本内容
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = formatMessage(text)
-    const plainText = tempDiv.textContent || tempDiv.innerText || ''
-    
-    navigator.clipboard.writeText(plainText)
+    // 复制原始Markdown文本，这样用户可以保留格式
+    navigator.clipboard.writeText(text)
       .then(() => {
         // 复制成功，显示提示
         if (index !== undefined) {
@@ -123,20 +127,12 @@ const copyToClipboard = (text: string, index?: number) => {
   }
 }
 
-// 格式化消息，处理markdown等
+// 格式化消息，使用markdown-it解析
 const formatMessage = (content: string): string => {
   if (!content) return ''
   
-  // 处理代码块
-  let formattedContent = content.replace(/```([a-z]*)\n([\s\S]*?)\n```/g, '<pre><code class="$1">$2</code></pre>')
-  
-  // 处理行内代码
-  formattedContent = formattedContent.replace(/`([^`]+)`/g, '<code>$1</code>')
-  
-  // 处理换行
-  formattedContent = formattedContent.replace(/\n/g, '<br>')
-  
-  return formattedContent
+  // 使用markdown-it解析Markdown文本为HTML
+  return md.render(content)
 }
 
 // 自动滚动到底部
@@ -348,6 +344,53 @@ onMounted(() => {
   to { opacity: 1; }
 }
 
+/* 优化Markdown样式 */
+.message-content :deep(h1),
+.message-content :deep(h2),
+.message-content :deep(h3),
+.message-content :deep(h4),
+.message-content :deep(h5),
+.message-content :deep(h6) {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.message-content :deep(h1) {
+  font-size: 1.4em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.message-content :deep(h2) {
+  font-size: 1.3em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.message-content :deep(h3) {
+  font-size: 1.2em;
+}
+
+.message-content :deep(h4) {
+  font-size: 1.1em;
+}
+
+.message-content :deep(ul),
+.message-content :deep(ol) {
+  padding-left: 1.2em;
+  margin: 0.5em 0;
+}
+
+.message-content :deep(li) {
+  margin: 0.1em 0;
+}
+
+.message-content :deep(p) {
+  margin: 0.3em 0;
+}
+
+/* 确保代码块样式正确 */
 .message-content :deep(pre) {
   background-color: #282c34;
   padding: 12px;

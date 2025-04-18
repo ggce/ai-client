@@ -120,12 +120,12 @@ const configDebug = computed(() => JSON.stringify({
   selectedProvider: selectedProvider.value,
   providers: {
     deepseek: {
-      apiKey: maskApiKey(deepseekApiKey.value),
+      apiKey: deepseekApiKey.value,
       baseUrl: deepseekBaseUrl.value,
       model: deepseekModel.value
     },
     openai: {
-      apiKey: maskApiKey(openaiApiKey.value),
+      apiKey: openaiApiKey.value,
       baseUrl: openaiBaseUrl.value,
       model: openaiModel.value
     }

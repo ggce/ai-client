@@ -2,7 +2,7 @@
   <div class="panel">
     <header class="compact-header">
       <div class="header-content">
-        <h1>AI聊天 <small>支持多种AI模型</small></h1>
+        <h1>AI聊天 <small>{{ modelDisplay }}</small></h1>
         <label class="stream-toggle-compact">
           <input type="checkbox" v-model="useStreaming">
           <span class="slider-compact"></span>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, computed } from 'vue'
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
 import { useSettingsStore } from '../store/settings'
@@ -47,6 +47,30 @@ const streamingMessage = ref<string>('')
 const useStreaming = ref<boolean>(true) // 默认使用流式输出
 
 const settingsStore = useSettingsStore()
+
+// 计算当前使用的模型显示文本
+const modelDisplay = computed(() => {
+  const provider = settingsStore.currentProvider
+  const config = settingsStore.providers[provider]
+  
+  if (!config?.apiKey) {
+    return '未配置API密钥'
+  }
+  
+  let modelName = config.model || '默认模型'
+  
+  // 针对DeepSeek模型显示版本名称
+  if (provider === 'deepseek') {
+    if (modelName === 'deepseek-chat' || (!config.model)) {
+      return 'DeepSeek V3'
+    } else if (modelName === 'deepseek-reasoner') {
+      return 'DeepSeek R1'
+    }
+  }
+  
+  // 返回与设置页一致的格式
+  return modelName
+})
 
 const isProviderConfigured = () => {
   const provider = settingsStore.currentProvider
