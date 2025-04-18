@@ -1,0 +1,87 @@
+{
+  "name": "deepseek-client",
+  "version": "1.0.0",
+  "description": "DeepSeek V3模型客户端，支持MCP多云协议",
+  "main": "dist/electron/main.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist && find src -name \"*.js\" -not -path \"*/public/*\" -delete && find src -name \"*.js.map\" -not -path \"*/public/*\" -delete && find src -name \"*.d.ts\" -not -path \"*/public/*\" -delete",
+    "start": "node dist/index.js",
+    "electron": "electron .",
+    "electron:dev": "tsc && electron .",
+    "electron:build": "tsc && electron-builder build --mac --win --linux",
+    "electron:pack": "electron-builder --dir",
+    "vue:build": "cd vue-client && npm run build",
+    "vue:dev": "cd vue-client && npm run dev",
+    "build": "node build.js",
+    "dev": "node build.js --dev",
+    "dev:vue-only": "node build.js --dev --no-electron",
+    "dev:electron-only": "node build.js --dev --no-vue",
+    "debug:vue-electron": "npm run vue:build && tsc --sourceMap && NODE_ENV=development electron .",
+    "dev:hot": "node dev.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "body-parser": "^2.2.0",
+    "dotenv": "^16.5.0",
+    "ejs": "^3.1.10",
+    "electron-store": "^10.0.1",
+    "express": "^5.1.0",
+    "openai": "^4.95.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.5",
+    "@types/ejs": "^3.1.5",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.14.1",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "electron": "^35.1.5",
+    "electron-builder": "^24.9.1",
+    "electron-devtools-installer": "^3.2.0",
+    "typescript": "^5.8.3"
+  },
+  "build": {
+    "appId": "com.deepseek.client",
+    "productName": "Deepseek客户端",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "dmg": {
+      "contents": [
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        }
+      ]
+    },
+    "mac": {
+      "icon": "build/icons/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "icon": "build/icons/icon.ico",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "target": "AppImage"
+    }
+  }
+}

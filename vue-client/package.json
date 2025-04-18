@@ -1,0 +1,29 @@
+{
+  "name": "deepseek-vue-client",
+  "version": "1.0.0",
+  "description": "DeepSeek V3模型客户端Vue版本，支持MCP多云协议",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:check": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "axios": "^1.8.4",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "eslint": "^8.54.0",
+    "eslint-plugin-vue": "^9.18.1",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.10",
+    "vue-tsc": "^1.8.22"
+  }
+} 
