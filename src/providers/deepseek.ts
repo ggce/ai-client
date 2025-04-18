@@ -1,136 +1,151 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import OpenAI from 'openai';
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { 
-  ClientOptions, 
   CompletionRequest, 
   CompletionResponse,
   Message
 } from '../types';
 import { generateUUID, withRetry } from '../utils';
 
+// DeepSeek客户端配置接口
+export interface ClientOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  defaultModel?: string;
+  timeout?: number;
+  maxRetries?: number;
+}
+
+// 使用OpenAI SDK连接DeepSeek API的客户端实现
 export class DeepseekClient {
-  private client: AxiosInstance;
+  private client: OpenAI;
   private options: ClientOptions;
 
-  constructor(options: ClientOptions = {}) {
+  constructor(config?: ClientOptions) {
     this.options = {
-      apiKey: options.apiKey || process.env.DEEPSEEK_API_KEY,
-      baseUrl: options.baseUrl || process.env.DEEPSEEK_API_BASE_URL || 'https://api.deepseek.com',
-      defaultModel: options.defaultModel || 'deepseek-v3-lite',
-      timeout: options.timeout || 60000,
-      maxRetries: options.maxRetries || 3,
+      apiKey: config?.apiKey || process.env.DEEPSEEK_API_KEY || '',
+      baseUrl: config?.baseUrl || 'https://api.deepseek.com',
+      defaultModel: config?.defaultModel || 'deepseek-chat',
+      timeout: config?.timeout || 30000,
+      maxRetries: config?.maxRetries || 3
     };
 
-    if (!this.options.apiKey) {
-      throw new Error('Deepseek API key is required');
-    }
-
-    console.log('DeepSeek API Base URL:', this.options.baseUrl);
-
-    this.client = axios.create({
+    // 创建OpenAI客户端实例，连接到DeepSeek API
+    this.client = new OpenAI({
+      apiKey: this.options.apiKey,
       baseURL: this.options.baseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.options.apiKey}`,
-      },
       timeout: this.options.timeout,
+      maxRetries: this.options.maxRetries
     });
+
+    console.log('初始化DeepSeek客户端，使用OpenAI SDK连接');
   }
 
+  // 聊天接口
   public chat = {
     completions: {
-      create: async (request: CompletionRequest): Promise<CompletionResponse> => {
-        const model = request.model || this.options.defaultModel;
-        
-        // 修正请求参数
-        const payload = {
-          ...request,
-          model,
-        };
+      // 非流式API
+      create: async (params: {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+        stream?: boolean;
+        max_tokens?: number;
+        temperature?: number;
+      }) => {
+        // 确保消息格式正确（role必须是'user'|'assistant'|'system'）
+        const messages = params.messages.map(msg => ({
+          role: msg.role as 'user' | 'assistant' | 'system',
+          content: msg.content
+        })) as ChatCompletionMessageParam[];
 
-        console.log('DeepSeek API请求参数:', JSON.stringify(payload, null, 2));
-
-        try {
-          return await withRetry(
-            async () => {
-              const response = await this.client.post('/v1/chat/completions', payload);
-              return response.data;
-            },
-            { maxRetries: this.options.maxRetries || 3 }
-          );
-        } catch (error: any) {
-          console.error('DeepSeek API错误:', error.message);
-          if (error.response) {
-            console.error('状态码:', error.response.status);
-            console.error('响应:', error.response.data);
-          }
-          throw error;
-        }
-      },
-
-      // Stream API支持
-      createStream: async (request: CompletionRequest) => {
-        const client = this.client;
-        const model = request.model || this.options.defaultModel;
-        
-        // 构建请求参数
-        const payload = {
-          ...request,
-          model,
-          stream: true,
-          temperature: request.temperature ?? 0.7,
-          max_tokens: request.max_tokens ?? 2048,
-        };
-
-        console.log('DeepSeek流式请求模型:', model);
-        console.log('DeepSeek流式请求参数:', JSON.stringify(payload, null, 2));
+        console.log(`DeepSeek 请求 (${params.model})`, {
+          messages: messages.map(m => ({ 
+            role: m.role, 
+            // 安全处理content字段
+            content: typeof m.content === 'string' 
+              ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content)
+              : '[非文本内容]'
+          })),
+          stream: params.stream
+        });
 
         try {
-          const response = await client.post('/v1/chat/completions', payload, {
-            responseType: 'stream',
-          });
-
-          console.log('DeepSeek流式响应开始');
+          // 确保model不会为undefined
+          const modelName = params.model || this.options.defaultModel || 'deepseek-chat';
           
-          const generator = async function* () {
-            for await (const chunk of response.data) {
-              const lines = chunk
-                .toString()
-                .split('\n')
-                .filter((line: string) => line.trim() !== '');
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6);
-                  if (data === '[DONE]') {
-                    return;
-                  }
-                  try {
-                    const parsedData = JSON.parse(data);
-                    yield parsedData;
-                  } catch (e) {
-                    console.error('Error parsing SSE data:', e);
-                  }
-                }
-              }
-            }
-          };
-
-          return generator();
-        } catch (error: any) {
-          console.error('DeepSeek流式API错误:', error.message);
-          if (error.response) {
-            console.error('状态码:', error.response.status);
-            try {
-              const responseData = await error.response.data.toString();
-              console.error('错误响应:', responseData);
-            } catch (e) {
-              console.error('无法读取响应数据:', e);
-            }
-          }
+          // 直接使用OpenAI SDK进行请求
+          const response = await this.client.chat.completions.create({
+            model: modelName,
+            messages,
+            stream: false,
+            max_tokens: params.max_tokens,
+            temperature: params.temperature
+          });
+          
+          return response;
+        } catch (error) {
+          console.error('DeepSeek API 请求失败:', error);
           throw error;
         }
       },
-    },
+
+      // 流式API
+      createStream: async (params: {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+        max_tokens?: number;
+        temperature?: number;
+      }) => {
+        // 确保消息格式正确
+        const messages = params.messages.map(msg => ({
+          role: msg.role as 'user' | 'assistant' | 'system',
+          content: msg.content
+        })) as ChatCompletionMessageParam[];
+
+        console.log(`DeepSeek 流式请求 (${params.model})`, {
+          messages: messages.map(m => ({ 
+            role: m.role, 
+            // 安全处理content字段
+            content: typeof m.content === 'string' 
+              ? (m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content)
+              : '[非文本内容]'
+          }))
+        });
+
+        try {
+          // 确保model不会为undefined
+          const modelName = params.model || this.options.defaultModel || 'deepseek-chat';
+          
+          console.log('DeepSeek 流式API请求参数:', {
+            model: modelName,
+            stream: true,
+            max_tokens: params.max_tokens || 2048,
+            temperature: params.temperature || 0.7
+          });
+          
+          // 显式指定stream为true，确保启用流式输出
+          const stream = await this.client.chat.completions.create({
+            model: modelName,
+            messages,
+            stream: true, // 确保这个参数正确设置
+            max_tokens: params.max_tokens || 2048,
+            temperature: params.temperature || 0.7
+          });
+          
+          // 增加额外日志和验证
+          console.log('验证流对象基本属性:', {
+            hasIterator: Symbol.asyncIterator in stream,
+            type: typeof stream,
+            isObject: stream instanceof Object
+          });
+          
+          return stream;
+        } catch (error) {
+          console.error('DeepSeek 流式API请求失败:', error);
+          throw error;
+        }
+      }
+    }
   };
 
   // 简化的文本补全API
@@ -144,8 +159,11 @@ export class DeepseekClient {
     }
 
     try {
+      // 确保model不会为undefined
+      const modelName = this.options.defaultModel || 'deepseek-chat';
+      
       const response = await this.chat.completions.create({
-        model: this.options.defaultModel || 'deepseek-v3-lite',
+        model: modelName,
         messages,
       });
 
@@ -159,12 +177,12 @@ export class DeepseekClient {
   // 嵌入API
   public async createEmbedding(input: string | string[]) {
     const payload = {
-      model: 'embedding-model',
+      model: 'text-embedding-ada-002', // 使用有效的模型名称
       input: Array.isArray(input) ? input : [input],
     };
 
     try {
-      const response = await this.client.post('/v1/embeddings', payload);
+      const response = await this.client.embeddings.create(payload);
       return response.data;
     } catch (error: any) {
       console.error('DeepSeek嵌入请求错误:', error.message);

@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
-import express, { Request, Response, Application, RequestHandler } from 'express';
+import express from 'express';
+import { Request, Response, NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import { DeepseekClient } from '../providers/deepseek';
 import { AIProviderSwitcher } from '../ai-provider-switcher';
@@ -19,11 +20,15 @@ app.name = 'DeepSeek客户端';
 const expressApp = express();
 const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务器冲突
 
-// 初始化API客户端
-const deepseekClient = new DeepseekClient();
-const providerSwitcher = new AIProviderSwitcher({
-  defaultProvider: process.env.DEFAULT_PROVIDER || 'deepseek',
-  providers: ['deepseek', 'openai']
+// 创建API客户端实例
+const deepseekClient = new DeepseekClient({
+  apiKey: process.env.DEEPSEEK_API_KEY || '',
+  baseUrl: process.env.DEEPSEEK_API_BASE_URL
+});
+
+const openaiclient = new OpenAIClient({
+  apiKey: process.env.OPENAI_API_KEY || '',
+  baseUrl: process.env.OPENAI_API_BASE_URL
 });
 
 // 设置静态文件夹 - 提供API服务
@@ -40,8 +45,11 @@ expressApp.set('views', path.join(__dirname, '../../src/views'));
 expressApp.use(bodyParser.json());
 expressApp.use(bodyParser.urlencoded({ extended: true }));
 
+// 路由器实例，用于定义API路由
+const router = express.Router();
+
 // 主页路由 - 使用Vue应用代替EJS模板
-expressApp.get('/', (req: Request, res: Response) => {
+router.get('/', routeHandler((req: Request, res: Response) => {
   // 检查Vue构建文件是否存在
   const vueDist = path.join(__dirname, '../../vue-client/dist/index.html');
   
@@ -64,7 +72,7 @@ expressApp.get('/', (req: Request, res: Response) => {
     console.warn('Vue应用构建不存在，使用EJS模板替代');
     res.render('index');
   }
-});
+}));
 
 // 处理聊天请求的API端点
 const chatHandler = async (req: Request, res: Response) => {
@@ -129,7 +137,7 @@ const chatHandler = async (req: Request, res: Response) => {
 };
 
 // 聊天API路由
-expressApp.post('/api/chat', (req: Request, res: Response) => {
+router.post('/api/chat', routeHandler((req: Request, res: Response) => {
   chatHandler(req, res).catch(error => {
     console.error('处理聊天请求时出错:', error);
     res.status(500).json({ 
@@ -137,267 +145,136 @@ expressApp.post('/api/chat', (req: Request, res: Response) => {
       details: error instanceof Error ? error.message : String(error) 
     });
   });
-});
+}));
+
+// 处理所有路由 - 使用类型断言避免TypeScript编译错误
+interface RouterHandler {
+  (req: Request, res: Response): void;
+}
+
+interface MiddlewareHandler {
+  (req: Request, res: Response, next: NextFunction): void;
+}
+
+function routeHandler(handler: RouterHandler) {
+  return handler as any; // 类型断言为any避免TypeScript错误
+}
+
+function middlewareHandler(handler: MiddlewareHandler) {
+  return handler as any; // 类型断言为any避免TypeScript错误
+}
 
 // 注册流式API路由 - 使用SSE标准
-expressApp.post('/api/chat/stream', (async (req: Request, res: Response) => {
-  try {
-    const { message, provider, model, config } = req.body;
-    
-    if (!message) {
-      return res.status(400).json({ error: '消息不能为空' });
-    }
+router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
+  const { message, provider = 'deepseek', modelName = 'deepseek-chat' } = req.body;
 
-    if (!provider) {
-      return res.status(400).json({ error: '未指定AI提供商' });
-    }
-
-    if (!config || !config.apiKey) {
-      return res.status(400).json({ error: 'API密钥未配置' });
-    }
-    
-    // 设置响应头以支持Server-Sent Events
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
-    
-    // 标记连接是否已完成
-    let isCompleted = false;
-    
-    const sendData = (data: string) => {
-      if (!res.writableEnded && !isCompleted) {
-        console.log('发送SSE数据:', data);
-        // 确保格式正确: 每条消息以data:开头，以两个换行符结尾
-        res.write(`data: ${data}\n\n`);
-      }
-    };
-    
-    const handleError = (error: any) => {
-      console.error('流式输出错误:', error);
-      if (!isCompleted) {
-        sendData(JSON.stringify({ error: String(error) }));
-        sendData('[DONE]');
-        isCompleted = true;
-        res.end();
-      }
-    };
-    
-    const cleanupConnection = () => {
-      if (!isCompleted) {
-        isCompleted = true;
-        if (!res.writableEnded) {
-          try {
-            sendData('[DONE]');
-            res.end();
-          } catch (endError) {
-            console.error('结束响应流时出错:', endError);
-          }
-        }
-      }
-    };
-    
-    // 根据提供商创建相应的客户端并调用流式API
-    const processStream = async () => {
-      try {
-        if (provider === 'deepseek') {
-          // 使用用户配置创建Deepseek客户端
-          const dynamicClient = new DeepseekClient({
-            apiKey: config.apiKey,
-            baseUrl: config.baseUrl || undefined
-          });
-          
-          try {
-            // 打印请求参数，方便调试
-            const modelName = model || 'deepseek-chat';
-            console.log('请求Deepseek API，参数:', {
-              model: modelName,
-              messages: [{ role: 'user', content: message }],
-              stream: true
-            });
-            
-            // 使用模型名称，不需要修改
-            // 根据DeepSeek官方文档，deepseek-chat用于V3，deepseek-reasoner用于R1
-            const correctedModel = modelName;
-            
-            // 使用更多请求参数，确保兼容性
-            const stream = await dynamicClient.chat.completions.createStream({
-              model: correctedModel,
-              messages: [{ role: 'user', content: message }],
-              stream: true,
-              temperature: 0.7,
-              max_tokens: 2048
-            });
-            
-            console.log(`开始Deepseek流式响应, 模型: ${correctedModel}`);
-            
-            // 设置计数器以跟踪响应
-            let chunkCount = 0;
-            let totalContent = '';
-            
-            for await (const chunk of stream) {
-              if (isCompleted) break;
-              
-              chunkCount++;
-              
-              // 直接打印原始响应数据
-              console.log(`Deepseek流块 #${chunkCount}:`, JSON.stringify(chunk, null, 2));
-              
-              // 将Deepseek格式转换为前端期望的统一格式
-              let formattedChunk;
-              
-              // 检查Deepseek返回数据的格式
-              if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) {
-                // 已经是OpenAI类似格式
-                formattedChunk = chunk;
-                const content = chunk.choices[0].delta.content;
-                if (content) {
-                  console.log(`【Deepseek-OpenAI格式 #${chunkCount}】收到内容:`, content);
-                  totalContent += content;
-                }
-              } else {
-                // 从Deepseek特有格式转换成类似OpenAI的格式
-                const content = chunk.content || '';
-                console.log(`【Deepseek特有格式 #${chunkCount}】收到内容:`, content);
-                totalContent += content;
-                
-                formattedChunk = {
-                  choices: [{
-                    delta: {
-                      content: content
-                    }
-                  }]
-                };
-              }
-              
-              // 只在有内容时发送
-              if (formattedChunk.choices[0].delta.content) {
-                console.log('向前端发送数据:', formattedChunk.choices[0].delta.content);
-                sendData(JSON.stringify(formattedChunk));
-              } else {
-                console.log('跳过空内容');
-              }
-            }
-            
-            console.log(`Deepseek流式响应完成，共收到${chunkCount}个数据块，总内容长度: ${totalContent.length}字符`);
-            if (chunkCount === 0) {
-              console.log('警告: 未收到任何数据块，可能存在API问题');
-              // 如果没有收到任何内容，提供一个反馈给用户
-              sendData(JSON.stringify({
-                choices: [{
-                  delta: {
-                    content: '抱歉，AI服务未能提供回复。请检查API设置或稍后再试。'
-                  }
-                }]
-              }));
-            }
-          } catch (streamError) {
-            console.error('处理Deepseek流式输出错误:', streamError);
-            sendData(JSON.stringify({ 
-              error: `Deepseek流式输出错误: ${streamError instanceof Error ? streamError.message : String(streamError)}` 
-            }));
-          }
-          
-          cleanupConnection();
-        } 
-        else if (provider === 'openai') {
-          // 使用用户配置创建OpenAI客户端
-          const dynamicClient = new OpenAIClient({
-            apiKey: config.apiKey,
-            baseUrl: config.baseUrl || undefined
-          });
-          
-          try {
-            console.log(`开始OpenAI流式响应, 模型: ${model || 'gpt-3.5-turbo'}`);
-            
-            // 使用OpenAI的createStream方法
-            const stream = await dynamicClient.chat.completions.createStream({
-              model: model || 'gpt-3.5-turbo',
-              messages: [{ role: 'user', content: message }]
-            });
-            
-            // OpenAI流是AsyncIterable
-            for await (const chunk of stream) {
-              if (isCompleted) break;
-              
-              // 直接打印原始响应数据
-              console.log('OpenAI流式原始数据:', JSON.stringify(chunk, null, 2));
-              
-              // 将OpenAI格式转换为通用格式
-              const formattedChunk = {
-                choices: [{
-                  delta: {
-                    content: chunk.choices[0]?.delta?.content || ''
-                  }
-                }]
-              };
-              
-              const content = formattedChunk.choices[0].delta.content;
-              
-              // 只在有内容时发送
-              if (content) {
-                console.log('【OpenAI】收到内容:', content);
-                console.log('向前端发送数据:', content);
-                sendData(JSON.stringify(formattedChunk));
-              } else {
-                console.log('跳过空内容');
-              }
-            }
-            
-            console.log('OpenAI流式响应完成');
-          } catch (streamError) {
-            console.error('处理OpenAI流式输出错误:', streamError);
-            sendData(JSON.stringify({ 
-              error: `OpenAI流式输出错误: ${streamError instanceof Error ? streamError.message : String(streamError)}` 
-            }));
-          }
-          
-          cleanupConnection();
-        } 
-        else {
-          handleError('不支持的AI提供商');
-        }
-      } catch (error) {
-        handleError(error);
-      }
-    };
-    
-    // 启动流式处理
-    processStream();
-    
-    // 当客户端断开连接时处理
-    req.on('close', () => {
-      if (!isCompleted) {
-        console.log('客户端断开连接 - 时间:', new Date().toISOString());
-        cleanupConnection();
-      }
-    });
-    
-    // 设置超时以防止连接挂起
-    const timeoutId = setTimeout(() => {
-      if (!isCompleted) {
-        console.log('流式连接超时');
-        sendData(JSON.stringify({ error: '连接超时，请重试' }));
-        cleanupConnection();
-      }
-    }, 60000); // 增加到60秒超时
-    
-    // 当响应结束时清除超时
-    res.on('close', () => {
-      clearTimeout(timeoutId);
-    });
-  } 
-  catch (error) {
-    console.error('流式API处理错误:', error);
-    res.status(500).json({ 
-      error: '处理请求时出错', 
-      details: error instanceof Error ? error.message : String(error) 
-    });
+  console.log(`开始${provider}流式响应, 模型: ${modelName}`);
+  
+  // 基本参数验证
+  if (!message) {
+    return res.status(400).json({ error: '消息不能为空' });
   }
-}) as RequestHandler);
+  
+  // 设置SSE响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  // 创建计数器和内容
+  let chunkCount = 0;
+  let accumulatedContent = '';
+
+  // 使用立即执行异步函数，而不是在主处理程序中使用async
+  (async function() {
+    try {
+      // 根据provider创建不同的client
+      const dynamicClient = provider === 'deepseek' ? deepseekClient : openaiclient;
+      
+      // 创建流
+      const stream = await dynamicClient.chat.completions.createStream({
+        model: modelName,
+        messages: [{ role: 'user', content: message }],
+        max_tokens: 2048,
+        temperature: 0.7
+      });
+      
+      console.log(`流创建成功, 准备处理数据`);
+
+      // 处理流数据的函数
+      async function processStream() {
+        try {
+          // 确保stream是异步迭代器
+          if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+            throw new Error(`流对象不是有效的异步迭代器: ${typeof stream}`);
+          }
+          
+          for await (const chunk of stream) {
+            // 深度检查chunk对象的结构
+            console.log(`收到数据块类型: ${typeof chunk}`, 
+              chunk?.choices ? `包含choices: ${chunk.choices.length}` : '无choices');
+            
+            // 获取每个chunk的内容
+            const content = chunk.choices[0]?.delta?.content || '';
+            
+            if (content) {
+              chunkCount++;
+              accumulatedContent += content;
+              
+              // 发送数据给客户端
+              const data = { content };
+              sendData(res, data);
+            }
+          }
+          
+          // 流结束，记录统计信息
+          console.log(`${provider}流式响应完成，共收到${chunkCount}个数据块，总内容长度: ${accumulatedContent.length}字符`);
+          
+          // 如果没有收到任何内容，发送警告
+          if (chunkCount === 0) {
+            console.warn('警告: 未收到任何数据块，可能存在API问题');
+            sendData(res, { error: '未能获取到有效回复，请检查API配置' });
+          }
+          
+          // 结束响应
+          res.end();
+        } catch (error: any) {
+          console.error(`流处理错误:`, error);
+          sendData(res, { error: `流处理出错: ${error.message}` });
+          res.end();
+        }
+      }
+      
+      // 启动流处理
+      await processStream();
+    } catch (error: any) {
+      console.error(`创建流失败:`, error);
+      sendData(res, { error: `创建流失败: ${error.message}` });
+      res.end();
+    }
+  })().catch((error: any) => {
+    console.error('处理流时发生错误:', error);
+    sendData(res, { error: `处理出错: ${error.message}` });
+    res.end();
+  });
+}));
+
+// 格式化发送数据的辅助函数
+function sendData(res: Response, data: any) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // 使用兼容的方式尝试刷新流
+  try {
+    // 某些Express环境支持flush，但不在类型定义中
+    const response = res as any;
+    if (typeof response.flush === 'function') {
+      response.flush();
+    }
+  } catch (error) {
+    // 忽略刷新错误
+  }
+}
 
 // 配置API路由 - 获取配置
-expressApp.get('/api/config', (req: Request, res: Response) => {
+router.get('/api/config', routeHandler((req: Request, res: Response) => {
   try {
     // 读取配置文件，如果存在的话
     const configPath = path.join(app.getPath('userData'), 'config.json');
@@ -416,10 +293,10 @@ expressApp.get('/api/config', (req: Request, res: Response) => {
     console.error('读取配置失败:', error);
     res.status(500).json({ error: '读取配置失败' });
   }
-});
+}));
 
 // 配置API路由 - 保存配置
-expressApp.post('/api/config', (req: Request, res: Response) => {
+router.post('/api/config', routeHandler((req: Request, res: Response) => {
   try {
     // 保存配置到文件
     const configPath = path.join(app.getPath('userData'), 'config.json');
@@ -439,10 +316,13 @@ expressApp.post('/api/config', (req: Request, res: Response) => {
     console.error('保存配置失败:', error);
     res.status(500).json({ error: '保存配置失败' });
   }
-});
+}));
+
+// 使用路由器
+expressApp.use(router);
 
 // 处理所有其他GET请求 - 支持Vue的路由模式
-expressApp.use((req: Request, res: Response, next) => {
+expressApp.use(middlewareHandler((req: Request, res: Response, next: NextFunction) => {
   // 跳过API请求和静态资源
   if (req.path.startsWith('/api/') || req.path.includes('.')) {
     return next();
@@ -456,7 +336,7 @@ expressApp.use((req: Request, res: Response, next) => {
     console.warn(`Vue应用构建不存在，无法处理路由: ${req.path}`);
     res.status(404).send('Vue应用未构建，请先运行 npm run vue:build');
   }
-});
+}));
 
 // 启动Express服务器
 let server = expressApp.listen(PORT, () => {

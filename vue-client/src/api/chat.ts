@@ -160,14 +160,23 @@ export const sendStreamingChatRequest = (
                 
                 // 处理不同AI提供商的响应格式
                 let content = '';
+                
+                // 检查OpenAI/DeepSeek标准格式的content字段
                 if (parsed.choices?.[0]?.delta?.content !== undefined) {
-                  // OpenAI 格式
                   content = parsed.choices[0].delta.content;
-                  console.log('【前端】从OpenAI格式中提取内容:', content);
-                } else if (parsed.content !== undefined) {
-                  // Deepseek 格式
+                  
+                  // 检查是否有reasoning标记
+                  const isReasoning = parsed.choices[0].delta.is_reasoning === true;
+                  if (isReasoning) {
+                    console.log('【前端】从Deepseek-Reasoner格式中提取reasoning内容:', content);
+                  } else {
+                    console.log('【前端】从OpenAI/Deepseek格式中提取内容:', content);
+                  }
+                } 
+                // 兼容旧版DeepSeek响应格式
+                else if (parsed.content !== undefined) {
                   content = parsed.content;
-                  console.log('【前端】从Deepseek格式中提取内容:', content);
+                  console.log('【前端】从Deepseek旧格式中提取内容:', content);
                 }
                 
                 if (content && !isFinished) {

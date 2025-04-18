@@ -5,6 +5,7 @@
       :key="index" 
       class="message"
       :class="message.type"
+      v-show="!(isLoading && streamingMessage && message.type === 'ai' && index === messages.length - 1)"
     >
       <div class="message-row">
         <div v-if="message.type === 'ai'" class="avatar ai-avatar">

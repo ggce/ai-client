@@ -1,20 +1,22 @@
 <template>
   <div class="panel">
     <header class="compact-header">
-      <h1>AI聊天 <small>支持多种AI模型</small></h1>
-      <div class="stream-toggle">
-        <label class="switch">
+      <div class="header-content">
+        <h1>AI聊天 <small>支持多种AI模型</small></h1>
+        <label class="stream-toggle-compact">
           <input type="checkbox" v-model="useStreaming">
-          <span class="slider"></span>
+          <span class="slider-compact"></span>
+          <span class="toggle-label-compact">流式输出</span>
         </label>
-        <span class="toggle-label">流式输出</span>
       </div>
     </header>
 
     <main>
       <div class="chat-container">
         <MessageList :messages="messages" :isLoading="isLoading" :streamingMessage="streamingMessage" />
-        <ChatInput @send="sendMessage" :disabled="isLoading" />
+        <div class="input-wrapper">
+          <ChatInput @send="sendMessage" :disabled="isLoading" />
+        </div>
       </div>
     </main>
   </div>
@@ -96,9 +98,8 @@ const sendMessage = async (content: string) => {
       // 使用流式API
       let fullResponse = ''
       
-      // 添加一个空的AI消息，用于流式更新
-      messages.value.push({ type: 'ai', content: '' })
-      const messageIndex = messages.value.length - 1
+      // 先不添加AI消息，等流式输出完成后再添加
+      const userMessageIndex = messages.value.length - 1
       
       // 发送流式请求
       sendStreamingChatRequest(
@@ -114,17 +115,16 @@ const sendMessage = async (content: string) => {
         },
         // 处理每个流块
         (chunk: string) => {
-          console.log(`收到流块: "${chunk}"`);
+          console.log(`收到流块 [${chunk.length}字符]: "${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''}"`);
           fullResponse += chunk;
           streamingMessage.value = fullResponse;
-          
-          // 实时更新消息内容
-          messages.value[messageIndex].content = fullResponse;
-          console.log(`当前完整响应(${fullResponse.length}字符): "${fullResponse.slice(-50)}"`);
+          console.log(`当前完整响应(${fullResponse.length}字符)`);
         },
         // 完成回调
         () => {
           console.log('流式响应完成, 最终长度:', fullResponse.length);
+          // 流式输出完成后，添加AI消息
+          messages.value.push({ type: 'ai', content: fullResponse });
           streamingMessage.value = '';
           isLoading.value = false;
         },
@@ -207,12 +207,18 @@ onDeactivated(() => {
   border-bottom: 1px solid #f0f0f0;
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .compact-header h1 {
   font-size: 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-top: 0;
+  margin-bottom: 0;
 }
 
 .compact-header h1 small {
@@ -235,49 +241,47 @@ main {
   height: 100%;
 }
 
-/* 切换开关样式 */
-.stream-toggle {
+.input-wrapper {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   margin-top: 10px;
 }
 
-.toggle-label {
-  margin-left: 8px;
-  font-size: 14px;
+.stream-toggle-compact {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toggle-label-compact {
+  margin-left: 6px;
+  font-size: 12px;
   color: #666;
 }
 
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-
-.switch input {
+.stream-toggle-compact input {
   opacity: 0;
   width: 0;
   height: 0;
+  position: absolute;
 }
 
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.slider-compact {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 14px;
   background-color: #ccc;
   transition: .4s;
-  border-radius: 34px;
+  border-radius: 14px;
 }
 
-.slider:before {
+.slider-compact:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
+  height: 10px;
+  width: 10px;
   left: 2px;
   bottom: 2px;
   background-color: white;
@@ -285,15 +289,15 @@ main {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+.stream-toggle-compact input:checked + .slider-compact {
   background-color: #1a73e8;
 }
 
-input:focus + .slider {
+.stream-toggle-compact input:focus + .slider-compact {
   box-shadow: 0 0 1px #1a73e8;
 }
 
-input:checked + .slider:before {
-  transform: translateX(20px);
+.stream-toggle-compact input:checked + .slider-compact:before {
+  transform: translateX(14px);
 }
 </style>
