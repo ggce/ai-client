@@ -25,13 +25,39 @@
           
           <div class="api-key-section" v-show="selectedProvider === 'deepseek'">
             <label for="deepseek-api-key">Deepseek API密钥</label>
-            <input 
-              type="text" 
-              id="deepseek-api-key"
-              v-model="deepseekApiKey" 
-              placeholder="输入Deepseek API密钥" 
-              class="api-key-input"
-            >
+            <div class="api-key-row">
+              <input 
+                type="text" 
+                id="deepseek-api-key"
+                v-model="deepseekApiKey" 
+                placeholder="输入Deepseek API密钥" 
+                class="api-key-input"
+              >
+              <button 
+                @click="checkDeepseekBalance" 
+                class="balance-button"
+                :disabled="!deepseekApiKey || isCheckingBalance"
+              >
+                {{ isCheckingBalance ? '查询中...' : '查询余额' }}
+              </button>
+            </div>
+
+            <div v-if="balanceInfo" class="balance-info">
+              <div class="balance-status" :class="{ 'balance-available': balanceInfo.is_available }">
+                状态: {{ balanceInfo.is_available ? '可用' : '余额不足' }}
+              </div>
+              <div v-for="(balance, index) in balanceInfo.balance_infos" :key="index" class="balance-detail">
+                <div>货币: {{ balance.currency }}</div>
+                <div>总余额: {{ balance.total_balance }}</div>
+                <div>赠金余额: {{ balance.granted_balance }}</div>
+                <div>充值余额: {{ balance.topped_up_balance }}</div>
+              </div>
+            </div>
+            
+            <div v-if="balanceError" class="balance-error">
+              余额查询失败: {{ balanceError }}
+            </div>
+
             <label for="deepseek-base-url">Deepseek 基础URL（可选）</label>
             <input 
               type="text" 
@@ -95,8 +121,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onActivated, onDeactivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, watch } from 'vue'
 import { useSettingsStore } from '../store/settings'
+import { getDeepSeekBalance, DeepSeekBalanceResponse } from '../api/config'
 
 // 定义组件名称
 defineOptions({
@@ -114,6 +141,50 @@ const openaiApiKey = ref('')
 const openaiBaseUrl = ref('')
 const openaiModel = ref('gpt-3.5-turbo')
 const showDebugConfig = ref(false)
+
+// DeepSeek余额查询相关状态
+const balanceInfo = ref<DeepSeekBalanceResponse | null>(null)
+const balanceError = ref<string | null>(null)
+const isCheckingBalance = ref(false)
+
+// 查询DeepSeek账户余额
+const checkDeepseekBalance = async () => {
+  if (!deepseekApiKey.value) {
+    balanceError.value = '请先输入API密钥'
+    return
+  }
+  
+  try {
+    balanceError.value = null
+    isCheckingBalance.value = true
+    balanceInfo.value = await getDeepSeekBalance(deepseekApiKey.value)
+    console.log('DeepSeek余额信息:', balanceInfo.value)
+  } catch (error) {
+    balanceInfo.value = null
+    balanceError.value = error instanceof Error ? error.message : '查询失败，请检查API密钥'
+    console.error('查询DeepSeek余额失败:', error)
+  } finally {
+    isCheckingBalance.value = false
+  }
+}
+
+// 监听当前选择的模型提供商变化，并立即保存
+watch(selectedProvider, (newValue) => {
+  settingsStore.setProvider(newValue)
+})
+
+// 监听模型选择变化，并立即保存
+watch(deepseekModel, (newValue) => {
+  if (newValue) {
+    settingsStore.setModel('deepseek', newValue)
+  }
+})
+
+watch(openaiModel, (newValue) => {
+  if (newValue) {
+    settingsStore.setModel('openai', newValue)
+  }
+})
 
 // 配置调试信息
 const configDebug = computed(() => JSON.stringify({
@@ -133,24 +204,8 @@ const configDebug = computed(() => JSON.stringify({
 }, null, 2))
 
 // 加载当前配置
-onMounted(() => {
-  loadSettings()
-  console.log('SettingsView mounted')
-})
-
-// 激活时触发（keep-alive组件被显示时）
-onActivated(() => {
-  console.log('SettingsView activated')
-})
-
-// 停用时触发（keep-alive组件被隐藏时）
-onDeactivated(() => {
-  console.log('SettingsView deactivated')
-})
-
-// 从store加载设置
-const loadSettings = () => {
-  settingsStore.loadSettings()
+const loadSettings = async () => {
+  await settingsStore.loadSettings()
   
   selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai'
   
@@ -167,29 +222,64 @@ const loadSettings = () => {
     openaiBaseUrl.value = openaiConfig.baseUrl || ''
     openaiModel.value = openaiConfig.model || 'gpt-3.5-turbo'
   }
+
+  console.log('设置已加载：', {
+    provider: selectedProvider.value,
+    deepseek: {
+      apiKey: deepseekApiKey.value ? '******' : '',
+      model: deepseekModel.value
+    },
+    openai: {
+      apiKey: openaiApiKey.value ? '******' : '',
+      model: openaiModel.value
+    }
+  })
+  
+  // 如果已经配置了DeepSeek API密钥，自动查询余额
+  if (deepseekApiKey.value && selectedProvider.value === 'deepseek') {
+    checkDeepseekBalance()
+  }
 }
 
 // 保存设置到store
-const saveSettings = () => {
-  // 设置当前提供商
-  settingsStore.setProvider(selectedProvider.value)
+const saveSettings = async () => {
+  // 保存提供商设置
+  await settingsStore.setProvider(selectedProvider.value)
   
   // 设置Deepseek配置
-  settingsStore.setApiKey('deepseek', deepseekApiKey.value)
+  await settingsStore.setApiKey('deepseek', deepseekApiKey.value)
   settingsStore.setBaseUrl('deepseek', deepseekBaseUrl.value)
-  settingsStore.setModel('deepseek', deepseekModel.value)
+  await settingsStore.setModel('deepseek', deepseekModel.value)
   
   // 设置OpenAI配置
-  settingsStore.setApiKey('openai', openaiApiKey.value)
+  await settingsStore.setApiKey('openai', openaiApiKey.value)
   settingsStore.setBaseUrl('openai', openaiBaseUrl.value)
-  settingsStore.setModel('openai', openaiModel.value)
+  await settingsStore.setModel('openai', openaiModel.value)
   
-  // 保存到本地存储
-  settingsStore.saveSettings()
+  // 保存全部设置确保同步
+  await settingsStore.saveSettings()
   
   // 显示保存成功提示
   showToast('设置已保存')
 }
+
+// 页面生命周期钩子
+onMounted(() => {
+  loadSettings()
+  console.log('SettingsView mounted')
+})
+
+// 激活时触发（keep-alive组件被显示时）
+onActivated(() => {
+  console.log('SettingsView activated')
+  // 每次组件被激活时重新加载设置以确保同步
+  loadSettings()
+})
+
+// 停用时触发（keep-alive组件被隐藏时）
+onDeactivated(() => {
+  console.log('SettingsView deactivated')
+})
 
 // 切换显示调试配置
 const toggleDebugConfig = () => {
@@ -248,7 +338,11 @@ const maskApiKey = (apiKey: string): string => {
 }
 
 .settings-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .settings-section h3 {
@@ -288,7 +382,6 @@ const maskApiKey = (apiKey: string): string => {
 .api-key-section input, .api-key-section select {
   width: 100%;
   padding: 10px;
-  margin-bottom: 16px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
@@ -298,6 +391,86 @@ const maskApiKey = (apiKey: string): string => {
 
 .api-key-section input:focus, .api-key-section select:focus {
   border-color: #1a73e8;
+}
+
+.api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.api-key-input {
+  flex: 1;
+  margin-bottom: 0 !important;
+}
+
+.balance-button {
+  padding: 10px 15px;
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.balance-button:hover {
+  background-color: #0d66d0;
+}
+
+.balance-button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+.balance-info {
+  margin: 10px 0 15px;
+  padding: 10px;
+  background-color: #f0f7ff;
+  border-radius: 4px;
+  border-left: 3px solid #1a73e8;
+  font-size: 14px;
+}
+
+.balance-status {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #d32f2f;
+}
+
+.balance-status.balance-available {
+  color: #388e3c;
+}
+
+.balance-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 5px;
+  padding: 5px;
+  background-color: white;
+  border-radius: 3px;
+}
+
+.balance-detail > div {
+  flex: 1;
+  min-width: 120px;
+}
+
+.balance-error {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: #ffebee;
+  border-radius: 4px;
+  border-left: 3px solid #d32f2f;
+  color: #d32f2f;
+  font-size: 14px;
 }
 
 .primary-button {

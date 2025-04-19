@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useSettingsStore } from '../store/settings'
 
 const settingsStore = useSettingsStore()
@@ -43,6 +43,16 @@ const isSidebarCollapsed = computed(() => settingsStore.isSidebarCollapsed)
 const toggleSidebar = () => {
   settingsStore.toggleSidebar()
 }
+
+// 观察侧边栏状态变化，记录日志
+watch(isSidebarCollapsed, (newValue) => {
+  console.log('侧边栏状态已更新为:', newValue ? '收起' : '展开')
+})
+
+// 组件挂载时记录初始状态
+onMounted(() => {
+  console.log('Sidebar组件挂载，初始状态:', isSidebarCollapsed.value ? '收起' : '展开')
+})
 </script>
 
 <style scoped>

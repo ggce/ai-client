@@ -13,12 +13,18 @@
 </template>
 
 <script setup lang="ts">
-import Sidebar from '@/components/Sidebar.vue'
+import Sidebar from './components/Sidebar.vue'
 import { ref, onMounted } from 'vue'
+import { useSettingsStore } from './store/settings'
 
 const isMacOS = ref(false)
+const settingsStore = useSettingsStore()
 
-onMounted(() => {
+onMounted(async () => {
+  // 加载保存的设置，使用await确保设置在应用启动前加载完成
+  await settingsStore.loadSettings()
+  console.log('应用启动时的侧边栏状态:', settingsStore.isSidebarCollapsed ? '收起' : '展开')
+  
   // 检测是否为macOS
   isMacOS.value = navigator.platform.toLowerCase().includes('mac')
 })

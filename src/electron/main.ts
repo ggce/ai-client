@@ -9,6 +9,7 @@ import { AIProviderSwitcher } from '../ai-provider-switcher';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
 import { OpenAIClient } from '../providers/openai';
+import { Message, Role } from '../types';
 
 // 加载环境变量
 dotenv.config();
@@ -77,7 +78,23 @@ router.get('/', routeHandler((req: Request, res: Response) => {
 // 处理聊天请求的API端点
 const chatHandler = async (req: Request, res: Response) => {
   try {
-    const { message, provider, config, model } = req.body;
+    const { message, provider, config, model, conversationId, conversationHistory } = req.body;
+    
+    // 添加调试日志 - 打印接收到的请求详情
+    console.log('收到聊天请求:', { 
+      provider, 
+      model, 
+      messageLength: message?.length,
+      hasConversationHistory: !!conversationHistory,
+      conversationHistoryLength: conversationHistory?.length || 0
+    });
+    
+    if (conversationHistory && Array.isArray(conversationHistory)) {
+      console.log('对话历史摘要:', conversationHistory.map(msg => ({
+        type: msg.type,
+        contentPreview: msg.content.substring(0, 30) + '...'
+      })));
+    }
     
     if (!message) {
       return res.status(400).json({ error: '消息不能为空' });
@@ -100,12 +117,72 @@ const chatHandler = async (req: Request, res: Response) => {
         baseUrl: config.baseUrl || undefined
       });
 
-      response = await dynamicClient.chat.completions.create({
-        model: model || 'deepseek-chat',
-        messages: [
-          { role: 'user', content: message }
-        ]
-      });
+      // 处理多轮对话
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        // 将历史消息格式化为DeepSeek需要的格式 - 使用正确的类型
+        const messages: Message[] = conversationHistory.map(msg => {
+          // 将UI消息类型转换为API所需的Role类型
+          let role: Role = 'user';
+          if (msg.type === 'ai') role = 'assistant';
+          else if (msg.type === 'system') role = 'system';
+          
+          return {
+            role: role,
+            content: msg.content
+          };
+        });
+        
+        // 添加当前用户消息
+        messages.push({ role: 'user', content: message });
+        
+        // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
+        if (model === 'deepseek-reasoner') {
+          console.log('检测到Reasoner模型，进行消息交替检查');
+          
+          // 创建一个新的消息数组，确保严格交替
+          const filteredMessages: Message[] = [];
+          let lastRole: Role | null = null;
+          
+          for (const msg of messages) {
+            // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
+            if (lastRole === msg.role) {
+              console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
+              continue;
+            }
+            
+            // 添加到过滤后的消息中
+            filteredMessages.push(msg);
+            lastRole = msg.role;
+          }
+          
+          // 替换原始消息数组
+          console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
+          console.log('过滤后的消息序列:', filteredMessages.map(m => m.role).join(' -> '));
+          
+          // 使用过滤后的消息
+          response = await dynamicClient.chat.completions.create({
+            model: model || 'deepseek-reasoner',
+            messages: filteredMessages
+          });
+        } else {
+          // 输出调试信息
+          console.log('发送给DeepSeek的完整消息历史:', JSON.stringify(messages));
+          
+          // 发送带历史的请求
+          response = await dynamicClient.chat.completions.create({
+            model: model || 'deepseek-chat',
+            messages: messages
+          });
+        }
+      } else {
+        // 单轮对话 - 向后兼容
+        response = await dynamicClient.chat.completions.create({
+          model: model || 'deepseek-chat',
+          messages: [
+            { role: 'user', content: message }
+          ]
+        });
+      }
     } else if (provider === 'openai') {
       // 使用用户配置创建OpenAI客户端
       const dynamicClient = new OpenAIClient({
@@ -113,12 +190,41 @@ const chatHandler = async (req: Request, res: Response) => {
         baseUrl: config.baseUrl || undefined
       });
 
-      response = await dynamicClient.chat.completions.create({
-        model: model || 'gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: message }
-        ]
-      });
+      // 处理多轮对话
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        // 将历史消息格式化为OpenAI需要的格式 - 使用正确的类型
+        const messages: Message[] = conversationHistory.map(msg => {
+          // 将UI消息类型转换为API所需的Role类型
+          let role: Role = 'user';
+          if (msg.type === 'ai') role = 'assistant';
+          else if (msg.type === 'system') role = 'system';
+          
+          return {
+            role: role,
+            content: msg.content
+          };
+        });
+        
+        // 添加当前用户消息
+        messages.push({ role: 'user', content: message });
+        
+        // 输出调试信息
+        console.log('发送给OpenAI的完整消息历史:', JSON.stringify(messages));
+        
+        // 发送带历史的请求
+        response = await dynamicClient.chat.completions.create({
+          model: model || 'gpt-3.5-turbo',
+          messages: messages
+        });
+      } else {
+        // 单轮对话 - 向后兼容
+        response = await dynamicClient.chat.completions.create({
+          model: model || 'gpt-3.5-turbo',
+          messages: [
+            { role: 'user', content: message }
+          ]
+        });
+      }
     } else {
       return res.status(400).json({ error: '不支持的AI提供商' });
     }
@@ -166,9 +272,25 @@ function middlewareHandler(handler: MiddlewareHandler) {
 
 // 注册流式API路由 - 使用SSE标准
 router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
-  const { message, provider = 'deepseek', modelName = 'deepseek-chat' } = req.body;
+  const { message, provider = 'deepseek', config, model = 'deepseek-chat', conversationHistory } = req.body;
 
-  console.log(`开始${provider}流式响应, 模型: ${modelName}`);
+  console.log(`开始${provider}流式响应, 模型: ${model}`);
+  
+  // 添加调试日志
+  console.log('接收到流式请求:', {
+    provider,
+    model,
+    messageLength: message?.length,
+    hasConversationHistory: !!conversationHistory,
+    conversationHistoryLength: conversationHistory?.length || 0
+  });
+  
+  if (conversationHistory && Array.isArray(conversationHistory)) {
+    console.log('流式对话历史摘要:', conversationHistory.map(msg => ({
+      type: msg.type,
+      contentPreview: msg.content.substring(0, 30) + '...'
+    })));
+  }
   
   // 基本参数验证
   if (!message) {
@@ -188,12 +310,80 @@ router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
   (async function() {
     try {
       // 根据provider创建不同的client
-      const dynamicClient = provider === 'deepseek' ? deepseekClient : openaiclient;
+      let dynamicClient; 
+      
+      if (provider === 'deepseek') {
+        dynamicClient = new DeepseekClient({
+          apiKey: config?.apiKey || process.env.DEEPSEEK_API_KEY || '',
+          baseUrl: config?.baseUrl || process.env.DEEPSEEK_API_BASE_URL
+        });
+      } else {
+        dynamicClient = new OpenAIClient({
+          apiKey: config?.apiKey || process.env.OPENAI_API_KEY || '',
+          baseUrl: config?.baseUrl || process.env.OPENAI_API_BASE_URL
+        });
+      }
+      
+      // 准备消息数组 - 使用正确的类型
+      let messages: Message[] = [];
+      
+      // 处理多轮对话
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        // 将历史消息格式化为API需要的格式
+        messages = conversationHistory.map(msg => {
+          // 将UI消息类型转换为API所需的Role类型
+          let role: Role = 'user';
+          if (msg.type === 'ai') role = 'assistant';
+          else if (msg.type === 'system') role = 'system';
+          
+          return {
+            role: role,
+            content: msg.content
+          };
+        });
+        
+        // 输出调试日志
+        console.log('流式会话历史已转换, 条数:', messages.length);
+      }
+      
+      // 添加当前用户消息
+      messages.push({ role: 'user', content: message });
+      
+      // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
+      if (provider === 'deepseek' && model === 'deepseek-reasoner') {
+        console.log('流式请求检测到Reasoner模型，进行消息交替检查');
+        
+        // 创建一个新的消息数组，确保严格交替
+        const filteredMessages: Message[] = [];
+        let lastRole: Role | null = null;
+        
+        for (const msg of messages) {
+          // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
+          if (lastRole === msg.role) {
+            console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
+            continue;
+          }
+          
+          // 添加到过滤后的消息中
+          filteredMessages.push(msg);
+          lastRole = msg.role;
+        }
+        
+        // 替换原始消息数组
+        console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
+        console.log('过滤后的消息序列:', filteredMessages.map(m => m.role).join(' -> '));
+        
+        // 使用过滤后的消息
+        messages = filteredMessages;
+      }
+      
+      // 打印完整发送的消息
+      console.log('发送给API的完整消息历史:', JSON.stringify(messages));
       
       // 创建流
       const stream = await dynamicClient.chat.completions.createStream({
-        model: modelName,
-        messages: [{ role: 'user', content: message }],
+        model: model,
+        messages: messages,
         max_tokens: 2048,
         temperature: 0.7
       });
@@ -315,6 +505,47 @@ router.post('/api/config', routeHandler((req: Request, res: Response) => {
   } catch (error) {
     console.error('保存配置失败:', error);
     res.status(500).json({ error: '保存配置失败' });
+  }
+}));
+
+// 查询DeepSeek账户余额API
+router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Response) => {
+  const apiKey = req.query.apiKey as string;
+  
+  if (!apiKey) {
+    return res.status(400).json({ error: 'API密钥不能为空' });
+  }
+  
+  try {
+    // 使用fetch调用DeepSeek余额查询API
+    const response = await fetch('https://api.deepseek.com/user/balance', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('查询DeepSeek余额失败:', response.status, errorData);
+      return res.status(response.status).json({ 
+        error: '查询余额失败', 
+        status: response.status,
+        details: errorData
+      });
+    }
+    
+    // 返回余额信息
+    const balanceData = await response.json();
+    console.log('DeepSeek余额信息:', balanceData);
+    res.json(balanceData);
+  } catch (error) {
+    console.error('查询DeepSeek余额错误:', error);
+    res.status(500).json({ 
+      error: '查询余额失败', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
   }
 }));
 

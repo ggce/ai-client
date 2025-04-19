@@ -16,10 +16,71 @@ export interface ClientOptions {
   maxRetries?: number;
 }
 
+// 对话消息接口
+export interface ConversationMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+// 会话管理类 - 用于多轮对话
+export class Conversation {
+  private messages: ConversationMessage[] = [];
+  private id: string;
+  
+  constructor(systemMessage?: string) {
+    this.id = generateUUID();
+    
+    // 如果提供了系统消息，则添加到对话历史的开头
+    if (systemMessage) {
+      this.messages.push({
+        role: 'system',
+        content: systemMessage
+      });
+    }
+  }
+  
+  // 获取会话ID
+  public getId(): string {
+    return this.id;
+  }
+  
+  // 添加用户消息
+  public addUserMessage(content: string): void {
+    this.messages.push({
+      role: 'user',
+      content
+    });
+  }
+  
+  // 添加助手消息
+  public addAssistantMessage(content: string): void {
+    this.messages.push({
+      role: 'assistant',
+      content
+    });
+  }
+  
+  // 获取所有消息历史
+  public getMessages(): ConversationMessage[] {
+    return [...this.messages];
+  }
+  
+  // 清空会话历史（但保留系统消息如果有的话）
+  public clear(keepSystemMessage: boolean = true): void {
+    if (keepSystemMessage && this.messages.length > 0 && this.messages[0].role === 'system') {
+      const systemMessage = this.messages[0];
+      this.messages = [systemMessage];
+    } else {
+      this.messages = [];
+    }
+  }
+}
+
 // 使用OpenAI SDK连接DeepSeek API的客户端实现
 export class DeepseekClient {
   private client: OpenAI;
   private options: ClientOptions;
+  private conversations: Map<string, Conversation> = new Map();
 
   constructor(config?: ClientOptions) {
     this.options = {
@@ -39,6 +100,113 @@ export class DeepseekClient {
     });
 
     console.log('初始化DeepSeek客户端，使用OpenAI SDK连接');
+  }
+
+  // 创建新的会话
+  public createConversation(systemMessage?: string): Conversation {
+    const conversation = new Conversation(systemMessage);
+    this.conversations.set(conversation.getId(), conversation);
+    return conversation;
+  }
+  
+  // 获取会话
+  public getConversation(id: string): Conversation | undefined {
+    return this.conversations.get(id);
+  }
+  
+  // 删除会话
+  public deleteConversation(id: string): boolean {
+    return this.conversations.delete(id);
+  }
+
+  // 多轮对话接口 - 传入会话对象和用户消息，返回助手响应
+  public async continueConversation(
+    conversation: Conversation,
+    userMessage: string,
+    options?: {
+      model?: string;
+      max_tokens?: number;
+      temperature?: number;
+    }
+  ): Promise<string> {
+    // 添加用户消息到会话
+    conversation.addUserMessage(userMessage);
+    
+    // 获取完整消息历史
+    const messages = conversation.getMessages();
+    
+    // 发送请求
+    const response = await this.chat.completions.create({
+      model: options?.model || this.options.defaultModel || 'deepseek-chat',
+      messages,
+      max_tokens: options?.max_tokens,
+      temperature: options?.temperature
+    });
+    
+    // 获取助手响应
+    const assistantMessage = response.choices[0]?.message?.content || '';
+    
+    // 将助手响应添加到会话历史
+    conversation.addAssistantMessage(assistantMessage);
+    
+    return assistantMessage;
+  }
+  
+  // 多轮对话流式接口
+  public async continueConversationStream(
+    conversation: Conversation,
+    userMessage: string,
+    options?: {
+      model?: string;
+      max_tokens?: number;
+      temperature?: number;
+    }
+  ) {
+    // 添加用户消息到会话
+    conversation.addUserMessage(userMessage);
+    
+    // 获取完整消息历史
+    const messages = conversation.getMessages();
+    
+    // 使用流式API发送请求
+    const stream = await this.chat.completions.createStream({
+      model: options?.model || this.options.defaultModel || 'deepseek-chat',
+      messages,
+      max_tokens: options?.max_tokens,
+      temperature: options?.temperature
+    });
+    
+    // 收集完整的响应以添加到会话历史
+    let fullResponse = '';
+    
+    // 返回包装后的流，自动收集完整响应并在最后添加到会话历史
+    return {
+      stream,
+      onComplete: (completeCallback?: (fullText: string) => void) => {
+        // 创建一个异步函数来处理流
+        const handleStream = async () => {
+          try {
+            for await (const chunk of stream) {
+              const content = chunk.choices[0]?.delta?.content || '';
+              fullResponse += content;
+            }
+            
+            // 流结束后，将完整响应添加到会话历史
+            conversation.addAssistantMessage(fullResponse);
+            
+            // 如果提供了回调，则调用它
+            if (completeCallback) {
+              completeCallback(fullResponse);
+            }
+          } catch (error) {
+            console.error('处理流数据时出错:', error);
+          }
+        };
+        
+        // 启动处理，但不等待它完成
+        handleStream();
+      }
+    };
   }
 
   // 聊天接口

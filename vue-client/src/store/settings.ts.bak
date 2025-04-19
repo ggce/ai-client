@@ -1,0 +1,96 @@
+import { defineStore } from 'pinia'
+
+type Provider = 'deepseek' | 'openai'
+
+interface ProviderConfig {
+  apiKey: string
+  baseUrl: string
+  model: string
+}
+
+interface SettingsState {
+  providers: {
+    [key: string]: ProviderConfig
+  }
+  currentProvider: Provider
+  isSidebarCollapsed: boolean
+}
+
+export const useSettingsStore = defineStore('settings', {
+  state: (): SettingsState => ({
+    providers: {
+      deepseek: {
+        apiKey: '',
+        baseUrl: '',
+        model: 'deepseek-chat'
+      },
+      openai: {
+        apiKey: '',
+        baseUrl: '',
+        model: 'gpt-3.5-turbo'
+      }
+    },
+    currentProvider: 'deepseek',
+    isSidebarCollapsed: false
+  }),
+  
+  actions: {
+    setProvider(provider: Provider) {
+      this.currentProvider = provider
+    },
+    
+    setApiKey(provider: Provider, apiKey: string) {
+      if (this.providers[provider]) {
+        this.providers[provider].apiKey = apiKey
+      }
+    },
+    
+    setBaseUrl(provider: Provider, baseUrl: string) {
+      if (this.providers[provider]) {
+        this.providers[provider].baseUrl = baseUrl
+      }
+    },
+    
+    setModel(provider: Provider, model: string) {
+      if (this.providers[provider]) {
+        this.providers[provider].model = model
+      }
+    },
+    
+    toggleSidebar() {
+      this.isSidebarCollapsed = !this.isSidebarCollapsed
+      console.log('侧边栏状态已切换为:', this.isSidebarCollapsed ? '收起' : '展开')
+      this.saveSettings()
+    },
+    
+    saveSettings() {
+      const settingsToSave = {
+        providers: this.providers,
+        currentProvider: this.currentProvider,
+        isSidebarCollapsed: this.isSidebarCollapsed
+      }
+      console.log('保存设置:', settingsToSave)
+      localStorage.setItem('ai-chat-settings', JSON.stringify(settingsToSave))
+    },
+    
+    loadSettings() {
+      const settings = localStorage.getItem('ai-chat-settings')
+      console.log('读取保存的设置:', settings)
+      if (settings) {
+        try {
+          const parsed = JSON.parse(settings)
+          console.log('解析后的设置:', parsed)
+          this.$patch(parsed)
+          console.log('应用后的状态:', {
+            currentProvider: this.currentProvider,
+            isSidebarCollapsed: this.isSidebarCollapsed
+          })
+        } catch (error) {
+          console.error('Failed to parse settings:', error)
+        }
+      } else {
+        console.log('未找到保存的设置，使用默认设置')
+      }
+    }
+  }
+}) 

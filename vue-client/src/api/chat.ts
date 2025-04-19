@@ -11,6 +11,7 @@ export interface ChatRequest {
   model: string
   config: ChatRequestConfig
   stream?: boolean
+  conversationHistory?: Array<{ type: 'user' | 'ai' | 'system', content: string }>
 }
 
 export interface ChatResponse {

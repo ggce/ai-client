@@ -112,10 +112,23 @@ const sendMessage = async (content: string) => {
       }
     }
     
+    // 准备会话历史 - 去除系统消息，仅保留用户和AI消息
+    const conversationHistory = messages.value
+      .filter(msg => msg.type === 'user' || msg.type === 'ai')
+      // 排除最后一条用户消息，因为它会单独发送
+      .slice(0, messages.value.length - 1)
+    
+    // 添加详细的调试日志
+    console.log('所有消息:', messages.value.map((msg, index) => `[${index}] ${msg.type}: ${msg.content.substring(0, 30)}...`));
+    console.log('发送的对话历史:', conversationHistory.map((msg, index) => 
+      `[${index}] ${msg.type}: ${msg.content.substring(0, 30)}...`
+    ));
+    
     console.log('使用配置:', {
       provider: currentProvider,
       model: modelName,
-      useStreaming: useStreaming.value
+      useStreaming: useStreaming.value,
+      conversationHistoryLength: conversationHistory.length
     })
     
     if (useStreaming.value) {
@@ -135,7 +148,8 @@ const sendMessage = async (content: string) => {
           config: {
             apiKey: config.apiKey,
             baseUrl: config.baseUrl || undefined
-          }
+          },
+          conversationHistory: conversationHistory
         },
         // 处理每个流块
         (chunk: string) => {
@@ -172,7 +186,8 @@ const sendMessage = async (content: string) => {
         config: {
           apiKey: config.apiKey,
           baseUrl: config.baseUrl || undefined
-        }
+        },
+        conversationHistory: conversationHistory
       })
       
       // 添加AI响应
