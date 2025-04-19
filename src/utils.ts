@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { ClientOptions } from './types';
+import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from './constants';
 
 // 加载环境变量
 dotenv.config();
@@ -14,13 +15,13 @@ export function loadConfigFromEnv(provider: string = 'deepseek'): ClientOptions 
   };
 
   if (provider === 'deepseek') {
-    config.apiKey = process.env.DEEPSEEK_API_KEY || '';
-    config.baseUrl = process.env.DEEPSEEK_API_BASE_URL || 'https://api.deepseek.com';
-    config.defaultModel = 'deepseek-chat';
+    config.apiKey = '';
+    config.baseUrl = DEEPSEEK_DEFAULT_URL;
+    config.defaultModel = DEEPSEEK_MODELS.DEFAULT;
   } else if (provider === 'openai') {
-    config.apiKey = process.env.OPENAI_API_KEY || '';
-    config.baseUrl = process.env.OPENAI_API_BASE_URL;
-    config.defaultModel = 'gpt-3.5-turbo';
+    config.apiKey = '';
+    config.baseUrl = OPENAI_DEFAULT_URL;
+    config.defaultModel = OPENAI_MODELS.DEFAULT;
   }
 
   return config;

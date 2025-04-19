@@ -17,8 +17,6 @@ npm install
 
 ## 配置
 
-复制`.env.example`文件并重命名为`.env`，然后填入您的API密钥:
-
 ```bash
 cp .env.example .env
 ```

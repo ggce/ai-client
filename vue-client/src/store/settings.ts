@@ -27,8 +27,8 @@ export const useSettingsStore = defineStore('settings', {
       },
       openai: {
         apiKey: '',
-        baseUrl: '',
-        model: 'gpt-3.5-turbo'
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4.1'
       }
     },
     currentProvider: 'deepseek',

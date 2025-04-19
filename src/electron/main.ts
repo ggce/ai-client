@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import * as fs from 'fs';
 import { OpenAIClient } from '../providers/openai';
 import { Message, Role } from '../types';
+import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from '../constants';
 
 // 加载环境变量
 dotenv.config();
@@ -23,13 +24,13 @@ const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务�
 
 // 创建API客户端实例
 const deepseekClient = new DeepseekClient({
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-  baseUrl: process.env.DEEPSEEK_API_BASE_URL
+  apiKey: '',
+  baseUrl: DEEPSEEK_DEFAULT_URL
 });
 
 const openaiclient = new OpenAIClient({
-  apiKey: process.env.OPENAI_API_KEY || '',
-  baseUrl: process.env.OPENAI_API_BASE_URL
+  apiKey: '',
+  baseUrl: OPENAI_DEFAULT_URL
 });
 
 // 设置静态文件夹 - 提供API服务
@@ -136,7 +137,7 @@ const chatHandler = async (req: Request, res: Response) => {
         messages.push({ role: 'user', content: message });
         
         // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
-        if (model === 'deepseek-reasoner') {
+        if (model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
           console.log('检测到Reasoner模型，进行消息交替检查');
           
           // 创建一个新的消息数组，确保严格交替
@@ -161,7 +162,7 @@ const chatHandler = async (req: Request, res: Response) => {
           
           // 使用过滤后的消息
           response = await dynamicClient.chat.completions.create({
-            model: model || 'deepseek-reasoner',
+            model: model || DEEPSEEK_MODELS.DEEPSEEK_REASONER,
             messages: filteredMessages
           });
         } else {
@@ -170,14 +171,14 @@ const chatHandler = async (req: Request, res: Response) => {
           
           // 发送带历史的请求
           response = await dynamicClient.chat.completions.create({
-            model: model || 'deepseek-chat',
+            model: model || DEEPSEEK_MODELS.DEFAULT,
             messages: messages
           });
         }
       } else {
         // 单轮对话 - 向后兼容
         response = await dynamicClient.chat.completions.create({
-          model: model || 'deepseek-chat',
+          model: model || DEEPSEEK_MODELS.DEFAULT,
           messages: [
             { role: 'user', content: message }
           ]
@@ -213,13 +214,13 @@ const chatHandler = async (req: Request, res: Response) => {
         
         // 发送带历史的请求
         response = await dynamicClient.chat.completions.create({
-          model: model || 'gpt-3.5-turbo',
+          model: model || OPENAI_MODELS.DEFAULT,
           messages: messages
         });
       } else {
         // 单轮对话 - 向后兼容
         response = await dynamicClient.chat.completions.create({
-          model: model || 'gpt-3.5-turbo',
+          model: model || OPENAI_MODELS.DEFAULT,
           messages: [
             { role: 'user', content: message }
           ]
@@ -272,7 +273,7 @@ function middlewareHandler(handler: MiddlewareHandler) {
 
 // 注册流式API路由 - 使用SSE标准
 router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
-  const { message, provider = 'deepseek', config, model = 'deepseek-chat', conversationHistory } = req.body;
+  const { message, provider = 'deepseek', config, model = DEEPSEEK_MODELS.DEFAULT, conversationHistory } = req.body;
 
   console.log(`开始${provider}流式响应, 模型: ${model}`);
   
@@ -314,13 +315,13 @@ router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
       
       if (provider === 'deepseek') {
         dynamicClient = new DeepseekClient({
-          apiKey: config?.apiKey || process.env.DEEPSEEK_API_KEY || '',
-          baseUrl: config?.baseUrl || process.env.DEEPSEEK_API_BASE_URL
+          apiKey: config?.apiKey || '',
+          baseUrl: config?.baseUrl || DEEPSEEK_DEFAULT_URL
         });
       } else {
         dynamicClient = new OpenAIClient({
-          apiKey: config?.apiKey || process.env.OPENAI_API_KEY || '',
-          baseUrl: config?.baseUrl || process.env.OPENAI_API_BASE_URL
+          apiKey: config?.apiKey || '',
+          baseUrl: config?.baseUrl || OPENAI_DEFAULT_URL
         });
       }
       
@@ -350,7 +351,7 @@ router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
       messages.push({ role: 'user', content: message });
       
       // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
-      if (provider === 'deepseek' && model === 'deepseek-reasoner') {
+      if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
         console.log('流式请求检测到Reasoner模型，进行消息交替检查');
         
         // 创建一个新的消息数组，确保严格交替

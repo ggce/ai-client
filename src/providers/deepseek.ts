@@ -3,18 +3,11 @@ import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { 
   CompletionRequest, 
   CompletionResponse,
-  Message
+  Message,
+  ClientOptions
 } from '../types';
 import { generateUUID, withRetry } from '../utils';
-
-// DeepSeek客户端配置接口
-export interface ClientOptions {
-  apiKey?: string;
-  baseUrl?: string;
-  defaultModel?: string;
-  timeout?: number;
-  maxRetries?: number;
-}
+import { DEEPSEEK_DEFAULT_URL, DEEPSEEK_MODELS } from '../constants';
 
 // 对话消息接口
 export interface ConversationMessage {
@@ -84,9 +77,9 @@ export class DeepseekClient {
 
   constructor(config?: ClientOptions) {
     this.options = {
-      apiKey: config?.apiKey || process.env.DEEPSEEK_API_KEY || '',
-      baseUrl: config?.baseUrl || 'https://api.deepseek.com',
-      defaultModel: config?.defaultModel || 'deepseek-chat',
+      apiKey: config?.apiKey || '',
+      baseUrl: config?.baseUrl || DEEPSEEK_DEFAULT_URL,
+      defaultModel: config?.defaultModel || DEEPSEEK_MODELS.DEFAULT,
       timeout: config?.timeout || 30000,
       maxRetries: config?.maxRetries || 3
     };
@@ -137,7 +130,7 @@ export class DeepseekClient {
     
     // 发送请求
     const response = await this.chat.completions.create({
-      model: options?.model || this.options.defaultModel || 'deepseek-chat',
+      model: options?.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT,
       messages,
       max_tokens: options?.max_tokens,
       temperature: options?.temperature
@@ -170,7 +163,7 @@ export class DeepseekClient {
     
     // 使用流式API发送请求
     const stream = await this.chat.completions.createStream({
-      model: options?.model || this.options.defaultModel || 'deepseek-chat',
+      model: options?.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT,
       messages,
       max_tokens: options?.max_tokens,
       temperature: options?.temperature
@@ -239,7 +232,7 @@ export class DeepseekClient {
 
         try {
           // 确保model不会为undefined
-          const modelName = params.model || this.options.defaultModel || 'deepseek-chat';
+          const modelName = params.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT;
           
           // 直接使用OpenAI SDK进行请求
           const response = await this.client.chat.completions.create({
@@ -282,7 +275,7 @@ export class DeepseekClient {
 
         try {
           // 确保model不会为undefined
-          const modelName = params.model || this.options.defaultModel || 'deepseek-chat';
+          const modelName = params.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT;
           
           console.log('DeepSeek 流式API请求参数:', {
             model: modelName,
@@ -328,7 +321,7 @@ export class DeepseekClient {
 
     try {
       // 确保model不会为undefined
-      const modelName = this.options.defaultModel || 'deepseek-chat';
+      const modelName = this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT;
       
       const response = await this.chat.completions.create({
         model: modelName,

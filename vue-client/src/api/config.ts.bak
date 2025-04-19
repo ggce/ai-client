@@ -158,6 +158,15 @@ export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanc
   }
 }
 
+// 获取OpenAI配置
+export function getOpenAIConfig(): ProviderConfig {
+  const config = getConfig();
+  return {
+    apiKey: config?.openai?.apiKey || '',
+    baseUrl: config?.openai?.baseUrl || 'https://api.openai.com/v1',
+    model: config?.openai?.model || 'gpt-4.1'
+  };
+}
 
 // 获取默认模型
 export function getDefaultModel(provider: string): string {

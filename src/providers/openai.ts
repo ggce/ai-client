@@ -8,6 +8,7 @@ import {
   FunctionCall
 } from '../types';
 import { withRetry } from '../utils';
+import { OPENAI_DEFAULT_URL, OPENAI_MODELS } from '../constants';
 
 export class OpenAIClient {
   private client: OpenAI;
@@ -15,19 +16,16 @@ export class OpenAIClient {
 
   constructor(options: ClientOptions = {}) {
     this.options = {
-      apiKey: options.apiKey || process.env.OPENAI_API_KEY,
-      baseUrl: options.baseUrl || process.env.OPENAI_API_BASE_URL,
-      defaultModel: options.defaultModel || 'gpt-3.5-turbo',
+      apiKey: options.apiKey || '',
+      baseUrl: options.baseUrl || OPENAI_DEFAULT_URL,
+      defaultModel: options.defaultModel || OPENAI_MODELS.DEFAULT,
       timeout: options.timeout || 60000,
       maxRetries: options.maxRetries || 3,
     };
 
-    if (!this.options.apiKey) {
-      throw new Error('OpenAI API key is required');
-    }
-
+    // API key可以为空，由用户在使用时提供
     this.client = new OpenAI({
-      apiKey: this.options.apiKey,
+      apiKey: this.options.apiKey || 'dummy-key', // 使用dummy-key防止OpenAI SDK初始化错误
       baseURL: this.options.baseUrl,
       timeout: this.options.timeout,
       maxRetries: this.options.maxRetries,
@@ -37,7 +35,7 @@ export class OpenAIClient {
   public chat = {
     completions: {
       create: async (request: CompletionRequest): Promise<CompletionResponse> => {
-        const model = request.model || this.options.defaultModel || 'gpt-3.5-turbo';
+        const model = request.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
         
         return withRetry(
           async () => {
@@ -46,6 +44,8 @@ export class OpenAIClient {
               model: model as string, // 确保model是字符串类型
               stream: false
             }) as ChatCompletion;
+
+            console.log('OpenAI响应: ', response);
             
             // 将OpenAI响应转换为通用格式
             return {
@@ -78,7 +78,7 @@ export class OpenAIClient {
 
       // Stream API支持
       createStream: async (request: CompletionRequest) => {
-        const model = request.model || this.options.defaultModel || 'gpt-3.5-turbo';
+        const model = request.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
         
         const stream = await this.client.chat.completions.create({
           ...request,
@@ -102,7 +102,7 @@ export class OpenAIClient {
     }
 
     const response = await this.chat.completions.create({
-      model: this.options.defaultModel || 'gpt-3.5-turbo',
+      model: this.options.defaultModel || OPENAI_MODELS.DEFAULT,
       messages,
     });
 

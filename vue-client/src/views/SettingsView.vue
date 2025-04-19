@@ -90,7 +90,7 @@
               type="text" 
               id="openai-base-url"
               v-model="openaiBaseUrl"
-              placeholder="默认: https://api.openai.com"
+              placeholder="默认: https://api.openai.com/v1"
             >
             <label for="openai-model">OpenAI 模型</label>
             <select 
@@ -98,9 +98,10 @@
               v-model="openaiModel" 
               class="model-select"
             >
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4.1">GPT-4.1</option>
+              <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+              <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+              <option value="o3-mini">O3 Mini</option>
             </select>
           </div>
         </div>
@@ -139,7 +140,7 @@ const deepseekBaseUrl = ref('')
 const deepseekModel = ref('deepseek-chat')
 const openaiApiKey = ref('')
 const openaiBaseUrl = ref('')
-const openaiModel = ref('gpt-3.5-turbo')
+const openaiModel = ref('gpt-4.1')
 const showDebugConfig = ref(false)
 
 // DeepSeek余额查询相关状态
@@ -220,7 +221,7 @@ const loadSettings = async () => {
   if (openaiConfig) {
     openaiApiKey.value = openaiConfig.apiKey || ''
     openaiBaseUrl.value = openaiConfig.baseUrl || ''
-    openaiModel.value = openaiConfig.model || 'gpt-3.5-turbo'
+    openaiModel.value = openaiConfig.model || 'gpt-4.1'
   }
 
   console.log('设置已加载：', {
