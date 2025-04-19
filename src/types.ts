@@ -38,6 +38,7 @@ export interface CompletionChoice {
     role: Role;
     content: string | null;
     function_call?: FunctionCall;
+    reasoning_content?: string;
   };
   finish_reason: 'stop' | 'length' | 'function_call';
 }
@@ -88,6 +89,7 @@ export interface DeltaChoice {
     role?: Role;
     content?: string;
     function_call?: Partial<FunctionCall>;
+    reasoning_content?: string;
   };
   finish_reason?: string | null;
 } 

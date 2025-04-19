@@ -79,164 +79,103 @@ router.get('/', routeHandler((req: Request, res: Response) => {
 // 处理聊天请求的API端点
 const chatHandler = async (req: Request, res: Response) => {
   try {
-    const { message, provider, config, model, conversationId, conversationHistory } = req.body;
+    const { message, provider = 'deepseek', config, model = DEEPSEEK_MODELS.DEFAULT, conversationHistory } = req.body;
     
-    // 添加调试日志 - 打印接收到的请求详情
-    console.log('收到聊天请求:', { 
-      provider, 
-      model, 
-      messageLength: message?.length,
-      hasConversationHistory: !!conversationHistory,
-      conversationHistoryLength: conversationHistory?.length || 0
-    });
-    
-    if (conversationHistory && Array.isArray(conversationHistory)) {
-      console.log('对话历史摘要:', conversationHistory.map(msg => ({
-        type: msg.type,
-        contentPreview: msg.content.substring(0, 30) + '...'
-      })));
-    }
-    
+    // 参数验证
     if (!message) {
       return res.status(400).json({ error: '消息不能为空' });
     }
-
-    if (!provider) {
-      return res.status(400).json({ error: '未指定AI提供商' });
-    }
-
-    if (!config || !config.apiKey) {
-      return res.status(400).json({ error: 'API密钥未配置' });
-    }
-
-    let response;
+    
+    console.log(`开始${provider}请求, 模型: ${model}`);
+    
+    // 根据provider创建不同的client
+    let dynamicClient; 
     
     if (provider === 'deepseek') {
-      // 使用用户配置创建Deepseek客户端
-      const dynamicClient = new DeepseekClient({
-        apiKey: config.apiKey,
-        baseUrl: config.baseUrl || undefined
+      dynamicClient = new DeepseekClient({
+        apiKey: config?.apiKey || '',
+        baseUrl: config?.baseUrl || DEEPSEEK_DEFAULT_URL
       });
-
-      // 处理多轮对话
-      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-        // 将历史消息格式化为DeepSeek需要的格式 - 使用正确的类型
-        const messages: Message[] = conversationHistory.map(msg => {
-          // 将UI消息类型转换为API所需的Role类型
-          let role: Role = 'user';
-          if (msg.type === 'ai') role = 'assistant';
-          else if (msg.type === 'system') role = 'system';
-          
-          return {
-            role: role,
-            content: msg.content
-          };
-        });
-        
-        // 添加当前用户消息
-        messages.push({ role: 'user', content: message });
-        
-        // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
-        if (model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
-          console.log('检测到Reasoner模型，进行消息交替检查');
-          
-          // 创建一个新的消息数组，确保严格交替
-          const filteredMessages: Message[] = [];
-          let lastRole: Role | null = null;
-          
-          for (const msg of messages) {
-            // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
-            if (lastRole === msg.role) {
-              console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
-              continue;
-            }
-            
-            // 添加到过滤后的消息中
-            filteredMessages.push(msg);
-            lastRole = msg.role;
-          }
-          
-          // 替换原始消息数组
-          console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
-          console.log('过滤后的消息序列:', filteredMessages.map(m => m.role).join(' -> '));
-          
-          // 使用过滤后的消息
-          response = await dynamicClient.chat.completions.create({
-            model: model || DEEPSEEK_MODELS.DEEPSEEK_REASONER,
-            messages: filteredMessages
-          });
-        } else {
-          // 输出调试信息
-          console.log('发送给DeepSeek的完整消息历史:', JSON.stringify(messages));
-          
-          // 发送带历史的请求
-          response = await dynamicClient.chat.completions.create({
-            model: model || DEEPSEEK_MODELS.DEFAULT,
-            messages: messages
-          });
-        }
-      } else {
-        // 单轮对话 - 向后兼容
-        response = await dynamicClient.chat.completions.create({
-          model: model || DEEPSEEK_MODELS.DEFAULT,
-          messages: [
-            { role: 'user', content: message }
-          ]
-        });
-      }
-    } else if (provider === 'openai') {
-      // 使用用户配置创建OpenAI客户端
-      const dynamicClient = new OpenAIClient({
-        apiKey: config.apiKey,
-        baseUrl: config.baseUrl || undefined
-      });
-
-      // 处理多轮对话
-      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-        // 将历史消息格式化为OpenAI需要的格式 - 使用正确的类型
-        const messages: Message[] = conversationHistory.map(msg => {
-          // 将UI消息类型转换为API所需的Role类型
-          let role: Role = 'user';
-          if (msg.type === 'ai') role = 'assistant';
-          else if (msg.type === 'system') role = 'system';
-          
-          return {
-            role: role,
-            content: msg.content
-          };
-        });
-        
-        // 添加当前用户消息
-        messages.push({ role: 'user', content: message });
-        
-        // 输出调试信息
-        console.log('发送给OpenAI的完整消息历史:', JSON.stringify(messages));
-        
-        // 发送带历史的请求
-        response = await dynamicClient.chat.completions.create({
-          model: model || OPENAI_MODELS.DEFAULT,
-          messages: messages
-        });
-      } else {
-        // 单轮对话 - 向后兼容
-        response = await dynamicClient.chat.completions.create({
-          model: model || OPENAI_MODELS.DEFAULT,
-          messages: [
-            { role: 'user', content: message }
-          ]
-        });
-      }
     } else {
-      return res.status(400).json({ error: '不支持的AI提供商' });
+      dynamicClient = new OpenAIClient({
+        apiKey: config?.apiKey || '',
+        baseUrl: config?.baseUrl || OPENAI_DEFAULT_URL
+      });
     }
-
-    res.json({ 
-      reply: response.choices[0].message.content,
-      rawResponse: response
+    
+    // 准备消息数组
+    let messages: Message[] = [];
+    
+    // 处理多轮对话
+    if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      // 将历史消息格式化为API需要的格式
+      messages = conversationHistory.map(msg => {
+        // 将UI消息类型转换为API所需的Role类型
+        let role: Role = 'user';
+        if (msg.type === 'ai') role = 'assistant';
+        else if (msg.type === 'system') role = 'system';
+        
+        return {
+          role: role,
+          content: msg.content
+        };
+      });
+    }
+    
+    // 添加当前用户消息
+    messages.push({ role: 'user', content: message });
+    
+    // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
+    if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
+      console.log('请求检测到Reasoner模型，进行消息交替检查');
+      
+      // 创建一个新的消息数组，确保严格交替
+      const filteredMessages: Message[] = [];
+      let lastRole: Role | null = null;
+      
+      for (const msg of messages) {
+        // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
+        if (lastRole === msg.role) {
+          console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
+          continue;
+        }
+        
+        // 添加到过滤后的消息中
+        filteredMessages.push(msg);
+        lastRole = msg.role;
+      }
+      
+      // 替换原始消息数组
+      console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
+      messages = filteredMessages;
+    }
+    
+    // 获取回复
+    const completion = await dynamicClient.chat.completions.create({
+      model: model,
+      messages,
+      max_tokens: 2048,
+      temperature: 0.7
+    });
+    
+    // 提取回复文本
+    const replyText = completion.choices[0]?.message?.content || '';
+    
+    // 检查是否存在推理内容 (DeepSeek Reasoner 模型)
+    let reasoningContent;
+    if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
+      // @ts-ignore - 访问推理内容字段
+      reasoningContent = completion.choices[0]?.message?.reasoning_content;
+    }
+    
+    // 返回结果
+    return res.json({ 
+      reply: replyText,
+      reasoningContent: reasoningContent || undefined
     });
   } catch (error) {
-    console.error('API请求失败:', error);
-    res.status(500).json({ 
+    console.error('处理聊天请求时出错:', error);
+    return res.status(500).json({ 
       error: '处理请求时出错', 
       details: error instanceof Error ? error.message : String(error) 
     });
@@ -407,12 +346,20 @@ router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
             // 获取每个chunk的内容
             const content = chunk.choices[0]?.delta?.content || '';
             
-            if (content) {
+            // 处理DeepSeek Reasoner模型的推理内容
+            // @ts-ignore - Delta类型定义中不存在reasoning_content属性，但实际API返回中包含此字段
+            const reasoningContent = chunk.choices[0]?.delta?.reasoning_content || '';
+            
+            if (content || reasoningContent) {
               chunkCount++;
               accumulatedContent += content;
               
-              // 发送数据给客户端
-              const data = { content };
+              // 发送数据给客户端，包含推理内容（如果有）
+              const data = { 
+                content,
+                // 添加推理内容字段，仅当使用Reasoner模型且有推理内容时才会有值
+                reasoning_content: reasoningContent || undefined
+              };
               sendData(res, data);
             }
           }

@@ -16,6 +16,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   reply: string
+  reasoningContent?: string
 }
 
 export const sendChatRequest = async (request: ChatRequest): Promise<ChatResponse> => {
@@ -31,7 +32,7 @@ export const sendChatRequest = async (request: ChatRequest): Promise<ChatRespons
 // 添加流式请求API，兼容DeepSeek-V3
 export const sendStreamingChatRequest = (
   request: ChatRequest, 
-  onChunk: (chunk: string) => void,
+  onChunk: (chunk: string, reasoningChunk?: string) => void,
   onComplete: () => void,
   onError: (error: unknown) => void
 ): () => void => {
@@ -113,6 +114,7 @@ export const sendStreamingChatRequest = (
           if (done) {
             clearInterval(heartbeatCheckInterval);
             if (!isFinished) {
+              console.log('前端收到完成信号 [DONE]');
               onComplete();
               isFinished = true;
             }
@@ -161,30 +163,45 @@ export const sendStreamingChatRequest = (
                 
                 // 处理不同AI提供商的响应格式
                 let content = '';
+                let reasoningContent = '';
                 
-                // 检查OpenAI/DeepSeek标准格式的content字段
+                // 最优先检查推理内容
+                let hasReasoningContent = false;
+                
+                // 1. 先检查根级别的reasoning_content字段
+                if (parsed.reasoning_content !== undefined) {
+                  reasoningContent = parsed.reasoning_content;
+                  console.log('【前端】发现根级别推理内容，长度:', reasoningContent.length, '字符');
+                  hasReasoningContent = true;
+                  
+                  // 立即发送推理内容，不等待其他内容
+                  if (!isFinished) {
+                    console.log('【前端】立即更新推理内容到UI');
+                    onChunk('', reasoningContent);
+                    // 防止重复处理
+                    reasoningContent = '';
+                  }
+                }
+                
+                // 2. 再检查常规内容
                 if (parsed.choices?.[0]?.delta?.content !== undefined) {
                   content = parsed.choices[0].delta.content;
                   
-                  // 检查是否有reasoning标记
-                  const isReasoning = parsed.choices[0].delta.is_reasoning === true;
-                  if (isReasoning) {
-                    console.log('【前端】从Deepseek-Reasoner格式中提取reasoning内容:', content);
-                  } else {
-                    console.log('【前端】从OpenAI/Deepseek格式中提取内容:', content);
+                  // 还要检查是否有嵌套的推理内容
+                  if (parsed.choices?.[0]?.delta?.reasoning_content !== undefined) {
+                    reasoningContent = parsed.choices[0].delta.reasoning_content;
+                    console.log('【前端】检测到嵌套推理内容，长度:', reasoningContent.length);
+                    hasReasoningContent = true;
                   }
                 } 
-                // 兼容旧版DeepSeek响应格式
                 else if (parsed.content !== undefined) {
                   content = parsed.content;
-                  console.log('【前端】从Deepseek旧格式中提取内容:', content);
                 }
                 
-                if (content && !isFinished) {
-                  console.log('【前端】发送内容片段到UI层:', content);
-                  onChunk(content);
-                } else {
-                  console.log('【前端】跳过空内容');
+                // 如果有常规内容，或者有推理内容但前面没处理过，则发送到UI
+                if ((content || (reasoningContent && !hasReasoningContent)) && !isFinished) {
+                  console.log('【前端】发送到UI - 内容长度:', content.length, '推理长度:', reasoningContent.length);
+                  onChunk(content, reasoningContent);
                 }
               } catch (error) {
                 console.error('解析流数据失败:', error, '原始数据:', data);

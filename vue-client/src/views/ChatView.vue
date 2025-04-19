@@ -13,7 +13,12 @@
 
     <main>
       <div class="chat-container">
-        <MessageList :messages="messages" :isLoading="isLoading" :streamingMessage="streamingMessage" />
+        <MessageList 
+          :messages="messages" 
+          :isLoading="isLoading" 
+          :streamingMessage="streamingMessage" 
+          :streamingReasoningContent="streamingReasoningContent" 
+        />
         <div class="input-wrapper">
           <ChatInput @send="sendMessage" :disabled="isLoading" />
         </div>
@@ -23,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, computed } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, computed, nextTick } from 'vue'
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
 import { useSettingsStore } from '../store/settings'
@@ -37,6 +42,7 @@ defineOptions({
 interface ChatMessage {
   type: 'user' | 'ai' | 'system'
   content: string
+  reasoningContent?: string // 添加推理内容字段
 }
 
 const messages = ref<ChatMessage[]>([
@@ -44,6 +50,7 @@ const messages = ref<ChatMessage[]>([
 ])
 const isLoading = ref(false)
 const streamingMessage = ref<string>('')
+const streamingReasoningContent = ref<string>('') // 添加流式推理内容
 const useStreaming = ref<boolean>(true) // 默认使用流式输出
 
 const settingsStore = useSettingsStore()
@@ -95,6 +102,7 @@ const sendMessage = async (content: string) => {
   // 设置加载状态为true
   isLoading.value = true
   streamingMessage.value = ''
+  streamingReasoningContent.value = '' // 重置流式推理内容
   
   try {
     const currentProvider = settingsStore.currentProvider
@@ -134,6 +142,7 @@ const sendMessage = async (content: string) => {
     if (useStreaming.value) {
       // 使用流式API
       let fullResponse = ''
+      let fullReasoningContent = '' // 添加完整推理内容变量
       
       // 先不添加AI消息，等流式输出完成后再添加
       const userMessageIndex = messages.value.length - 1
@@ -152,18 +161,52 @@ const sendMessage = async (content: string) => {
           conversationHistory: conversationHistory
         },
         // 处理每个流块
-        (chunk: string) => {
+        (chunk: string, reasoningChunk?: string) => {
           console.log(`收到流块 [${chunk.length}字符]: "${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''}"`);
+          
+          // 处理最终回答内容
           fullResponse += chunk;
           streamingMessage.value = fullResponse;
+          
+          // 处理推理内容（如果有）
+          if (reasoningChunk) {
+            console.log(`【推理内容】新块到达: ${reasoningChunk.length}字符`);
+            
+            // 立即更新显示，不进行累加处理，而是直接设置值
+            fullReasoningContent += reasoningChunk;
+            
+            // 强制Vue在下一个tick更新，使用nextTick确保DOM已更新
+            streamingReasoningContent.value = fullReasoningContent;
+            
+            // 强制立即滚动到底部
+            nextTick(() => {
+              const reasoningElements = document.querySelectorAll('.reasoning-content');
+              if (reasoningElements.length > 0) {
+                const lastElement = reasoningElements[reasoningElements.length - 1];
+                lastElement.scrollTop = lastElement.scrollHeight;
+                console.log('【推理内容】滚动到最新位置');
+              }
+            });
+          }
+          
           console.log(`当前完整响应(${fullResponse.length}字符)`);
         },
         // 完成回调
         () => {
           console.log('流式响应完成, 最终长度:', fullResponse.length);
-          // 流式输出完成后，添加AI消息
-          messages.value.push({ type: 'ai', content: fullResponse });
+          console.log('【DEBUG】最终推理内容长度:', fullReasoningContent.length);
+          
+          // 流式输出完成后，添加AI消息，包含推理内容
+          messages.value.push({ 
+            type: 'ai', 
+            content: fullResponse,
+            reasoningContent: fullReasoningContent || undefined
+          });
+          
+          console.log('【DEBUG】已添加消息，推理内容长度:', fullReasoningContent.length);
+          
           streamingMessage.value = '';
+          streamingReasoningContent.value = '';
           isLoading.value = false;
         },
         // 错误回调
@@ -174,6 +217,7 @@ const sendMessage = async (content: string) => {
             content: `流式输出失败: ${error instanceof Error ? error.message : String(error)}` 
           });
           streamingMessage.value = '';
+          streamingReasoningContent.value = '';
           isLoading.value = false;
         }
       )
@@ -192,7 +236,11 @@ const sendMessage = async (content: string) => {
       
       // 添加AI响应
       if (response.reply) {
-        messages.value.push({ type: 'ai', content: response.reply })
+        messages.value.push({ 
+          type: 'ai', 
+          content: response.reply,
+          reasoningContent: response.reasoningContent
+        })
       }
       
       // 设置加载状态为false
