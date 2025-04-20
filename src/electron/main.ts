@@ -159,6 +159,10 @@ const chatHandler = async (req: Request, res: Response) => {
     });
     
     // 提取回复文本
+    if (!('choices' in completion)) {
+      throw new Error('收到了意外的流式响应');
+    }
+    
     const replyText = completion.choices[0]?.message?.content || '';
     
     // 检查是否存在推理内容 (DeepSeek Reasoner 模型)
