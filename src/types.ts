@@ -1,9 +1,11 @@
-export type Role = 'user' | 'assistant' | 'system';
+export type Role = 'user' | 'assistant' | 'system' | 'tool';
 
 export interface Message {
   role: Role;
   content: string;
   name?: string;
+  reasoning_content?: string;
+  tool_call_id?: string; // 为工具消息添加的可选字段
 }
 
 export interface CompletionRequest {
@@ -21,7 +23,7 @@ export interface CompletionRequest {
   logit_bias?: Record<string, number>;
 }
 
-export interface FunctionDefinition {
+export interface MCPTool {
   name: string;
   description: string;
   parameters: Record<string, any>;
@@ -58,7 +60,7 @@ export interface CompletionResponse {
 
 export interface ProviderConfig {
   apiKey: string;
-  baseUrl?: string;
+  baseURL?: string;
   organizationId?: string;
   [key: string]: any;
 }
@@ -76,7 +78,7 @@ export interface MCPCompletionRequest extends Omit<CompletionRequest, 'model'> {
 
 export type ClientOptions = {
   apiKey?: string;
-  baseUrl?: string;
+  baseURL?: string;
   organizationId?: string;
   defaultModel?: string;
   timeout?: number;

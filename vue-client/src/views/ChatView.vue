@@ -1,38 +1,58 @@
 <template>
   <div class="panel">
-    <header class="compact-header">
-      <div class="header-content">
-        <h1>AI聊天 <small>{{ modelDisplay }}</small></h1>
-        <label class="stream-toggle-compact">
-          <input type="checkbox" v-model="useStreaming">
-          <span class="slider-compact"></span>
-          <span class="toggle-label-compact">流式输出</span>
-        </label>
-      </div>
-    </header>
-
-    <main>
-      <div class="chat-container">
-        <MessageList 
-          :messages="messages" 
-          :isLoading="isLoading" 
-          :streamingMessage="streamingMessage" 
-          :streamingReasoningContent="streamingReasoningContent" 
-        />
-        <div class="input-wrapper">
-          <ChatInput @send="sendMessage" :disabled="isLoading" />
+    <div class="chat-content">
+      <header class="compact-header">
+        <div class="header-content">
+          <h1>AI聊天 <small>{{ modelDisplay }}</small></h1>
+          <div class="header-controls">
+            <label class="stream-toggle-compact">
+              <input type="checkbox" v-model="useStreaming" class="hidden-checkbox">
+              <span class="slider-compact"></span>
+              <span class="toggle-label-compact">流式输出</span>
+            </label>
+          </div>
         </div>
-      </div>
-    </main>
+      </header>
+
+      <main>
+        <div class="chat-container">
+          <MessageList 
+            :messages="displayMessages" 
+            :isLoading="isLoading" 
+            :streamingMessage="streamingMessage" 
+            :streamingReasoningContent="streamingReasoningContent" 
+          />
+          <div class="input-wrapper">
+            <ChatInput @send="sendMessage" :disabled="isLoading || !activeSessionId" />
+          </div>
+        </div>
+      </main>
+    </div>
+    
+    <SessionSidebar 
+      :activeSessionId="activeSessionId"
+      @update:activeSessionId="setActiveSessionId"
+      @create-session="handleCreateSession"
+      @session-deleted="handleSessionDeleted"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, computed, nextTick } from 'vue'
+import { ref, onMounted, watch, computed, inject, provide } from 'vue'
+import { Ref } from 'vue'
+// 使用类型断言
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
+import SessionSidebar from '../components/SessionSidebar.vue'
 import { useSettingsStore } from '../store/settings'
-import { sendChatRequest, sendStreamingChatRequest } from '../api/chat'
+import { 
+  getSessionMessages, 
+  sendSessionMessage, 
+  sendStreamingSessionMessage, 
+  SessionMessage,
+  createSession
+} from '../api/chat'
 
 // 定义组件名称
 defineOptions({
@@ -45,15 +65,75 @@ interface ChatMessage {
   reasoningContent?: string // 添加推理内容字段
 }
 
-const messages = ref<ChatMessage[]>([
-  { type: 'system', content: '欢迎使用AI聊天助手！请输入您的问题。' }
-])
+// 本地管理会话ID
+const activeSessionId = ref<string>('')
+
+// 将activeSessionId提供给可能需要的子组件
+provide('activeSessionId', activeSessionId)
+
+// 会话状态
+const sessionMessages = ref<SessionMessage[]>([])
+
+// 聊天状态
 const isLoading = ref(false)
 const streamingMessage = ref<string>('')
 const streamingReasoningContent = ref<string>('') // 添加流式推理内容
 const useStreaming = ref<boolean>(true) // 默认使用流式输出
 
+// 将isLoading提供给其他组件
+provide('isLoading', isLoading)
+
 const settingsStore = useSettingsStore()
+
+// 设置活动会话ID
+const setActiveSessionId = (sessionId: string) => {
+  activeSessionId.value = sessionId
+}
+
+// 创建新会话
+const handleCreateSession = async () => {
+  try {
+    const sessionId = await createSession()
+    activeSessionId.value = sessionId
+  } catch (error) {
+    console.error('创建会话失败:', error)
+  }
+}
+
+// 处理会话删除
+const handleSessionDeleted = (deletedId: string) => {
+  if (activeSessionId.value === deletedId) {
+    activeSessionId.value = ''
+  }
+}
+
+// 转换服务器消息到显示消息
+const displayMessages = computed<ChatMessage[]>(() => {
+  if (!activeSessionId.value) {
+    return [{ type: 'system', content: '请在右侧边栏选择或创建一个会话开始聊天' }]
+  }
+  
+  if (sessionMessages.value.length === 0) {
+    return [{ type: 'system', content: '这是一个新的会话，开始聊天吧！' }]
+  }
+  
+  return sessionMessages.value.map(msg => {
+    let type: 'user' | 'ai' | 'system' = 'user'
+    if (msg.role === 'assistant') type = 'ai'
+    else if (msg.role === 'system') type = 'system'
+    
+    // 确保reasoningContent是字符串或undefined
+    const reasoningContent = typeof msg.reasoningContent === 'string' 
+      ? msg.reasoningContent 
+      : undefined
+    
+    return {
+      type,
+      content: msg.content,
+      reasoningContent
+    }
+  })
+})
 
 // 计算当前使用的模型显示文本
 const modelDisplay = computed(() => {
@@ -79,219 +159,143 @@ const modelDisplay = computed(() => {
   return modelName
 })
 
+// 检查提供商配置
 const isProviderConfigured = () => {
   const provider = settingsStore.currentProvider
   return !!settingsStore.providers[provider]?.apiKey
 }
 
-const sendMessage = async (content: string) => {
-  // 检查当前提供商的API密钥是否已设置
+// 加载会话历史
+const loadSessionMessages = async (sessionId: string) => {
+  if (!sessionId) return
+  
+  try {
+    sessionMessages.value = await getSessionMessages(sessionId)
+  } catch (error) {
+    console.error('加载会话历史失败:', error)
+    sessionMessages.value = []
+  }
+}
+
+// 发送消息
+const sendMessage = async function(message: string) {
   if (!isProviderConfigured()) {
-    messages.value.push({ 
-      type: 'system', 
-      content: '请先在设置中配置API密钥' 
-    })
-    console.log('发送系统消息', messages.value)
-    return
+    sessionMessages.value.push({
+      role: 'system',
+      content: '请先在设置页面配置API Key。',
+    });
+    return;
+  }
+
+  if (!activeSessionId.value) {
+    sessionMessages.value.push({
+      role: 'system',
+      content: '请先选择或创建一个会话。',
+    });
+    return;
   }
 
   // 添加用户消息
-  messages.value.push({ type: 'user', content })
-  console.log('发送用户消息', messages.value)
-  
-  // 设置加载状态为true
+  const userMessage = {
+    role: 'user' as const,
+    content: message,
+  };
+  sessionMessages.value.push(userMessage);
+
+  // 开始加载
   isLoading.value = true
   streamingMessage.value = ''
-  streamingReasoningContent.value = '' // 重置流式推理内容
-  
+  streamingReasoningContent.value = ''
+
   try {
-    const currentProvider = settingsStore.currentProvider
-    const config = settingsStore.providers[currentProvider]
-    
-    // 确保使用的是正确的模型
-    let modelName = config.model
-    
-    // 使用DeepSeek官方文档要求的模型名称
-    if (currentProvider === 'deepseek') {
-      if (!modelName) {
-        // 如果没有设置模型，默认使用deepseek-chat (V3)
-        modelName = 'deepseek-chat'
-        console.log(`未设置模型，默认使用${modelName}`)
-      }
-    }
-    
-    // 准备会话历史 - 去除系统消息，仅保留用户和AI消息
-    const conversationHistory = messages.value
-      .filter(msg => msg.type === 'user' || msg.type === 'ai')
-      // 排除最后一条用户消息，因为它会单独发送
-      .slice(0, messages.value.length - 1)
-    
-    // 添加详细的调试日志
-    console.log('所有消息:', messages.value.map((msg, index) => `[${index}] ${msg.type}: ${msg.content.substring(0, 30)}...`));
-    console.log('发送的对话历史:', conversationHistory.map((msg, index) => 
-      `[${index}] ${msg.type}: ${msg.content.substring(0, 30)}...`
-    ));
-    
-    console.log('使用配置:', {
-      provider: currentProvider,
-      model: modelName,
-      useStreaming: useStreaming.value,
-      conversationHistoryLength: conversationHistory.length
-    })
-    
     if (useStreaming.value) {
-      // 使用流式API
-      let fullResponse = ''
-      let fullReasoningContent = '' // 添加完整推理内容变量
-      
-      // 先不添加AI消息，等流式输出完成后再添加
-      const userMessageIndex = messages.value.length - 1
-      
-      // 发送流式请求
-      sendStreamingChatRequest(
+      // 使用流式请求
+      const stream = await sendStreamingSessionMessage(
+        activeSessionId.value,
+        message,
         {
-          message: content,
-          provider: currentProvider,
-          model: modelName, // 使用更新后的模型名称
-          stream: true,
-          config: {
-            apiKey: config.apiKey,
-            baseUrl: config.baseUrl || undefined
-          },
-          conversationHistory: conversationHistory
-        },
-        // 处理每个流块
-        (chunk: string, reasoningChunk?: string) => {
-          console.log(`收到流块 [${chunk.length}字符]: "${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''}"`);
-          
-          // 处理最终回答内容
-          fullResponse += chunk;
-          streamingMessage.value = fullResponse;
-          
-          // 处理推理内容（如果有）
-          if (reasoningChunk) {
-            console.log(`【推理内容】新块到达: ${reasoningChunk.length}字符`);
-            
-            // 立即更新显示，不进行累加处理，而是直接设置值
-            fullReasoningContent += reasoningChunk;
-            
-            // 强制Vue在下一个tick更新，使用nextTick确保DOM已更新
-            streamingReasoningContent.value = fullReasoningContent;
-            
-            // 强制立即滚动到底部
-            nextTick(() => {
-              const reasoningElements = document.querySelectorAll('.reasoning-content');
-              if (reasoningElements.length > 0) {
-                const lastElement = reasoningElements[reasoningElements.length - 1];
-                lastElement.scrollTop = lastElement.scrollHeight;
-                console.log('【推理内容】滚动到最新位置');
-              }
-            });
-          }
-          
-          console.log(`当前完整响应(${fullResponse.length}字符)`);
-        },
-        // 完成回调
-        () => {
-          console.log('流式响应完成, 最终长度:', fullResponse.length);
-          console.log('【DEBUG】最终推理内容长度:', fullReasoningContent.length);
-          
-          // 流式输出完成后，添加AI消息，包含推理内容
-          messages.value.push({ 
-            type: 'ai', 
-            content: fullResponse,
-            reasoningContent: fullReasoningContent || undefined
-          });
-          
-          console.log('【DEBUG】已添加消息，推理内容长度:', fullReasoningContent.length);
-          
-          streamingMessage.value = '';
-          streamingReasoningContent.value = '';
-          isLoading.value = false;
-        },
-        // 错误回调
-        (error: unknown) => {
-          console.error('流式请求失败:', error);
-          messages.value.push({ 
-            type: 'system', 
-            content: `流式输出失败: ${error instanceof Error ? error.message : String(error)}` 
-          });
-          streamingMessage.value = '';
-          streamingReasoningContent.value = '';
-          isLoading.value = false;
+          model: settingsStore.providers[settingsStore.currentProvider]?.model,
         }
-      )
+      );
+      
+      stream.onMessage((content, reasoningContent) => {
+        streamingMessage.value += content;
+        if (reasoningContent) {
+          streamingReasoningContent.value += reasoningContent;
+        }
+      });
+      
+      // 等待流式响应完成
+      await new Promise<void>((resolve) => {
+        stream.onComplete(() => resolve());
+        stream.onError(() => resolve());
+      });
+
     } else {
-      // 使用传统API
-      const response = await sendChatRequest({
-        message: content,
-        provider: currentProvider,
-        model: config.model,
-        config: {
-          apiKey: config.apiKey,
-          baseUrl: config.baseUrl || undefined
-        },
-        conversationHistory: conversationHistory
-      })
-      
-      // 添加AI响应
-      if (response.reply) {
-        messages.value.push({ 
-          type: 'ai', 
-          content: response.reply,
-          reasoningContent: response.reasoningContent
-        })
-      }
-      
-      // 设置加载状态为false
-      isLoading.value = false
+      // 使用非流式请求
+      await sendSessionMessage(
+        activeSessionId.value,
+        message,
+        {
+          model: settingsStore.providers[settingsStore.currentProvider]?.model,
+        }
+      );
     }
+
+    // 重新查询最新的对话
+    await loadSessionMessages(activeSessionId.value)
   } catch (error) {
-    console.error('聊天请求失败:', error)
-    messages.value.push({ 
-      type: 'system', 
-      content: `发送消息失败: ${error instanceof Error ? error.message : String(error)}` 
-    })
-    // 无论成功还是失败，都设置加载状态为false
+    console.error('Failed to send message:', error)
+    // 更新最后一条AI消息为错误信息
+    const lastMessage = sessionMessages.value[sessionMessages.value.length - 1]
+    lastMessage.content = '消息发送失败，请稍后再试或检查API配置。'
+  } finally {
+    // 结束加载
     isLoading.value = false
+    streamingMessage.value = ''
+    streamingReasoningContent.value = ''
   }
 }
 
-// 切换流式输出
-const toggleStreaming = () => {
-  useStreaming.value = !useStreaming.value
-}
+// 监听会话变化
+watch(() => activeSessionId.value, async (newSessionId) => {
+  if (newSessionId) {
+    await loadSessionMessages(newSessionId)
+  } else {
+    sessionMessages.value = []
+  }
+})
 
-onMounted(() => {
+// 组件挂载时加载会话列表
+onMounted(async () => {
   settingsStore.loadSettings()
-  console.log('ChatView mounted')
-})
-
-// 激活时触发（keep-alive组件被显示时）
-onActivated(() => {
-  console.log('ChatView activated')
-})
-
-// 停用时触发（keep-alive组件被隐藏时）
-onDeactivated(() => {
-  console.log('ChatView deactivated')
+  
+  // 如果已经有活动会话ID，加载其消息
+  if (activeSessionId.value) {
+    await loadSessionMessages(activeSessionId.value)
+  }
 })
 </script>
 
 <style scoped>
 .panel {
   display: flex;
+  height: 100vh;
+  max-height: 100vh;
+  width: 100%;
+}
+
+.chat-content {
+  flex: 1;
+  display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 20px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .compact-header {
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  text-align: left;
-  border-bottom: 1px solid #f0f0f0;
+  background-color: #f5f5f5;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .header-content {
@@ -300,26 +304,58 @@ onDeactivated(() => {
   align-items: center;
 }
 
-.compact-header h1 {
-  font-size: 18px;
+.header-controls {
   display: flex;
   align-items: center;
-  margin-top: 0;
-  margin-bottom: 0;
+  gap: 20px;
 }
 
-.compact-header h1 small {
-  font-size: 12px;
-  font-weight: normal;
-  color: #777;
-  margin-left: 8px;
+.stream-toggle-compact {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.slider-compact {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  background-color: #ccc;
+  border-radius: 20px;
+  margin-right: 10px;
+  transition: .4s;
+}
+
+.slider-compact:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+}
+
+input:checked + .slider-compact {
+  background-color: #1890ff;
+}
+
+input:checked + .slider-compact:before {
+  transform: translateX(20px);
+}
+
+.toggle-label-compact {
+  font-size: 14px;
+  color: #333;
 }
 
 main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .chat-container {
@@ -329,62 +365,28 @@ main {
 }
 
 .input-wrapper {
-  display: flex;
-  flex-direction: column;
-  margin-top: 10px;
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+  background-color: #fff;
 }
 
-.stream-toggle-compact {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 12px;
+h1 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
 }
 
-.toggle-label-compact {
-  margin-left: 6px;
-  font-size: 12px;
-  color: #666;
+h1 small {
+  font-size: 14px;
+  color: #888;
+  font-weight: normal;
+  margin-left: 8px;
 }
 
-.stream-toggle-compact input {
+.hidden-checkbox {
+  position: absolute;
   opacity: 0;
-  width: 0;
   height: 0;
-  position: absolute;
-}
-
-.slider-compact {
-  position: relative;
-  display: inline-block;
-  width: 28px;
-  height: 14px;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 14px;
-}
-
-.slider-compact:before {
-  position: absolute;
-  content: "";
-  height: 10px;
-  width: 10px;
-  left: 2px;
-  bottom: 2px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-
-.stream-toggle-compact input:checked + .slider-compact {
-  background-color: #1a73e8;
-}
-
-.stream-toggle-compact input:focus + .slider-compact {
-  box-shadow: 0 0 1px #1a73e8;
-}
-
-.stream-toggle-compact input:checked + .slider-compact:before {
-  transform: translateX(14px);
+  width: 0;
 }
 </style>

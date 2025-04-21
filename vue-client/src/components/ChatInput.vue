@@ -58,8 +58,7 @@ const handleEnterKey = (event: KeyboardEvent) => {
 .input-area {
   display: flex;
   align-items: center;
-  padding: 16px;
-  border-top: 1px solid #eaeaea;
+  padding: 0;
   background-color: white;
 }
 

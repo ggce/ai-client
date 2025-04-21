@@ -69,7 +69,7 @@
                 ></path>
               </svg>
               <span v-if="hoveredButton === index" class="hover-tooltip"
-                >复制Markdown格式</span
+                >复制</span
               >
               <span v-if="copiedIndex === index" class="copy-tooltip"
                 >已复制</span

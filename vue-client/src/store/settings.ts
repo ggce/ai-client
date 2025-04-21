@@ -5,7 +5,7 @@ type Provider = 'deepseek' | 'openai'
 
 interface ProviderConfig {
   apiKey: string
-  baseUrl: string
+  baseURL: string
   model: string
 }
 
@@ -15,25 +15,39 @@ interface SettingsState {
   }
   currentProvider: Provider
   isSidebarCollapsed: boolean
+  isSessionSidebarCollapsed?: boolean
 }
 
 export const useSettingsStore = defineStore('settings', {
-  state: (): SettingsState => ({
-    providers: {
-      deepseek: {
-        apiKey: '',
-        baseUrl: '',
-        model: 'deepseek-chat'
+  state: () => {
+    const initialState: SettingsState = {
+      providers: {
+        deepseek: {
+          apiKey: '',
+          baseURL: '',
+          model: 'deepseek-chat'
+        },
+        openai: {
+          apiKey: '',
+          baseURL: 'https://api.openai.com/v1',
+          model: 'gpt-4.1'
+        }
       },
-      openai: {
-        apiKey: '',
-        baseUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4.1'
-      }
-    },
-    currentProvider: 'deepseek',
-    isSidebarCollapsed: false
-  }),
+      currentProvider: 'deepseek',
+      isSidebarCollapsed: false
+    }
+    
+    // 扩展状态对象，添加会话侧边栏设置
+    return {
+      ...initialState,
+      isSessionSidebarCollapsed: false
+    } as SettingsState & { isSessionSidebarCollapsed: boolean }
+  },
+  
+  getters: {
+    // 提供一个获取会话侧边栏状态的getter
+    sessionSidebarCollapsed: (state) => (state as any).isSessionSidebarCollapsed as boolean
+  },
   
   actions: {
     setProvider(provider: Provider) {
@@ -49,9 +63,9 @@ export const useSettingsStore = defineStore('settings', {
       }
     },
     
-    setBaseUrl(provider: Provider, baseUrl: string) {
+    setBaseURL(provider: Provider, baseURL: string) {
       if (this.providers[provider]) {
-        this.providers[provider].baseUrl = baseUrl
+        this.providers[provider].baseURL = baseURL
       }
     },
     
@@ -65,7 +79,13 @@ export const useSettingsStore = defineStore('settings', {
     
     toggleSidebar() {
       this.isSidebarCollapsed = !this.isSidebarCollapsed
-      console.log('侧边栏状态已切换为:', this.isSidebarCollapsed ? '收起' : '展开')
+      console.log('主侧边栏状态已切换为:', this.isSidebarCollapsed ? '收起' : '展开')
+      this.saveSettings()
+    },
+    
+    toggleSessionSidebar() {
+      (this as any).isSessionSidebarCollapsed = !(this as any).isSessionSidebarCollapsed
+      console.log('会话侧边栏状态已切换为:', (this as any).isSessionSidebarCollapsed ? '收起' : '展开')
       this.saveSettings()
     },
     
@@ -73,7 +93,8 @@ export const useSettingsStore = defineStore('settings', {
       const settingsToSave = {
         providers: this.providers,
         currentProvider: this.currentProvider,
-        isSidebarCollapsed: this.isSidebarCollapsed
+        isSidebarCollapsed: this.isSidebarCollapsed,
+        isSessionSidebarCollapsed: (this as any).isSessionSidebarCollapsed
       }
       console.log('保存所有设置到Electron:', settingsToSave)
       
@@ -111,10 +132,15 @@ export const useSettingsStore = defineStore('settings', {
           this.isSidebarCollapsed = config.isSidebarCollapsed
         }
         
+        if (typeof (config as any).isSessionSidebarCollapsed === 'boolean') {
+          (this as any).isSessionSidebarCollapsed = (config as any).isSessionSidebarCollapsed
+        }
+        
         console.log('设置已应用，当前状态:', {
           providers: this.providers,
           currentProvider: this.currentProvider,
-          isSidebarCollapsed: this.isSidebarCollapsed ? '收起' : '展开'
+          isSidebarCollapsed: this.isSidebarCollapsed ? '收起' : '展开',
+          isSessionSidebarCollapsed: (this as any).isSessionSidebarCollapsed ? '收起' : '展开'
         })
       } else {
         console.log('未找到已保存的设置，使用默认值')

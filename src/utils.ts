@@ -16,11 +16,11 @@ export function loadConfigFromEnv(provider: string = 'deepseek'): ClientOptions 
 
   if (provider === 'deepseek') {
     config.apiKey = '';
-    config.baseUrl = DEEPSEEK_DEFAULT_URL;
+    config.baseURL = DEEPSEEK_DEFAULT_URL;
     config.defaultModel = DEEPSEEK_MODELS.DEFAULT;
   } else if (provider === 'openai') {
     config.apiKey = '';
-    config.baseUrl = OPENAI_DEFAULT_URL;
+    config.baseURL = OPENAI_DEFAULT_URL;
     config.defaultModel = OPENAI_MODELS.DEFAULT;
   }
 

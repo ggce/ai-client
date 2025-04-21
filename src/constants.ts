@@ -26,5 +26,6 @@ export const DEEPSEEK_MODELS = {
   DEFAULT: 'deepseek-chat',
   DEEPSEEK_CHAT: 'deepseek-chat',
   DEEPSEEK_CODER: 'deepseek-coder',
-  DEEPSEEK_REASONER: 'deepseek-reasoner'
+  DEEPSEEK_REASONER: 'deepseek-reasoner',
+  ALL: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner']
 }; 

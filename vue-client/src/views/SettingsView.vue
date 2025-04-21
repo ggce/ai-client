@@ -193,12 +193,12 @@ const configDebug = computed(() => JSON.stringify({
   providers: {
     deepseek: {
       apiKey: deepseekApiKey.value,
-      baseUrl: deepseekBaseUrl.value,
+      baseURL: deepseekBaseUrl.value,
       model: deepseekModel.value
     },
     openai: {
       apiKey: openaiApiKey.value,
-      baseUrl: openaiBaseUrl.value,
+      baseURL: openaiBaseUrl.value,
       model: openaiModel.value
     }
   }
@@ -213,14 +213,14 @@ const loadSettings = async () => {
   const deepseekConfig = settingsStore.providers.deepseek
   if (deepseekConfig) {
     deepseekApiKey.value = deepseekConfig.apiKey || ''
-    deepseekBaseUrl.value = deepseekConfig.baseUrl || ''
+    deepseekBaseUrl.value = deepseekConfig.baseURL || ''
     deepseekModel.value = deepseekConfig.model || 'deepseek-chat'
   }
   
   const openaiConfig = settingsStore.providers.openai
   if (openaiConfig) {
     openaiApiKey.value = openaiConfig.apiKey || ''
-    openaiBaseUrl.value = openaiConfig.baseUrl || ''
+    openaiBaseUrl.value = openaiConfig.baseURL || ''
     openaiModel.value = openaiConfig.model || 'gpt-4.1'
   }
 
@@ -249,12 +249,12 @@ const saveSettings = async () => {
   
   // 设置Deepseek配置
   await settingsStore.setApiKey('deepseek', deepseekApiKey.value)
-  settingsStore.setBaseUrl('deepseek', deepseekBaseUrl.value)
+  settingsStore.setBaseURL('deepseek', deepseekBaseUrl.value)
   await settingsStore.setModel('deepseek', deepseekModel.value)
   
   // 设置OpenAI配置
   await settingsStore.setApiKey('openai', openaiApiKey.value)
-  settingsStore.setBaseUrl('openai', openaiBaseUrl.value)
+  settingsStore.setBaseURL('openai', openaiBaseUrl.value)
   await settingsStore.setModel('openai', openaiModel.value)
   
   // 保存全部设置确保同步

@@ -48,5 +48,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 </style>

@@ -1,8 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
-import express from 'express';
-import { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, Express, Application } from 'express';
+import { NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import { DeepseekClient } from '../providers/deepseek';
 import { AIProviderSwitcher } from '../ai-provider-switcher';
@@ -16,21 +16,64 @@ import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODEL
 dotenv.config();
 
 // 设置应用名称
-app.name = 'DeepSeek客户端';
+app.name = 'AI-CLIENT';
 
 // 设置Express服务器
-const expressApp = express();
+const expressApp: Application = express();
 const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务器冲突
 
-// 创建API客户端实例
-const deepseekClient = new DeepseekClient({
+// 创建API客户端实例（初始化时使用默认值）
+let deepseekClient: DeepseekClient = new DeepseekClient({
   apiKey: '',
-  baseUrl: DEEPSEEK_DEFAULT_URL
+  baseURL: DEEPSEEK_DEFAULT_URL
 });
 
-const openaiclient = new OpenAIClient({
+let openaiclient = new OpenAIClient({
   apiKey: '',
-  baseUrl: OPENAI_DEFAULT_URL
+  baseURL: OPENAI_DEFAULT_URL
+});
+
+// 从配置文件加载配置
+function initClientsFromConfig() {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'config.json');
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configData);
+      
+      console.log('读取到的配置:', JSON.stringify(config, null, 2).substring(0, 100) + '...');
+      
+      if (config.providers) {
+        // 更新DeepSeek客户端
+        if (config.providers.deepseek?.apiKey) {
+          deepseekClient.updateOptions({
+            apiKey: config.providers.deepseek.apiKey,
+            baseURL: config.providers.deepseek.baseURL || DEEPSEEK_DEFAULT_URL,
+            defaultModel: config.providers.deepseek.model || DEEPSEEK_MODELS.DEFAULT
+          });
+          console.log('已从配置文件加载DeepSeek API配置');
+        }
+        
+        // 更新OpenAI客户端
+        if (config.providers.openai?.apiKey) {
+          openaiclient.updateOptions({
+            apiKey: config.providers.openai.apiKey,
+            baseURL: config.providers.openai.baseURL || OPENAI_DEFAULT_URL,
+            defaultModel: config.providers.openai.model || OPENAI_MODELS.DEFAULT
+          });
+          console.log('已更新OpenAI API配置');
+        }
+      }
+    }
+  } catch (error) {
+    console.error('从配置文件初始化客户端失败:', error);
+  }
+}
+
+// 应用准备就绪后初始化
+app.whenReady().then(() => {
+  // 从配置文件加载配置
+  initClientsFromConfig();
 });
 
 // 设置静态文件夹 - 提供API服务
@@ -38,10 +81,6 @@ expressApp.use(express.static(path.join(__dirname, '../../src/public')));
 
 // 设置Vue构建输出的静态文件夹
 expressApp.use(express.static(path.join(__dirname, '../../vue-client/dist')));
-
-// 设置模板引擎
-expressApp.set('view engine', 'ejs');
-expressApp.set('views', path.join(__dirname, '../../src/views'));
 
 // 使用中间件解析请求主体
 expressApp.use(bodyParser.json());
@@ -76,130 +115,9 @@ router.get('/', routeHandler((req: Request, res: Response) => {
   }
 }));
 
-// 处理聊天请求的API端点
-const chatHandler = async (req: Request, res: Response) => {
-  try {
-    const { message, provider = 'deepseek', config, model = DEEPSEEK_MODELS.DEFAULT, conversationHistory } = req.body;
-    
-    // 参数验证
-    if (!message) {
-      return res.status(400).json({ error: '消息不能为空' });
-    }
-    
-    console.log(`开始${provider}请求, 模型: ${model}`);
-    
-    // 根据provider创建不同的client
-    let dynamicClient; 
-    
-    if (provider === 'deepseek') {
-      dynamicClient = new DeepseekClient({
-        apiKey: config?.apiKey || '',
-        baseUrl: config?.baseUrl || DEEPSEEK_DEFAULT_URL
-      });
-    } else {
-      dynamicClient = new OpenAIClient({
-        apiKey: config?.apiKey || '',
-        baseUrl: config?.baseUrl || OPENAI_DEFAULT_URL
-      });
-    }
-    
-    // 准备消息数组
-    let messages: Message[] = [];
-    
-    // 处理多轮对话
-    if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-      // 将历史消息格式化为API需要的格式
-      messages = conversationHistory.map(msg => {
-        // 将UI消息类型转换为API所需的Role类型
-        let role: Role = 'user';
-        if (msg.type === 'ai') role = 'assistant';
-        else if (msg.type === 'system') role = 'system';
-        
-        return {
-          role: role,
-          content: msg.content
-        };
-      });
-    }
-    
-    // 添加当前用户消息
-    messages.push({ role: 'user', content: message });
-    
-    // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
-    if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
-      console.log('请求检测到Reasoner模型，进行消息交替检查');
-      
-      // 创建一个新的消息数组，确保严格交替
-      const filteredMessages: Message[] = [];
-      let lastRole: Role | null = null;
-      
-      for (const msg of messages) {
-        // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
-        if (lastRole === msg.role) {
-          console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
-          continue;
-        }
-        
-        // 添加到过滤后的消息中
-        filteredMessages.push(msg);
-        lastRole = msg.role;
-      }
-      
-      // 替换原始消息数组
-      console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
-      messages = filteredMessages;
-    }
-    
-    // 获取回复
-    const completion = await dynamicClient.chat.completions.create({
-      model: model,
-      messages,
-      max_tokens: 2048,
-      temperature: 0.7
-    });
-    
-    // 提取回复文本
-    if (!('choices' in completion)) {
-      throw new Error('收到了意外的流式响应');
-    }
-    
-    const replyText = completion.choices[0]?.message?.content || '';
-    
-    // 检查是否存在推理内容 (DeepSeek Reasoner 模型)
-    let reasoningContent;
-    if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
-      // @ts-ignore - 访问推理内容字段
-      reasoningContent = completion.choices[0]?.message?.reasoning_content;
-    }
-    
-    // 返回结果
-    return res.json({ 
-      reply: replyText,
-      reasoningContent: reasoningContent || undefined
-    });
-  } catch (error) {
-    console.error('处理聊天请求时出错:', error);
-    return res.status(500).json({ 
-      error: '处理请求时出错', 
-      details: error instanceof Error ? error.message : String(error) 
-    });
-  }
-};
-
-// 聊天API路由
-router.post('/api/chat', routeHandler((req: Request, res: Response) => {
-  chatHandler(req, res).catch(error => {
-    console.error('处理聊天请求时出错:', error);
-    res.status(500).json({ 
-      error: '处理请求时出错', 
-      details: error instanceof Error ? error.message : String(error) 
-    });
-  });
-}));
-
 // 处理所有路由 - 使用类型断言避免TypeScript编译错误
 interface RouterHandler {
-  (req: Request, res: Response): void;
+  (req: Request, res: Response): Promise<any> | any;
 }
 
 interface MiddlewareHandler {
@@ -207,212 +125,36 @@ interface MiddlewareHandler {
 }
 
 function routeHandler(handler: RouterHandler) {
-  return handler as any; // 类型断言为any避免TypeScript错误
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // 直接调用处理函数获取结果
+      const result = await handler(req, res);
+      
+      // 如果响应已结束，不执行后续代码
+      if (res.headersSent) {
+        return;
+      }
+      
+      // 显式发送响应
+      res.json(result);
+    } catch (error) {
+      console.error('路由处理错误:', error);
+      
+      // 如果响应已结束，不执行后续代码
+      if (res.headersSent) {
+        return;
+      }
+      
+      // 发送错误响应
+      res.status(500).json({
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
 }
 
 function middlewareHandler(handler: MiddlewareHandler) {
   return handler as any; // 类型断言为any避免TypeScript错误
-}
-
-// 注册流式API路由 - 使用SSE标准
-router.post('/api/chat/stream', routeHandler((req: Request, res: Response) => {
-  const { message, provider = 'deepseek', config, model = DEEPSEEK_MODELS.DEFAULT, conversationHistory } = req.body;
-
-  console.log(`开始${provider}流式响应, 模型: ${model}`);
-  
-  // 添加调试日志
-  console.log('接收到流式请求:', {
-    provider,
-    model,
-    messageLength: message?.length,
-    hasConversationHistory: !!conversationHistory,
-    conversationHistoryLength: conversationHistory?.length || 0
-  });
-  
-  if (conversationHistory && Array.isArray(conversationHistory)) {
-    console.log('流式对话历史摘要:', conversationHistory.map(msg => ({
-      type: msg.type,
-      contentPreview: msg.content.substring(0, 30) + '...'
-    })));
-  }
-  
-  // 基本参数验证
-  if (!message) {
-    return res.status(400).json({ error: '消息不能为空' });
-  }
-  
-  // 设置SSE响应头
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  
-  // 创建计数器和内容
-  let chunkCount = 0;
-  let accumulatedContent = '';
-
-  // 使用立即执行异步函数，而不是在主处理程序中使用async
-  (async function() {
-    try {
-      // 根据provider创建不同的client
-      let dynamicClient; 
-      
-      if (provider === 'deepseek') {
-        dynamicClient = new DeepseekClient({
-          apiKey: config?.apiKey || '',
-          baseUrl: config?.baseUrl || DEEPSEEK_DEFAULT_URL
-        });
-      } else {
-        dynamicClient = new OpenAIClient({
-          apiKey: config?.apiKey || '',
-          baseUrl: config?.baseUrl || OPENAI_DEFAULT_URL
-        });
-      }
-      
-      // 准备消息数组 - 使用正确的类型
-      let messages: Message[] = [];
-      
-      // 处理多轮对话
-      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-        // 将历史消息格式化为API需要的格式
-        messages = conversationHistory.map(msg => {
-          // 将UI消息类型转换为API所需的Role类型
-          let role: Role = 'user';
-          if (msg.type === 'ai') role = 'assistant';
-          else if (msg.type === 'system') role = 'system';
-          
-          return {
-            role: role,
-            content: msg.content
-          };
-        });
-        
-        // 输出调试日志
-        console.log('流式会话历史已转换, 条数:', messages.length);
-      }
-      
-      // 添加当前用户消息
-      messages.push({ role: 'user', content: message });
-      
-      // 特殊处理: 对于DeepSeek Reasoner模型，需要确保消息是严格交替的
-      if (provider === 'deepseek' && model === DEEPSEEK_MODELS.DEEPSEEK_REASONER) {
-        console.log('流式请求检测到Reasoner模型，进行消息交替检查');
-        
-        // 创建一个新的消息数组，确保严格交替
-        const filteredMessages: Message[] = [];
-        let lastRole: Role | null = null;
-        
-        for (const msg of messages) {
-          // 跳过与前一条消息角色相同的消息（防止连续相同角色消息）
-          if (lastRole === msg.role) {
-            console.log(`跳过连续的${msg.role}消息:`, msg.content.substring(0, 30) + '...');
-            continue;
-          }
-          
-          // 添加到过滤后的消息中
-          filteredMessages.push(msg);
-          lastRole = msg.role;
-        }
-        
-        // 替换原始消息数组
-        console.log('过滤前消息数量:', messages.length, '过滤后:', filteredMessages.length);
-        console.log('过滤后的消息序列:', filteredMessages.map(m => m.role).join(' -> '));
-        
-        // 使用过滤后的消息
-        messages = filteredMessages;
-      }
-      
-      // 打印完整发送的消息
-      console.log('发送给API的完整消息历史:', JSON.stringify(messages));
-      
-      // 创建流
-      const stream = await dynamicClient.chat.completions.createStream({
-        model: model,
-        messages: messages,
-        max_tokens: 2048,
-        temperature: 0.7
-      });
-      
-      console.log(`流创建成功, 准备处理数据`);
-
-      // 处理流数据的函数
-      async function processStream() {
-        try {
-          // 确保stream是异步迭代器
-          if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
-            throw new Error(`流对象不是有效的异步迭代器: ${typeof stream}`);
-          }
-          
-          for await (const chunk of stream) {
-            // 深度检查chunk对象的结构
-            console.log(`收到数据块类型: ${typeof chunk}`, 
-              chunk?.choices ? `包含choices: ${chunk.choices.length}` : '无choices');
-            
-            // 获取每个chunk的内容
-            const content = chunk.choices[0]?.delta?.content || '';
-            
-            // 处理DeepSeek Reasoner模型的推理内容
-            // @ts-ignore - Delta类型定义中不存在reasoning_content属性，但实际API返回中包含此字段
-            const reasoningContent = chunk.choices[0]?.delta?.reasoning_content || '';
-            
-            if (content || reasoningContent) {
-              chunkCount++;
-              accumulatedContent += content;
-              
-              // 发送数据给客户端，包含推理内容（如果有）
-              const data = { 
-                content,
-                // 添加推理内容字段，仅当使用Reasoner模型且有推理内容时才会有值
-                reasoning_content: reasoningContent || undefined
-              };
-              sendData(res, data);
-            }
-          }
-          
-          // 流结束，记录统计信息
-          console.log(`${provider}流式响应完成，共收到${chunkCount}个数据块，总内容长度: ${accumulatedContent.length}字符`);
-          
-          // 如果没有收到任何内容，发送警告
-          if (chunkCount === 0) {
-            console.warn('警告: 未收到任何数据块，可能存在API问题');
-            sendData(res, { error: '未能获取到有效回复，请检查API配置' });
-          }
-          
-          // 结束响应
-          res.end();
-        } catch (error: any) {
-          console.error(`流处理错误:`, error);
-          sendData(res, { error: `流处理出错: ${error.message}` });
-          res.end();
-        }
-      }
-      
-      // 启动流处理
-      await processStream();
-    } catch (error: any) {
-      console.error(`创建流失败:`, error);
-      sendData(res, { error: `创建流失败: ${error.message}` });
-      res.end();
-    }
-  })().catch((error: any) => {
-    console.error('处理流时发生错误:', error);
-    sendData(res, { error: `处理出错: ${error.message}` });
-    res.end();
-  });
-}));
-
-// 格式化发送数据的辅助函数
-function sendData(res: Response, data: any) {
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-  // 使用兼容的方式尝试刷新流
-  try {
-    // 某些Express环境支持flush，但不在类型定义中
-    const response = res as any;
-    if (typeof response.flush === 'function') {
-      response.flush();
-    }
-  } catch (error) {
-    // 忽略刷新错误
-  }
 }
 
 // 配置API路由 - 获取配置
@@ -452,6 +194,10 @@ router.post('/api/config', routeHandler((req: Request, res: Response) => {
     }
     
     fs.writeFileSync(configPath, JSON.stringify(req.body, null, 2), 'utf8');
+    
+    // 从配置文件加载配置
+    initClientsFromConfig();
+
     console.log('配置保存成功');
     res.json({ success: true });
   } catch (error) {
@@ -498,6 +244,282 @@ router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Respo
       error: '查询余额失败', 
       details: error instanceof Error ? error.message : String(error) 
     });
+  }
+}));
+
+// 会话管理API
+
+// 创建新会话
+router.post('/api/sessions', routeHandler(async (req: Request, res: Response) => {
+  console.log('接收到创建会话请求', req.body);
+  try {
+    console.log('准备创建会话');
+    
+    // 使用新的API创建会话
+    const sessionId = deepseekClient.createSession();
+    
+    if (!sessionId) {
+      console.error('创建会话失败');
+      // 直接发送响应而不是返回值
+      res.status(500).json({ error: '创建会话失败: 未返回sessionId' });
+      return;
+    }
+    
+    console.log('成功创建会话，ID:', sessionId);
+    
+    // 直接发送响应
+    res.json(sessionId);
+  } catch (err) {
+    console.error('创建会话失败', err);
+    // 直接发送错误响应
+    res.status(500).json({
+      error: `创建会话失败: ${err instanceof Error ? err.message : String(err)}`
+    });
+  }
+}));
+
+// 获取会话id列表
+router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) => {
+  console.log('接收到获取会话id列表请求');
+  try {
+    // 设置超时处理
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('获取会话id列表超时')), 5000);
+    });
+    
+    const getSessionsPromise = (async () => {
+      try {
+        console.log('准备获取会话id列表');
+        // 使用新的API获取会话列表
+        const sessionIds = deepseekClient.listSessionIds();
+        console.log(`找到 ${sessionIds.length} 个会话`);
+        
+        // 转换为前端需要的格式
+        console.log('成功获取会话id列表', sessionIds);
+        return sessionIds;
+      } catch (innerErr) {
+        console.error('获取会话id列表内部错误', innerErr);
+        throw new Error(`获取会话id列表内部错误: ${innerErr instanceof Error ? innerErr.message : String(innerErr)}`);
+      }
+    })();
+    
+    // 使用Promise.race防止请求卡住
+    return await Promise.race([getSessionsPromise, timeoutPromise]);
+  } catch (err) {
+    console.error('获取会话id列表失败', err);
+    // 返回空列表，允许前端继续
+    return [];
+  }
+}));
+
+// 获取会话历史
+router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    
+    // 使用新的API获取会话历史
+    try {
+      const messages = deepseekClient.getSessionMessages(sessionId);
+      
+      // 转换消息格式以适应前端需求
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        reasoningContent: msg.reasoning_content,
+        // 添加其他前端需要的字段
+      }));
+
+      return formattedMessages;
+    } catch (error) {
+      if (error instanceof Error && error.message === '会话不存在') {
+        throw new Error('会话不存在');
+      }
+      throw error;
+    }
+  } catch (err) {
+    console.error('获取会话历史失败', err);
+    throw new Error(`获取会话历史失败: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}));
+
+// 发送消息到会话
+router.post('/api/sessions/:id/messages', routeHandler(async (req: Request, res: Response) => {
+  try {
+    const { message, options } = req.body;
+    const sessionId = req.params.id;
+    
+    // 使用新的API发送消息
+    try {
+      const result = await deepseekClient.sendMessageToSession(
+        sessionId,
+        message,
+        options
+      );
+
+      // 返回结果
+      return {
+        content: result.content,
+        role: 'assistant',
+        reasoningContent: result.reasoningContent
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === '会话不存在') {
+        throw new Error('会话不存在');
+      }
+      throw error;
+    }
+  } catch (err) {
+    console.error('发送消息失败', err);
+    throw new Error(`发送消息失败: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}));
+
+// 添加一个临时存储来保存消息请求，用于流式接口
+const streamRequestsStore: Map<string, { message: string, options?: any }> = new Map();
+
+// 为SSE格式化并发送数据
+function sendData(res: Response, data: any) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // 使用兼容的方式尝试刷新流
+  try {
+    // 某些Express环境支持flush，但不在类型定义中
+    const response = res as any;
+    if (typeof response.flush === 'function') {
+      response.flush();
+    }
+  } catch (error) {
+    // 忽略刷新错误
+  }
+}
+
+// 接收流式请求数据
+router.post('/api/sessions/:id/messages/stream', (req: Request, res: Response) => {
+  try {
+    const { message, options } = req.body;
+    const sessionId = req.params.id;
+    
+    // 存储请求数据，以便GET请求处理
+    const requestId = `${sessionId}_${Date.now()}`;
+    streamRequestsStore.set(requestId, { message, options });
+    
+    // 设置过期时间，60秒后自动清理
+    setTimeout(() => {
+      streamRequestsStore.delete(requestId);
+      console.log(`已清理流式请求数据: ${requestId}`);
+    }, 60000);
+    
+    // 返回请求ID
+    res.json({ requestId });
+  } catch (error) {
+    console.error('准备流式请求失败:', error);
+    res.status(500).json({ 
+      error: `准备流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
+    });
+  }
+});
+
+// 处理流式GET请求，建立SSE连接
+router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) => {
+  const requestId = req.query.requestId as string;
+  
+  if (!requestId) {
+    res.status(400).json({ error: 'Missing requestId parameter' });
+    return;
+  }
+  
+  const requestData = streamRequestsStore.get(requestId);
+  
+  if (!requestData) {
+    res.status(404).json({ error: 'Request not found or expired' });
+    return;
+  }
+  
+  // 设置SSE响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // 防止Nginx缓冲
+  res.flushHeaders();
+  
+  const sessionId = req.params.id;
+  const { message, options } = requestData;
+  
+  (async () => {
+    try {
+      if (!deepseekClient) {
+        sendData(res, { error: 'API client not initialized' });
+        res.end();
+        return;
+      }
+      
+      try {
+        // 使用新的流式API
+        const streamResult = await deepseekClient.sendStreamMessageToSession(
+          sessionId, 
+          message,
+          options
+        );
+        
+        const stream = streamResult.stream;
+        for await (const chunk of stream) {
+          if (chunk.choices && chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content;
+            sendData(res, { content });
+          }
+          
+          // 处理推理内容（如果有）
+          if (chunk.choices && 
+              chunk.choices[0]?.delta && 
+              'reasoning_content' in chunk.choices[0].delta) {
+            const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
+            if (reasoningContent) {
+              sendData(res, { reasoningContent });
+            }
+          }
+        }
+        
+        // 注册完成回调
+        if (streamResult.onComplete) {
+          streamResult.onComplete((finalResponse) => {
+            console.log('Stream session complete, final response length:', finalResponse.content.length);
+          });
+        }
+        
+        // 发送完成信号并清理
+        sendData(res, { done: true });
+        streamRequestsStore.delete(requestId);
+        res.end();
+      } catch (error) {
+        if (error instanceof Error && error.message === '会话不存在') {
+          sendData(res, { error: 'Session not found' });
+          streamRequestsStore.delete(requestId);
+          res.end();
+          return;
+        }
+        throw error;
+      }
+    } catch (err: any) {
+      console.error('Failed to send streaming message:', err);
+      sendData(res, { error: `Streaming error: ${err.message}` });
+      streamRequestsStore.delete(requestId);
+      res.end();
+    }
+  })();
+});
+
+// 删除会话
+router.delete('/api/sessions/:id', routeHandler(async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    // 使用新的API结束会话
+    const success = deepseekClient.endSession(sessionId);
+    if (!success) {
+      throw new Error('会话不存在');
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('删除会话失败', err);
+    throw new Error(`删除会话失败: ${err instanceof Error ? err.message : String(err)}`);
   }
 }));
 
@@ -653,4 +675,4 @@ app.on('will-quit', () => {
   if (server) {
     server.close();
   }
-}); 
+});

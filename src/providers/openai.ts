@@ -17,7 +17,7 @@ export class OpenAIClient {
   constructor(options: ClientOptions = {}) {
     this.options = {
       apiKey: options.apiKey || '',
-      baseUrl: options.baseUrl || OPENAI_DEFAULT_URL,
+      baseURL: options.baseURL || OPENAI_DEFAULT_URL,
       defaultModel: options.defaultModel || OPENAI_MODELS.DEFAULT,
       timeout: options.timeout || 60000,
       maxRetries: options.maxRetries || 3,
@@ -26,10 +26,31 @@ export class OpenAIClient {
     // API key可以为空，由用户在使用时提供
     this.client = new OpenAI({
       apiKey: this.options.apiKey || 'dummy-key', // 使用dummy-key防止OpenAI SDK初始化错误
-      baseURL: this.options.baseUrl,
+      baseURL: this.options.baseURL,
       timeout: this.options.timeout,
       maxRetries: this.options.maxRetries,
     });
+  }
+
+  // 更新options
+  public updateOptions(options: Partial<ClientOptions>) {
+    // 更新客户端选项
+    Object.keys(options).forEach(key => {
+      const k = key as keyof ClientOptions;
+      if (options[k] !== undefined) {
+        this.options[k] = options[k] as any;
+      }
+    });
+    
+    // 重新创建OpenAI客户端实例
+    this.client = new OpenAI({
+      apiKey: this.options.apiKey || 'dummy-key', // 使用dummy-key防止OpenAI SDK初始化错误
+      baseURL: this.options.baseURL,
+      timeout: this.options.timeout,
+      maxRetries: this.options.maxRetries
+    });
+    
+    console.log('已更新OpenAI客户端配置');
   }
 
   public chat = {
@@ -42,7 +63,17 @@ export class OpenAIClient {
             const response = await this.client.chat.completions.create({
               ...request,
               model: model as string, // 确保model是字符串类型
-              stream: false
+              stream: false,
+              messages: request.messages.map(msg => {
+                const message: any = {
+                  role: msg.role,
+                  content: msg.content
+                };
+                if (msg.name) message.name = msg.name;
+                // Only add function_call if it exists on the message
+                if ('function_call' in msg) message.function_call = msg.function_call;
+                return message;
+              }) as any
             }) as ChatCompletion;
 
             console.log('OpenAI响应: ', response);
@@ -84,6 +115,15 @@ export class OpenAIClient {
           ...request,
           model: model as string, // 确保model是字符串类型
           stream: true,
+          messages: request.messages.map(msg => {
+            const message: any = {
+              role: msg.role,
+              content: msg.content
+            };
+            if (msg.name) message.name = msg.name;
+            if ('function_call' in msg) message.function_call = msg.function_call;
+            return message;
+          }) as any
         });
 
         return stream;

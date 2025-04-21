@@ -5,7 +5,7 @@ type Provider = 'deepseek' | 'openai'
 
 interface ProviderConfig {
   apiKey: string
-  baseUrl: string
+  baseURL: string
   model: string
 }
 
@@ -32,12 +32,12 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
         providers: {
           deepseek: {
             apiKey: '',
-            baseUrl: '',
+            baseURL: '',
             model: 'deepseek-chat'
           },
           openai: {
             apiKey: '',
-            baseUrl: '',
+            baseURL: '',
             model: 'gpt-4.1'
           }
         },
@@ -94,7 +94,7 @@ export const saveApiKey = async (provider: Provider, apiKey: string): Promise<bo
     if (!currentConfig.providers[provider]) {
       currentConfig.providers[provider] = {
         apiKey: '',
-        baseUrl: '',
+        baseURL: '',
         model: provider === 'deepseek' ? 'deepseek-chat' : 'gpt-4.1'
       }
     }
@@ -120,7 +120,7 @@ export const saveModel = async (provider: Provider, model: string): Promise<bool
     if (!currentConfig.providers[provider]) {
       currentConfig.providers[provider] = {
         apiKey: '',
-        baseUrl: '',
+        baseURL: '',
         model: model
       }
     } else {

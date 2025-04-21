@@ -6,6 +6,10 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 // 导入mcpServers定义
 import { mcpServers, MCPServerConfig } from "./mcpServers";
 
+import { 
+  MCPTool,
+} from './types';
+
 // 定义每个服务器实例的状态接口
 interface ServerInstance {
   client: Client;
@@ -465,11 +469,7 @@ export class MCPClient {
    * 从所有MCP服务器收集工具列表
    * @returns 所有可用工具的合并列表，每个工具包含来源服务器信息
    */
-  async collectToolsFromAllServers(): Promise<Array<{
-    name: string;
-    description: string;
-    parameters: any;
-  }>> {
+  async collectToolsFromAllServers(): Promise<Array<MCPTool>> {
     const allTools: Array<{
       name: string;
       description: string;
