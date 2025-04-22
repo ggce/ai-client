@@ -1,11 +1,11 @@
 import OpenAI from 'openai';
-import { ChatCompletionMessageParam, ChatCompletionToolMessageParam } from 'openai/resources/chat/completions';
+import { ChatCompletionMessageParam, ChatCompletionToolMessageParam, ChatCompletionAssistantMessageParam, ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import { 
   MCPTool,
   Message,
   ClientOptions
 } from '../types';
-import { generateUUID } from '../utils';
+import { delay, generateUUID } from '../utils';
 import { DEEPSEEK_DEFAULT_URL, DEEPSEEK_MODELS } from '../constants';
 import MCPClient from '../mcpClient';
 
@@ -38,21 +38,24 @@ export class Session {
   }
   
   // 添加助手消息
-  public addAssistantMessage(content: string, reasoningContent?: string): void {
+  public addAssistantMessage(content: string, reasoningContent?: string, toolCalls?: Array<ChatCompletionMessageToolCall>): void {
     this.messages.push({
       role: 'assistant',
       content,
+      tool_calls: toolCalls,
       reasoning_content: reasoningContent
     });
   }
   
   // 添加工具消息
-  public addToolMessage(content: string, toolCallId: string): void {
-    this.messages.push({
+  public addToolMessage(toolCallId: string, content: string): void {
+    const message: Message = {
       role: 'tool',
       content,
-      tool_call_id: toolCallId
-    });
+      tool_call_id: toolCallId,
+      timestamp: Date.now()
+    };
+    this.messages.push(message);
   }
 
   // 获取会话ID
@@ -66,7 +69,10 @@ export class Session {
   }
 }
 
-// 使用OpenAI SDK连接DeepSeek API的客户端实现
+/**
+ * 使用OpenAI SDK连接DeepSeek API的客户端实现
+ * 此客户端仅支持流式API，提供更高效的对话体验
+ */
 export class DeepseekClient {
   private client: OpenAI;
   private options: ClientOptions;
@@ -88,7 +94,7 @@ export class DeepseekClient {
     // 初始化MCP客户端
     this.mcpClient = new MCPClient("deepseek-client", "1.0.0");
 
-    console.log('初始化DeepSeek客户端，使用OpenAI SDK连接');
+    console.log('[DeepSeek] 初始化客户端完成');
   }
 
   // 更新options
@@ -104,14 +110,14 @@ export class DeepseekClient {
     // 重新创建OpenAI客户端实例
     this.client = new OpenAI(this.options);
     
-    console.log('已更新DeepSeek客户端配置', this.options || "????");
+    console.log('[DeepSeek] 已更新客户端配置:', this.options);
   }
 
   // 创建新的会话
   public createSession(): string {
     const session = new Session();
     const sessionId = session.getId();
-    console.log('创建新会话:', sessionId);
+    console.log('[DeepSeek] 创建新会话:', sessionId);
     this.sessions.set(sessionId, session);
 
     return sessionId;
@@ -148,28 +154,6 @@ export class DeepseekClient {
   }
 
   /**
-   * 向会话发送消息并获取回复
-   * @param sessionId 会话ID
-   * @param message 用户消息
-   * @param options 可选配置项
-   * @returns 助手回复和推理内容
-   */
-  public async sendMessageToSession(
-    sessionId: string, 
-    message: string, 
-    options?: {
-      model?: string;
-    }
-  ): Promise<{ content: string; reasoningContent?: string }> {
-    const session = this.getSession(sessionId);
-    if (!session) {
-      throw new Error('会话不存在');
-    }
-    
-    return await this.continueSession(session, message, options);
-  }
-
-  /**
    * 向会话发送流式消息并获取流式回复
    * @param sessionId 会话ID
    * @param message 用户消息
@@ -178,7 +162,7 @@ export class DeepseekClient {
    */
   public async sendStreamMessageToSession(
     sessionId: string, 
-    message: string, 
+    message?: string, 
     options?: {
       model?: string;
     }
@@ -191,11 +175,7 @@ export class DeepseekClient {
     return await this.continueSessionStream(session, message, options);
   }
 
-  /**
-   * 结束并删除会话
-   * @param sessionId 会话ID
-   * @returns 删除是否成功
-   */
+  // 结束并删除会话
   public endSession(sessionId: string): boolean {
     return this.deleteSession(sessionId);
   }
@@ -208,24 +188,31 @@ export class DeepseekClient {
   // 准备会话请求共享逻辑
   private async prepareSessionRequest(
     session: Session, 
-    userMessage: string, 
+    userMessage?: string | undefined, 
     options?: {
       model?: string;
     }
   ) {
     // 添加用户消息到会话
-    session.addUserMessage(userMessage);
+    if (userMessage){
+      session.addUserMessage(userMessage);
+    }
     
     // 获取完整消息历史
     const messages = session.getMessages();
     
-    console.log('打印model'!!!!);
-    console.log(options?.model || "????");
+    console.log('[DeepSeek] 准备请求参数:', {
+      model: options?.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT,
+      messagesCount: messages.length,
+      hasTools: this.isReasonerModel(options?.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT) ? false : true
+    });
     const model = options?.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT;
     const isReasoner = this.isReasonerModel(model);
 
     // MCP工具
     const tools: Array<MCPTool> = await this.mcpClient.collectToolsFromAllServers();
+
+    console.log('[DeepSeek] 收集到的工具:', tools);
 
     return {
       messages,
@@ -236,123 +223,15 @@ export class DeepseekClient {
     };
   }
 
-  // 多轮对话接口 - 传入会话对象和用户消息，返回助手响应
-  public async continueSession(
-    session: Session,
-    userMessage: string,
-    options?: {
-      model?: string;
-    }
-  ): Promise<{ content: string; reasoningContent?: string }> {
-    const {
-      messages, model, isReasoner, tools
-    } = await this.prepareSessionRequest(session, userMessage, options);
-    
-    // 发送请求
-    const response = await this.chat.completions.create({
-      model,
-      messages,
-      tools,
-    });
-    
-    // 确保我们得到的是非流式响应
-    if ('choices' in response) {
-      // 获取助手响应
-      const assistantMessage = response.choices[0]?.message?.content || '';
-      
-      // 如果是推理模型，获取推理内容
-      let reasoningContent: string | undefined;
-      if (isReasoner && response.choices[0]?.message) {
-        // @ts-ignore - 添加推理内容访问支持
-        reasoningContent = response.choices[0].message.reasoning_content;
-      }
-      
-      // 检查是否有工具调用
-      if (response.choices[0]?.message?.tool_calls && 
-          response.choices[0].message.tool_calls.length > 0) {
-        
-        // 将助手响应添加到会话历史（包含工具调用）
-        session.addAssistantMessage(assistantMessage, reasoningContent);
-        
-        // 处理工具调用
-        const toolCalls = response.choices[0].message.tool_calls;
-        
-        // 执行工具调用并收集结果
-        for (const toolCall of toolCalls) {
-          try {
-            // 解析参数
-            const args = JSON.parse(toolCall.function.arguments || '{}');
-            
-            // 从工具名中提取服务器键和实际工具名
-            const [serverKey, actualToolName] = toolCall.function.name.split('_SERVERKEYTONAME_');
-            const result = await this.mcpClient.callTool(
-              {
-                name: actualToolName || toolCall.function.name,
-                arguments: args
-              },
-              serverKey
-            );
-            
-            // 添加工具响应到会话
-            session.addToolMessage(
-              JSON.stringify(result),
-              toolCall.id
-            );
-          } catch (error) {
-            // 处理错误
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`执行工具 ${toolCall.function.name} 失败:`, errorMessage);
-            
-            // 添加错误响应到会话
-            session.addToolMessage(
-              JSON.stringify({ error: errorMessage }),
-              toolCall.id
-            );
-          }
-        }
-        
-        // 再次发送请求，包含工具响应
-        const finalResponse = await this.chat.completions.create({
-          model,
-          messages: session.getMessages(),
-        });
-        
-        if ('choices' in finalResponse) {
-          const finalAssistantMessage = finalResponse.choices[0]?.message?.content || '';
-          
-          // 如果是推理模型，获取推理内容
-          let finalReasoningContent: string | undefined;
-          if (isReasoner && finalResponse.choices[0]?.message) {
-            // @ts-ignore - 添加推理内容访问支持
-            finalReasoningContent = finalResponse.choices[0].message.reasoning_content;
-          }
-          
-          // 将最终助手响应添加到会话历史
-          session.addAssistantMessage(finalAssistantMessage, finalReasoningContent);
-          
-          return { content: finalAssistantMessage, reasoningContent: finalReasoningContent };
-        }
-      } else {
-        // 没有工具调用，直接添加助手响应到会话历史
-        session.addAssistantMessage(assistantMessage, reasoningContent);
-        
-        return { content: assistantMessage, reasoningContent };
-      }
-      
-      return { content: assistantMessage, reasoningContent };
-    } else {
-      throw new Error('收到了意外的流式响应');
-    }
-  }
-  
   // 多轮对话流式接口
   public async continueSessionStream(
     session: Session,
-    userMessage: string,
+    userMessage?: string | undefined,
     options?: {
       model?: string;
     }
   ) {
+    console.log('[DeepSeek] 准备发送流式请求');
     const {
       messages, model, isReasoner, tools 
     } = await this.prepareSessionRequest(session, userMessage, options);
@@ -367,63 +246,37 @@ export class DeepseekClient {
     // 使用tee方法创建两个独立的流，一个用于返回，一个用于收集完整响应
     const [streamForClient, streamForCollecting] = streamResponse.tee();
     
-    // 收集完整的响应以添加到会话历史
-    let fullResponse = '';
-    let fullReasoningContent = '';
-    
     // 返回包装后的流，自动收集完整响应并在最后添加到会话历史
     return {
       stream: streamForClient,
-      onComplete: (completeCallback?: (response: { content: string; reasoningContent?: string }) => void) => {
-        // 创建一个异步函数来处理流
-        const handleStream = async () => {
-          try {
-            const startTime = Date.now();
-            let chunkCount = 0;
-            
-            // 使用独立的流副本进行处理
-            for await (const chunk of streamForCollecting) {
-              chunkCount++;
-              const content = chunk.choices[0]?.delta?.content || '';
-              fullResponse += content;
-              
-              // 如果是推理模型，收集推理内容
-              if (isReasoner) {
-                // @ts-ignore - 添加推理内容访问支持
-                const reasoningContent = chunk.choices[0]?.delta?.reasoning_content || '';
-                fullReasoningContent += reasoningContent;
-              }
+      onComplete: async(
+        fullContent: string,
+        fullReasoningContent: string,
+        toolCalls: Array<ChatCompletionMessageToolCall> | null
+      ) => {
+        // 工具调用
+        if (toolCalls && toolCalls.length > 0) {
+          for(const toolCall of toolCalls) {
+            // 调用工具获取结果
+            const res = await this.callTool(session, toolCall);
+
+            if (res.status) {
+              // 调用成功
+              // 添加工具成功到会话
+              session.addToolMessage(
+                res.id || '',
+                res.result || '',
+              );
+            } else {
+              // 调用失败
+              // 添加工具失败到会话
+              session.addToolMessage(
+                res.id || '',
+                JSON.stringify({errorMessage: res.errorMessage}),
+              );
             }
-            
-            const duration = Date.now() - startTime;
-            
-            // 流结束后记录完整响应信息
-            console.log(`DeepSeek 流式响应完成 (${model})`, {
-              total_chunks: chunkCount,
-              duration_ms: duration,
-              content_length: fullResponse.length,
-              content_preview: fullResponse.substring(0, 100) + (fullResponse.length > 100 ? '...' : ''),
-              has_reasoning: isReasoner && fullReasoningContent.length > 0,
-              reasoning_length: fullReasoningContent.length
-            });
-            
-            // 流结束后，将完整响应添加到会话历史
-            session.addAssistantMessage(fullResponse, isReasoner ? fullReasoningContent : undefined);
-            
-            // 如果提供了回调，则调用它
-            if (completeCallback) {
-              completeCallback({
-                content: fullResponse,
-                reasoningContent: isReasoner ? fullReasoningContent : undefined
-              });
-            }
-          } catch (error) {
-            console.error('处理流数据时出错:', error);
           }
-        };
-        
-        // 启动处理，但不等待它完成
-        handleStream();
+        }
       }
     };
   }
@@ -431,144 +284,18 @@ export class DeepseekClient {
   // 聊天接口
   public chat = {
     completions: {
-      // 非流式API
-      create: async (params: {
-        model: string;
-        messages: Array<{ role: string; content: string }>;
-        tools?: Array<MCPTool>;
-      }) => {
-        // 确保消息格式正确（role必须是'user'|'assistant'|'system'）
-        const messages = params.messages.map(msg => ({
-          role: msg.role as 'user' | 'assistant' | 'system',
-          content: msg.content
-        })) as ChatCompletionMessageParam[];
-
-        try {
-          // 确保model不会为undefined
-          const modelName = params.model || this.options.defaultModel || DEEPSEEK_MODELS.DEFAULT;
-          
-          // 准备正确类型的API请求参数
-          const requestParams = {
-            model: modelName,
-            messages,
-            // 确保stream为false (非流式)
-            stream: false,
-            max_tokens: 2048,
-            temperature: 0.7,
-            // 确保工具类型正确
-            tools: params.tools?.map(tool => ({
-              type: 'function' as const,
-              function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.parameters
-              }
-            }))
-          };
-
-          // 记录请求信息
-          console.log(`DeepSeek[非流式]请求:`, requestParams);
-
-          // 发送请求
-          const response = await this.client.chat.completions.create(requestParams);
-          
-          // 记录响应信息 - 更详细的响应摘要
-          if ('choices' in response) {
-            const content = response.choices[0]?.message?.content || '';
-            console.log(`DeepSeek[非流式]响应信息:`, {
-              choices_count: response.choices.length,
-              content_length: content.length,
-              content_preview: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
-              finish_reason: response.choices[0]?.finish_reason,
-              usage: response.usage
-            });
-          }
-          
-          if ('choices' in response && 
-              response.choices[0]?.finish_reason === 'tool_calls' && 
-              response.choices[0]?.message?.tool_calls && 
-              response.choices[0].message.tool_calls.length > 0) {
-            
-            // 安全地获取消息和工具调用
-            const message = response.choices[0].message;
-            const toolCalls = message.tool_calls;
-            
-            console.log('DeepSeek[非流式]请求工具调用:', {
-              tool_calls_count: toolCalls?.length,
-              first_tool: toolCalls && toolCalls[0]?.function?.name
-            });
-            
-            // 执行工具调用并收集结果 - 确保正确的类型
-            const toolResults: ChatCompletionToolMessageParam[] = [];
-            
-            for (const toolCall of toolCalls || []) {
-              try {
-                // 解析参数
-                const args = JSON.parse(toolCall.function.arguments || '{}');
-                
-                // 从工具名中提取服务器键和实际工具名
-                const [serverKey, actualToolName] = toolCall.function.name.split('_SERVERKEYTONAME_');
-                const result = await this.mcpClient.callTool(
-                  {
-                    name: actualToolName || toolCall.function.name,
-                    arguments: args
-                  },
-                  serverKey
-                );
-                
-                // 添加到结果列表 - 移除name属性，确保符合OpenAI规范
-                toolResults.push({
-                  role: 'tool',
-                  tool_call_id: toolCall.id,
-                  content: JSON.stringify(result)
-                });
-              } catch (err: any) {
-                // 类型安全的错误处理
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                console.error(`执行工具 ${toolCall.function.name} 失败:`, errorMessage);
-                
-                toolResults.push({
-                  role: 'tool',
-                  tool_call_id: toolCall.id,
-                  content: JSON.stringify({ error: errorMessage })
-                });
-              }
-            }
-            
-            // 创建类型安全的消息数组
-            const updatedMessages = [
-              ...messages,
-              message,
-              ...toolResults
-            ];
-            
-            // 发送后续请求获取最终结果
-            const finalResponse = await this.client.chat.completions.create({
-              model: modelName,
-              messages: updatedMessages,
-              tools: requestParams.tools
-            });
-            
-            return finalResponse;
-          }
-          
-          return response;
-        } catch (error) {
-          console.error('DeepSeek[非流式]API 请求失败:', error);
-          throw error;
-        }
-      },
-
       // 流式API
       createStream: async (params: {
         model: string;
-        messages: Array<{ role: string; content: string }>;
+        messages: Array<{ role: string; content: string, tool_call_id?: string, tool_calls?: Array<ChatCompletionMessageToolCall> }>;
         tools?: Array<MCPTool>,
       }) => {
         // 确保消息格式正确
         const messages = params.messages.map(msg => ({
           role: msg.role as 'user' | 'assistant' | 'system',
-          content: msg.content
+          content: msg.content,
+          tool_call_id: msg.tool_call_id,
+          tool_calls: msg.tool_calls,
         })) as ChatCompletionMessageParam[];
 
         try {
@@ -594,17 +321,17 @@ export class DeepseekClient {
             }))
           };
 
-          console.log(this.client);
-          // 记录请求信息 - 使用截断的参数
-          console.log(`DeepSeek[流式]请求:`, requestParams);
+          console.log('[DeepSeek] 发送流式请求:', {
+            model: modelName,
+            messagesCount: messages.length,
+            toolsCount: params.tools?.length || 0
+          });
           
           // 发送请求
           const stream = await this.client.chat.completions.create(requestParams);
           
           // 验证流对象 - 更详细的日志
-          console.log('DeepSeek[流式]响应开始:', {
-            stream_type: typeof stream,
-            isAsyncIterable: typeof stream[Symbol.asyncIterator] === 'function',
+          console.log('[DeepSeek] 流式响应开始:', {
             timestamp: new Date().toISOString()
           });
           
@@ -613,7 +340,65 @@ export class DeepseekClient {
           console.error('DeepSeek 流式API请求失败:', error);
           throw error;
         }
-      }
+      },
     }
   };
+
+  /**
+   * 调用工具请求
+   */
+  async callTool(
+    session: Session,
+    toolCall: ChatCompletionMessageToolCall
+  ) {
+    // 无工具
+    if (!toolCall.function || !toolCall.function.name) {
+      throw new Error('工具不存在');
+    }
+
+    console.log('[DeepSeek] 开始调用工具');
+    console.log(toolCall);
+
+    try {
+      // 解析参数 - 修复空字符串解析问题
+      let args = {};
+      if (toolCall.function.arguments && toolCall.function.arguments.trim() !== '') {
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseError) {
+          console.error('[DeepSeek][工具] 解析参数失败:', parseError);
+          // 保持 args 为空对象并继续执行
+        }
+      }
+      
+      // 从工具名中提取服务器键和实际工具名
+      const [serverKey, actualToolName] = toolCall.function.name.split('_SERVERKEYTONAME_');
+      const result = await this.mcpClient.callTool(
+        {
+          name: actualToolName || toolCall.function.name,
+          arguments: args
+        },
+        serverKey
+      );
+
+      console.log('[DeepSeek][工具] 调用成功:', result);
+      
+      return {
+        status: true,
+        id: toolCall.id,
+        result: JSON.stringify(result)
+      }
+    } catch (err: any) {
+      // 类型安全的错误处理
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      console.log('[DeepSeek][工具] 调用失败:', errorMessage);
+
+      return {
+        status: false,
+        id: toolCall.id,
+        errorMessage: errorMessage
+      }
+    }
+  }
 }

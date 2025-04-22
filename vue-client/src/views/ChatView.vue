@@ -5,11 +5,7 @@
         <div class="header-content">
           <h1>AI聊天 <small>{{ modelDisplay }}</small></h1>
           <div class="header-controls">
-            <label class="stream-toggle-compact">
-              <input type="checkbox" v-model="useStreaming" class="hidden-checkbox">
-              <span class="slider-compact"></span>
-              <span class="toggle-label-compact">流式输出</span>
-            </label>
+            <!-- 删除流式开关 -->
           </div>
         </div>
       </header>
@@ -22,6 +18,7 @@
             :streamingMessage="streamingMessage" 
             :streamingReasoningContent="streamingReasoningContent" 
           />
+          <ChatToolbar :messages="sessionMessages" />
           <div class="input-wrapper">
             <ChatInput @send="sendMessage" :disabled="isLoading || !activeSessionId" />
           </div>
@@ -45,13 +42,15 @@ import { Ref } from 'vue'
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
 import SessionSidebar from '../components/SessionSidebar.vue'
+import ChatToolbar from '../components/ChatToolbar.vue'
 import { useSettingsStore } from '../store/settings'
-import { 
-  getSessionMessages, 
-  sendSessionMessage, 
-  sendStreamingSessionMessage, 
-  SessionMessage,
-  createSession
+import {
+  createSession,
+  listSessionIds,
+  getSessionMessages,
+  sendStreamingSessionMessage,
+  deleteSession,
+  SessionMessage
 } from '../api/chat'
 
 // 定义组件名称
@@ -60,7 +59,7 @@ defineOptions({
 })
 
 interface ChatMessage {
-  type: 'user' | 'ai' | 'system'
+  type: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   reasoningContent?: string // 添加推理内容字段
 }
@@ -78,7 +77,6 @@ const sessionMessages = ref<SessionMessage[]>([])
 const isLoading = ref(false)
 const streamingMessage = ref<string>('')
 const streamingReasoningContent = ref<string>('') // 添加流式推理内容
-const useStreaming = ref<boolean>(true) // 默认使用流式输出
 
 // 将isLoading提供给其他组件
 provide('isLoading', isLoading)
@@ -118,9 +116,7 @@ const displayMessages = computed<ChatMessage[]>(() => {
   }
   
   return sessionMessages.value.map(msg => {
-    let type: 'user' | 'ai' | 'system' = 'user'
-    if (msg.role === 'assistant') type = 'ai'
-    else if (msg.role === 'system') type = 'system'
+    let type = msg.role
     
     // 确保reasoningContent是字符串或undefined
     const reasoningContent = typeof msg.reasoningContent === 'string' 
@@ -178,7 +174,7 @@ const loadSessionMessages = async (sessionId: string) => {
 }
 
 // 发送消息
-const sendMessage = async function(message: string) {
+const sendMessage = async function(message?: string) {
   if (!isProviderConfigured()) {
     sessionMessages.value.push({
       role: 'system',
@@ -195,65 +191,82 @@ const sendMessage = async function(message: string) {
     return;
   }
 
-  // 添加用户消息
-  const userMessage = {
-    role: 'user' as const,
-    content: message,
-  };
-  sessionMessages.value.push(userMessage);
+  if (message) {
+    // 添加用户消息
+    const userMessage = {
+      role: 'user' as const,
+      content: message,
+    };
+    sessionMessages.value.push(userMessage);
+  }
 
   // 开始加载
   isLoading.value = true
   streamingMessage.value = ''
   streamingReasoningContent.value = ''
 
+  let isUseToolCall = false;
+
   try {
-    if (useStreaming.value) {
-      // 使用流式请求
-      const stream = await sendStreamingSessionMessage(
-        activeSessionId.value,
-        message,
-        {
-          model: settingsStore.providers[settingsStore.currentProvider]?.model,
-        }
-      );
-      
-      stream.onMessage((content, reasoningContent) => {
-        streamingMessage.value += content;
-        if (reasoningContent) {
-          streamingReasoningContent.value += reasoningContent;
-        }
-      });
-      
-      // 等待流式响应完成
-      await new Promise<void>((resolve) => {
-        stream.onComplete(() => resolve());
-        stream.onError(() => resolve());
-      });
+    // 使用流式请求
+    const stream = await sendStreamingSessionMessage(
+      activeSessionId.value,
+      message,
+      {
+        model: settingsStore.providers[settingsStore.currentProvider]?.model,
+      }
+    );
 
-    } else {
-      // 使用非流式请求
-      await sendSessionMessage(
-        activeSessionId.value,
-        message,
-        {
-          model: settingsStore.providers[settingsStore.currentProvider]?.model,
-        }
-      );
-    }
+    // 正在接收流式信息
+    stream.onMessage(({
+      content,  // 文本内容
+      reasoningContent, // 推理内容
+      toolCalls,  // 工具
+      isMessageUpdate // 消息是否更新
+    }) => {
+      // 文本内容
+      streamingMessage.value += content;
+      // 推理内容
+      if (reasoningContent) {
+        streamingReasoningContent.value += reasoningContent;
+      }
+      // 使用了工具
+      if (toolCalls) {
+        console.log("需要调用工具");
+        console.log(toolCalls);
+        isUseToolCall = true;
+      }
 
-    // 重新查询最新的对话
-    await loadSessionMessages(activeSessionId.value)
+      // 消息更新
+      if (isMessageUpdate) {
+        // 重新查询最新的对话
+        loadSessionMessages(activeSessionId.value);
+      }
+    });
+    
+    // 等待流式响应完成
+    await new Promise<void>((resolve) => {
+      stream.onComplete(() => resolve());
+      stream.onError(() => resolve());
+    });
   } catch (error) {
     console.error('Failed to send message:', error)
     // 更新最后一条AI消息为错误信息
     const lastMessage = sessionMessages.value[sessionMessages.value.length - 1]
     lastMessage.content = '消息发送失败，请稍后再试或检查API配置。'
   } finally {
-    // 结束加载
-    isLoading.value = false
-    streamingMessage.value = ''
-    streamingReasoningContent.value = ''
+    // 重新查询最新的对话
+    await loadSessionMessages(activeSessionId.value);
+
+    // 如果调用了工具，则再请求一次
+    if (isUseToolCall) {
+      sendMessage();
+    } else {
+      // 结束加载
+      isLoading.value = false
+      streamingMessage.value = ''
+      streamingReasoningContent.value = ''
+    }
   }
 }
 

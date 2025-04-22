@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { OpenAIClient } from '../providers/openai';
 import { Message, Role } from '../types';
 import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from '../constants';
+import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 
 // 加载环境变量
 dotenv.config();
@@ -323,6 +324,7 @@ router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response)
       
       // 转换消息格式以适应前端需求
       const formattedMessages = messages.map(msg => ({
+        ...msg,
         role: msg.role,
         content: msg.content,
         reasoningContent: msg.reasoning_content,
@@ -345,29 +347,12 @@ router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response)
 // 发送消息到会话
 router.post('/api/sessions/:id/messages', routeHandler(async (req: Request, res: Response) => {
   try {
-    const { message, options } = req.body;
-    const sessionId = req.params.id;
-    
-    // 使用新的API发送消息
-    try {
-      const result = await deepseekClient.sendMessageToSession(
-        sessionId,
-        message,
-        options
-      );
-
-      // 返回结果
-      return {
-        content: result.content,
-        role: 'assistant',
-        reasoningContent: result.reasoningContent
-      };
-    } catch (error) {
-      if (error instanceof Error && error.message === '会话不存在') {
-        throw new Error('会话不存在');
-      }
-      throw error;
-    }
+    // 已废弃，所有请求都应使用流式API
+    return res.status(301).json({
+      content: "请使用流式API: /api/sessions/:id/messages/stream",
+      role: 'system',
+      reasoningContent: "该端点已废弃，仅支持流式API"
+    });
   } catch (err) {
     console.error('发送消息失败', err);
     throw new Error(`发送消息失败: ${err instanceof Error ? err.message : String(err)}`);
@@ -459,11 +444,24 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           message,
           options
         );
+
+        // 完整的响应内容
+        let fullContent = '';
+        // 完整的推理内容
+        let fullReasoningContent = '';
+        // 需要调用的工具
+        let toolCalls: Array<ChatCompletionMessageToolCall> | null = null;
+        // 需要调用的工具的提示
+        let toolTips: Array<string> | null = null;
+        // 当前调用工具index
+        let nowToolCallIndex = -1;
         
         const stream = streamResult.stream;
         for await (const chunk of stream) {
+          // 处理普通文字
           if (chunk.choices && chunk.choices[0]?.delta?.content) {
             const content = chunk.choices[0].delta.content;
+            fullContent += content;
             sendData(res, { content });
           }
           
@@ -473,18 +471,98 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
               'reasoning_content' in chunk.choices[0].delta) {
             const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
             if (reasoningContent) {
+              fullReasoningContent += reasoningContent;
               sendData(res, { reasoningContent });
             }
           }
+
+          // 处理工具调用（如果有）
+          if (
+            chunk.choices && 
+            chunk.choices[0] &&
+            chunk.choices[0].delta?.tool_calls &&
+            chunk.choices[0].delta?.tool_calls[0]
+          ) {
+            // 从chunk中获取工具调用
+            if (chunk.choices[0].delta?.tool_calls[0].type === 'function') {
+              // 工具index+1
+              nowToolCallIndex += 1;
+              // 赋值
+              if (!toolCalls) {
+                toolCalls = [];
+              }
+              if (!toolCalls[nowToolCallIndex]) {
+                toolCalls[nowToolCallIndex] = chunk.choices[0].delta?.tool_calls[0] as ChatCompletionMessageToolCall;
+              }
+              if (!toolTips) {
+                toolTips = [];
+              }
+              if (!toolTips[nowToolCallIndex]) {
+                toolTips[nowToolCallIndex] = '';
+                toolTips[nowToolCallIndex] += `工具名称: ${toolCalls[nowToolCallIndex].function.name}`;
+                toolTips[nowToolCallIndex] += `\n工具参数:`;
+              }
+            }
+
+            // 从chunk中获取第一个工具调用的参数
+            if (chunk.choices[0].delta.tool_calls[0].function) {
+              const addStr = chunk.choices[0].delta.tool_calls[0].function.arguments;
+              
+              if (toolCalls && toolCalls[nowToolCallIndex]) {
+                toolCalls[nowToolCallIndex].function.arguments += addStr;
+              }
+              if(toolTips && toolTips[nowToolCallIndex]) {
+                toolTips[nowToolCallIndex] += addStr;
+              }
+            }
+          }
         }
-        
-        // 注册完成回调
-        if (streamResult.onComplete) {
-          streamResult.onComplete((finalResponse) => {
-            console.log('Stream session complete, final response length:', finalResponse.content.length);
-          });
+
+        console.log('[DeepSeek] 流式响应完成:', {
+          fullContent,
+          fullReasoningContent,
+          toolCalls
+        });
+
+        // 当前session
+        const session = deepseekClient.getSession(sessionId);
+        // 信息是否更新
+        let isMessageUpdate = false;
+
+        // 文字流
+        if (fullContent || fullReasoningContent) {
+          // 将完整响应添加到会话历史
+          session?.addAssistantMessage(fullContent, fullReasoningContent);
+          // 信息更新
+          isMessageUpdate = true;
+
+          console.log('[DeepSeek] 响应已添加到会话历史');
         }
-        
+
+        // 有需要调用的工具
+        if (toolCalls && toolCalls.length > 0) {
+          console.log("---------- 有需要调用的工具 ------------");
+          console.log(toolCalls);
+          console.log(toolTips);
+
+          // 添加工具调用会话历史
+          session?.addAssistantMessage(toolTips ? toolTips.join('\n') : '', '', toolCalls);
+          // 信息更新
+          isMessageUpdate = true;
+        }
+
+        if (isMessageUpdate) {
+          // 提醒前端更新信息
+          sendData(res, { isMessageUpdate: true, toolCalls });
+        }
+
+        // 流完成回调，传递参数，并等待工具调用完毕
+        await streamResult.onComplete(
+          fullContent,
+          fullReasoningContent,
+          toolCalls
+        );
+
         // 发送完成信号并清理
         sendData(res, { done: true });
         streamRequestsStore.delete(requestId);

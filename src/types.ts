@@ -1,3 +1,5 @@
+import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
+
 export type Role = 'user' | 'assistant' | 'system' | 'tool';
 
 export interface Message {
@@ -5,7 +7,9 @@ export interface Message {
   content: string;
   name?: string;
   reasoning_content?: string;
+  tool_calls?: Array<ChatCompletionMessageToolCall>,
   tool_call_id?: string; // 为工具消息添加的可选字段
+  timestamp?: number; // 添加时间戳字段
 }
 
 export interface CompletionRequest {

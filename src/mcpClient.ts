@@ -366,6 +366,7 @@ export class MCPClient {
    * @param serverKey 必须指定服务器键名
    */
   async callTool(options: { name: string; arguments?: Record<string, any> }, serverKey: string) {
+    console.log(`在服务器 ${serverKey} 上调用工具 ${options.name}`, options);
     const instance = this.ensureServerConnected(serverKey);
     return await instance.client.callTool(options);
   }

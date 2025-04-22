@@ -35,5 +35,10 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     url: "http://localhost:7002/lianchuangServer",
     command: "node",
     args: ["./dist/mcpServers/LianchuangServer.js"]
+  },
+  "browser-server": {
+    url: "http://localhost:7003/browserServer",
+    command: "node",
+    args: ["./dist/mcpServers/BrowserServer.js"]
   }
 }; 

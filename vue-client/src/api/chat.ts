@@ -12,7 +12,7 @@ export interface ChatRequest {
   model: string
   config: ChatRequestConfig
   stream?: boolean
-  sessionHistory?: Array<{ type: 'user' | 'ai' | 'system', content: string }>
+  sessionHistory?: Array<{ type: 'user' | 'assistant' | 'system' | 'tool', content: string }>
 }
 
 export interface ChatResponse {
@@ -49,6 +49,13 @@ export interface MessageResponse {
   role: 'assistant'
   reasoningContent?: string
 }
+
+export interface MessageCallbackParams {
+  content: string;
+  reasoningContent: string;
+  toolCalls: Array<any>; // 替代 any 的推荐方案
+  isMessageUpdate: boolean;
+};
 
 /**
  * 创建新会话
@@ -92,42 +99,23 @@ export const getSessionMessages = async (sessionId: string): Promise<SessionMess
 }
 
 /**
- * 发送非流式消息
- */
-export const sendSessionMessage = async (
-  sessionId: string, 
-  message: string,
-  options?: MessageOptions
-): Promise<MessageResponse> => {
-  try {
-    const response = await axios.post<MessageResponse>(`/api/sessions/${sessionId}/messages`, {
-      message,
-      options
-    })
-    return response.data
-  } catch (error) {
-    console.error('发送消息失败:', error)
-    throw error
-  }
-}
-
-/**
  * 发送流式消息到会话
  */
 export async function sendStreamingSessionMessage(
   sessionId: string,
-  message: string,
+  message?: string,
   options?: MessageOptions
 ): Promise<{
   controller: AbortController;
-  onMessage: (callback: (content: string, reasoningContent?: string) => void) => void;
+  onMessage: (callback: (params: MessageCallbackParams) => void) => void;
   onError: (callback: (error: string) => void) => void;
   onComplete: (callback: () => void) => void;
 }> {
   const controller = new AbortController();
 
   // 存储回调函数
-  const messageCallbacks: ((content: string, reasoningContent?: string) => void)[] = [];
+  const messageCallbacks: ((params: MessageCallbackParams) => void)[] = [];
+
   const errorCallbacks: ((error: string) => void)[] = [];
   const completeCallbacks: (() => void)[] = [];
 
@@ -183,12 +171,19 @@ export async function sendStreamingSessionMessage(
           return;
         }
         
-        // 处理内容和推理内容
+        // 处理内容、推理内容、工具
         const content = data.content || '';
         const reasoningContent = data.reasoningContent || '';
+        const toolCalls = data.toolCalls || undefined;
+        const isMessageUpdate = data.isMessageUpdate || false;
         
         // 通知所有消息回调
-        messageCallbacks.forEach(callback => callback(content, reasoningContent));
+        messageCallbacks.forEach(callback => callback({
+          content,
+          reasoningContent,
+          toolCalls,
+          isMessageUpdate
+        }));
       } catch (error) {
         console.error('处理SSE消息错误:', error);
       }

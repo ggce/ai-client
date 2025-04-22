@@ -9,13 +9,13 @@
         !(
           isLoading &&
           streamingMessage &&
-          message.type === 'ai' &&
+          message.type === 'assistant' &&
           index === messages.length - 1
         )
       "
     >
       <div class="message-row">
-        <div v-if="message.type === 'ai'" class="avatar ai-avatar">
+        <div v-if="message.type === 'assistant'" class="avatar ai-avatar">
           <img src="/assets/logo.png" alt="AI" class="ai-logo" />
         </div>
         <div v-if="message.type === 'system'" class="avatar system-avatar">
@@ -24,10 +24,13 @@
         <div v-if="message.type === 'user'" class="avatar user-avatar">
           <div class="user-logo">用户</div>
         </div>
+        <div v-if="message.type === 'tool'" class="avatar tool-avatar">
+          <div class="tool-logo">工具</div>
+        </div>
         <div class="message-container">
           <!-- 显示推理内容区域 (仅当消息是AI类型且有推理内容) -->
           <div
-            v-if="message.type === 'ai' && message.reasoningContent"
+            v-if="message.type === 'assistant' && message.reasoningContent"
             class="reasoning-container"
             :class="{ 'collapsed': expandedReasoningIndex !== index }"
             @click="toggleReasoning(index)"
@@ -41,11 +44,11 @@
 
           <div
             class="message-content"
-            v-html="formatMessage(message.content)"
+            v-html="message.type === 'tool' ? formatToolMessage(message.content) : formatMessage(message.content)"
           ></div>
 
           <!-- 只在AI消息下添加复制按钮 -->
-          <div v-if="message.type === 'ai'" class="message-actions">
+          <div v-if="message.type === 'assistant'" class="message-actions">
             <button
               class="copy-button"
               @click="copyToClipboard(message.content, index)"
@@ -81,7 +84,7 @@
     </div>
 
     <!-- 显示加载状态 -->
-    <div v-if="isLoading && !streamingReasoningContent && !streamingMessage" class="message ai">
+    <div v-if="isLoading && !streamingReasoningContent && !streamingMessage" class="message assistant">
       <div class="message-row">
         <div class="avatar ai-avatar">
           <img src="/assets/logo.png" alt="AI" class="ai-logo" />
@@ -100,7 +103,7 @@
     </div>
 
     <!-- 推理中 -->
-    <div v-if="isLoading && streamingReasoningContent && !streamingMessage" class="message ai">
+    <div v-if="isLoading && streamingReasoningContent && !streamingMessage" class="message assistant">
       <div class="message-row">
         <div class="avatar ai-avatar">
           <img src="/assets/logo.png" alt="AI" class="ai-logo" />
@@ -125,7 +128,7 @@
     </div>
 
     <!-- 显示流式输出的消息，当有streamingMessage内容时显示 -->
-    <div v-if="isLoading && streamingMessage" class="message ai streaming">
+    <div v-if="isLoading && streamingMessage" class="message assistant streaming">
       <div class="message-row">
         <div class="avatar ai-avatar">
           <img src="/assets/logo.png" alt="AI" class="ai-logo" />
@@ -165,7 +168,7 @@ import { defineProps, ref, watch, onMounted, nextTick } from "vue";
 import MarkdownIt from "markdown-it";
 
 interface ChatMessage {
-  type: "user" | "ai" | "system";
+  type: 'user' | 'assistant' | 'system' | 'tool'
   content: string;
   reasoningContent?: string; // 添加推理内容字段
 }
@@ -241,6 +244,35 @@ const formatMessage = (content: string): string => {
 
   // 使用markdown-it解析Markdown文本为HTML
   return md.render(content);
+};
+
+const formatToolMessage = (content: string): string => {
+  if (!content) return "";
+
+  try {
+    // 尝试解析JSON
+    const parsed = JSON.parse(content);
+    
+    // 处理常见工具消息格式：content数组包含不同类型的内容
+    if (parsed.content && Array.isArray(parsed.content)) {
+      return parsed.content.map((item: { type: string; text?: string; url?: string; }) => {
+        if (item.type === 'text') {
+          // 将换行符转换为HTML换行
+          return `<div class="tool-text">${item.text?.replace(/\n/g, '<br>')}</div>`;
+        } else {
+          // 处理其他类型
+          return `<div>${JSON.stringify(item)}</div>`;
+        }
+      }).join('');
+    }
+    
+    // 如果不是预期格式，则美化显示JSON
+    return `<pre class="tool-json">${JSON.stringify(parsed, null, 2)}</pre>`;
+  } catch (e) {
+    // JSON解析失败，按原样返回内容
+    console.error("Tool message JSON parse error:", e);
+    return content;
+  }
 };
 
 // 自动滚动到底部
@@ -365,12 +397,28 @@ onMounted(() => {
   justify-content: center;
 }
 
+.tool-avatar {
+  background-color: #34a853;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.tool-logo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .message.user {
   align-items: flex-end;
 }
 
-.message.ai,
-.message.system {
+.message.assistant,
+.message.system,
+.message.tool {
   align-items: flex-start;
 }
 
@@ -388,7 +436,7 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.message.ai .message-container {
+.message.assistant .message-container {
   background-color: #e6e6fa; /* 偏紫色 Lavender */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -408,10 +456,42 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.message.tool .message-container {
+  background-color: #e6ffe6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .message-content {
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
+}
+
+/* 工具消息相关样式 */
+.tool-text {
+  padding: 8px 0;
+  line-height: 1.6;
+}
+
+.tool-image {
+  margin: 10px 0;
+}
+
+.tool-image img {
+  max-width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tool-json {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  overflow-x: auto;
+  color: #333;
+  border: 1px solid #ddd;
 }
 
 /* 按钮相关样式 */
