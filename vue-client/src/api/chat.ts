@@ -60,9 +60,9 @@ export interface MessageCallbackParams {
 /**
  * 创建新会话
  */
-export const createSession = async (): Promise<string> => {
+export const createSession = async (provider?: string): Promise<string> => {
   try {
-    const response = await axios.post<string>('/api/sessions')
+    const response = await axios.post<string>('/api/sessions', { provider })
     return response.data
   } catch (error) {
     console.error('创建会话失败:', error)
@@ -73,10 +73,11 @@ export const createSession = async (): Promise<string> => {
 /**
  * 获取会话列表
  */
-export const listSessionIds = async (): Promise<string[]> => {
+export const listSessionIds = async (provider?: string): Promise<string[]> => {
   try {
     console.log('开始获取会话:');
-    const response = await axios.get<string[]>('/api/sessionIds')
+    const url = provider ? `/api/sessionIds?provider=${provider}` : '/api/sessionIds';
+    const response = await axios.get<string[]>(url);
     console.log('获取会话列表成功:', response.data);
     return response.data
   } catch (error) {

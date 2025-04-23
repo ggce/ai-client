@@ -1,163 +1,100 @@
-import { OpenAI } from 'openai';
-import type { ChatCompletion } from 'openai/resources/chat';
+import { ChatCompletionMessageToolCall, ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { 
   ClientOptions, 
-  CompletionRequest, 
-  CompletionResponse,
   Message,
-  FunctionCall
+  MCPTool,
 } from '../types';
-import { withRetry } from '../utils';
+import { withRetry, generateUUID } from '../utils';
 import { OPENAI_DEFAULT_URL, OPENAI_MODELS } from '../constants';
+import logger from '../logger';
+import { BaseClient } from './baseClient';
 
-export class OpenAIClient {
-  private client: OpenAI;
-  private options: ClientOptions;
-
+/**
+ * 使用OpenAI SDK连接OpenAI API的客户端实现
+ * 支持会话管理和流式API
+ */
+export class OpenAIClient extends BaseClient {
   constructor(options: ClientOptions = {}) {
-    this.options = {
+    super({
       apiKey: options.apiKey || '',
       baseURL: options.baseURL || OPENAI_DEFAULT_URL,
       defaultModel: options.defaultModel || OPENAI_MODELS.DEFAULT,
       timeout: options.timeout || 60000,
       maxRetries: options.maxRetries || 3,
-    };
-
-    // API key可以为空，由用户在使用时提供
-    this.client = new OpenAI({
-      apiKey: this.options.apiKey || 'dummy-key', // 使用dummy-key防止OpenAI SDK初始化错误
-      baseURL: this.options.baseURL,
-      timeout: this.options.timeout,
-      maxRetries: this.options.maxRetries,
-    });
-  }
-
-  // 更新options
-  public updateOptions(options: Partial<ClientOptions>) {
-    // 更新客户端选项
-    Object.keys(options).forEach(key => {
-      const k = key as keyof ClientOptions;
-      if (options[k] !== undefined) {
-        this.options[k] = options[k] as any;
-      }
-    });
+    }, 'OpenAIClient');
     
-    // 重新创建OpenAI客户端实例
-    this.client = new OpenAI({
-      apiKey: this.options.apiKey || 'dummy-key', // 使用dummy-key防止OpenAI SDK初始化错误
-      baseURL: this.options.baseURL,
-      timeout: this.options.timeout,
-      maxRetries: this.options.maxRetries
-    });
-    
-    console.log('已更新OpenAI客户端配置');
+    logger.log(this.loggerPrefix, '初始化客户端完成');
   }
 
   public chat = {
     completions: {
-      create: async (request: CompletionRequest): Promise<CompletionResponse> => {
-        const model = request.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
-        
-        return withRetry(
-          async () => {
-            const response = await this.client.chat.completions.create({
-              ...request,
-              model: model as string, // 确保model是字符串类型
-              stream: false,
-              messages: request.messages.map(msg => {
-                const message: any = {
-                  role: msg.role,
-                  content: msg.content
-                };
-                if (msg.name) message.name = msg.name;
-                // Only add function_call if it exists on the message
-                if ('function_call' in msg) message.function_call = msg.function_call;
-                return message;
-              }) as any
-            }) as ChatCompletion;
+      // 流式API
+      createStream: async (params: {
+        model: string;
+        messages: Array<{ role: string; content: string, tool_call_id?: string, tool_calls?: Array<ChatCompletionMessageToolCall> }>;
+        mcpTools?: Array<MCPTool>,
+      }) => {
+        // 确保消息格式正确
+        const messages = params.messages.map(msg => ({
+          role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+          content: msg.content,
+          tool_call_id: msg.tool_call_id,
+          tool_calls: msg.tool_calls,
+        })) as ChatCompletionMessageParam[];
 
-            console.log('OpenAI响应: ', response);
-            
-            // 将OpenAI响应转换为通用格式
-            return {
-              id: response.id,
-              object: response.object,
-              created: Math.floor(Date.now() / 1000),
-              model: response.model,
-              choices: response.choices.map((choice: any) => ({
-                index: choice.index,
-                message: {
-                  role: choice.message.role,
-                  content: choice.message.content,
-                  function_call: choice.message.function_call ? {
-                    name: choice.message.function_call.name,
-                    arguments: choice.message.function_call.arguments,
-                  } as FunctionCall : undefined,
-                },
-                finish_reason: choice.finish_reason as 'stop' | 'length' | 'function_call',
-              })),
-              usage: response.usage || {
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                total_tokens: 0,
-              },
-            };
-          },
-          { maxRetries: this.options.maxRetries || 3 }
-        );
-      },
+        try {
+          // 确保model不会为undefined
+          const modelName = params.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
+          
+          // 准备正确类型的API请求参数
+          const requestParams = {
+            model: modelName,
+            messages,
+            // 确保stream为true (流式)
+            stream: true as const,
+            max_tokens: 2048,
+            temperature: 0.7,
+            // 工具类型正确 - 流式响应也支持工具
+            tools: params.mcpTools?.map(tool => ({
+              type: 'function' as const,
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.parameters
+              }
+            }))
+          };
 
-      // Stream API支持
-      createStream: async (request: CompletionRequest) => {
-        const model = request.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
-        
-        const stream = await this.client.chat.completions.create({
-          ...request,
-          model: model as string, // 确保model是字符串类型
-          stream: true,
-          messages: request.messages.map(msg => {
-            const message: any = {
-              role: msg.role,
-              content: msg.content
-            };
-            if (msg.name) message.name = msg.name;
-            if ('function_call' in msg) message.function_call = msg.function_call;
-            return message;
-          }) as any
-        });
+          // 验证流对象 - 更详细的日志
+          logger.log(this.loggerPrefix, `流式响应开始: ${JSON.stringify(requestParams)}`);
 
-        return stream;
+          // 发送请求
+          const stream = await this.client.chat.completions.create(requestParams);
+          
+          return stream;
+        } catch (error) {
+          logger.error(this.loggerPrefix, `流式API请求失败: ${error}`);
+          throw error;
+        }
       },
     },
   };
-
-  // 简化的文本补全API
-  public async complete(prompt: string | Message[]): Promise<string> {
-    let messages: Message[];
-    
-    if (typeof prompt === 'string') {
-      messages = [{ role: 'user', content: prompt }];
-    } else {
-      messages = prompt;
-    }
-
-    const response = await this.chat.completions.create({
-      model: this.options.defaultModel || OPENAI_MODELS.DEFAULT,
-      messages,
-    });
-
-    return response.choices[0]?.message?.content || '';
-  }
 
   // 嵌入API
   public async createEmbedding(input: string | string[]) {
     const textInput = Array.isArray(input) ? input : [input];
     
-    const response = await this.client.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: textInput,
-    });
-    
-    return response;
+    try {
+      const response = await this.client.embeddings.create({
+        model: 'text-embedding-ada-002',
+        input: textInput,
+      });
+      
+      logger.log(this.loggerPrefix, `嵌入API响应成功`);
+      return response;
+    } catch (error) {
+      logger.error(this.loggerPrefix, `嵌入API请求失败: ${error}`);
+      throw error;
+    }
   }
 } 

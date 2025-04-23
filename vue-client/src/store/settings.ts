@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { loadConfig, saveConfig, saveApiKey, saveModel } from '../api/config'
+import { createSession, listSessionIds } from '../api/chat'
+import router from '../router'
 
 type Provider = 'deepseek' | 'openai'
 
@@ -50,9 +52,17 @@ export const useSettingsStore = defineStore('settings', {
   },
   
   actions: {
-    setProvider(provider: Provider) {
+    async setProvider(provider: Provider) {
+      // 记录之前的提供商
+      const previousProvider = this.currentProvider
+      // 设置新的提供商
       this.currentProvider = provider
+      
+      // 保存设置
       this.saveSettings()
+      
+      // 返回提供商是否改变
+      return previousProvider !== provider
     },
     
     async setApiKey(provider: Provider, apiKey: string) {
@@ -93,6 +103,7 @@ export const useSettingsStore = defineStore('settings', {
       const settingsToSave = {
         providers: this.providers,
         currentProvider: this.currentProvider,
+        defaultProvider: this.currentProvider,
         isSidebarCollapsed: this.isSidebarCollapsed,
         isSessionSidebarCollapsed: (this as any).isSessionSidebarCollapsed
       }

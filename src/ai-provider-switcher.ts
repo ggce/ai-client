@@ -1,13 +1,15 @@
-import { OpenAIClient } from './providers/openai.js';
-import { DeepseekClient } from './providers/deepseek.js';
 import { 
   MCPOptions, 
   CompletionResponse,
   MCPCompletionRequest,
   ProviderConfig,
-  Message
+  Message,
+  CompletionRequest 
 } from './types.js';
 import { loadConfigFromEnv } from './utils.js';
+import { AIProviderFactory, ProviderType } from './providers/aiProviderFactory';
+import { BaseClient } from './providers/baseClient';
+import logger from './logger';
 
 /**
  * AI提供商切换器(AIProviderSwitcher)
@@ -15,7 +17,7 @@ import { loadConfigFromEnv } from './utils.js';
  */
 export class AIProviderSwitcher {
   private options: MCPOptions;
-  private providers: Map<string, any> = new Map();
+  private providers: Map<string, BaseClient> = new Map();
   private defaultProvider: string;
 
   constructor(options: MCPOptions) {
@@ -43,15 +45,15 @@ export class AIProviderSwitcher {
       }
 
       try {
-        if (provider === 'deepseek') {
-          this.providers.set(provider, new DeepseekClient(config));
-        } else if (provider === 'openai') {
-          this.providers.set(provider, new OpenAIClient(config));
+        if (provider === 'deepseek' || provider === 'openai') {
+          // 使用工厂创建提供商
+          const client = AIProviderFactory.getProvider(provider as ProviderType, config);
+          this.providers.set(provider, client);
         } else {
-          console.warn(`不支持的提供商: ${provider}`);
+          logger.warn('AIProviderSwitcher', `不支持的提供商: ${provider}`);
         }
       } catch (error) {
-        console.error(`初始化提供商 ${provider} 失败:`, error);
+        logger.error('AIProviderSwitcher', `初始化提供商 ${provider} 失败: ${error}`);
       }
     }
 
@@ -64,7 +66,7 @@ export class AIProviderSwitcher {
   /**
    * 获取特定提供商的客户端实例
    */
-  public getProvider(provider: string) {
+  public getProvider(provider: string): BaseClient {
     const client = this.providers.get(provider);
     if (!client) {
       throw new Error(`提供商 ${provider} 未初始化`);
@@ -75,7 +77,7 @@ export class AIProviderSwitcher {
   /**
    * 获取当前默认提供商的客户端实例
    */
-  public getDefaultProvider() {
+  public getDefaultProvider(): BaseClient {
     return this.getProvider(this.defaultProvider);
   }
 
@@ -98,42 +100,17 @@ export class AIProviderSwitcher {
     }
 
     try {
-      if (name === 'deepseek') {
-        this.providers.set(name, new DeepseekClient(config));
-      } else if (name === 'openai') {
-        this.providers.set(name, new OpenAIClient(config));
+      if (name === 'deepseek' || name === 'openai') {
+        // 使用工厂创建提供商
+        const client = AIProviderFactory.getProvider(name as ProviderType, config);
+        this.providers.set(name, client);
       } else {
         throw new Error(`不支持的提供商类型: ${name}`);
       }
     } catch (error) {
-      console.error(`添加提供商 ${name} 失败:`, error);
+      logger.error('AIProviderSwitcher', `添加提供商 ${name} 失败: ${error}`);
       throw error;
     }
-  }
-
-  /**
-   * 执行补全请求，自动选择提供商
-   */
-  public async completions(request: MCPCompletionRequest): Promise<CompletionResponse> {
-    const provider = request.provider || this.defaultProvider;
-    const client = this.getProvider(provider);
-    
-    // 删除provider字段，因为实际的客户端API不需要它
-    const { provider: _, ...cleanRequest } = request;
-    
-    // 使用用户选择的模型，不再强制覆盖
-    
-    return await client.chat.completions.create(cleanRequest);
-  }
-
-  /**
-   * 简化的文本补全API
-   */
-  public async complete(prompt: string | Message[], provider?: string): Promise<string> {
-    const targetProvider = provider || this.defaultProvider;
-    const client = this.getProvider(targetProvider);
-    
-    return client.complete(prompt);
   }
 
   /**
@@ -143,6 +120,10 @@ export class AIProviderSwitcher {
     const targetProvider = provider || this.defaultProvider;
     const client = this.getProvider(targetProvider);
     
-    return client.createEmbedding(input);
+    if ('createEmbedding' in client) {
+      return (client as any).createEmbedding(input);
+    } else {
+      throw new Error(`提供商 ${targetProvider} 不支持嵌入向量功能`);
+    }
   }
 } 

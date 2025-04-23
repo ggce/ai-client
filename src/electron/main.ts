@@ -3,16 +3,14 @@ import * as path from 'path';
 import express, { Request, Response, Express, Application } from 'express';
 import { NextFunction } from 'express';
 import bodyParser from 'body-parser';
-import { DeepseekClient } from '../providers/deepseek';
-import { AIProviderSwitcher } from '../ai-provider-switcher';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
-import { OpenAIClient } from '../providers/openai';
 import MCPClient from '../mcpClient';
 import { MCPTool } from '../types';
 import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from '../constants';
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import logger from '../logger';
+import { AIProviderFactory, ProviderType } from '../providers/aiProviderFactory';
 
 // 加载环境变量
 dotenv.config();
@@ -24,16 +22,30 @@ app.name = 'AI-CLIENT';
 const expressApp: Application = express();
 const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务器冲突
 
-// 创建API客户端实例（初始化时使用默认值）
-let deepseekClient: DeepseekClient = new DeepseekClient({
-  apiKey: '',
-  baseURL: DEEPSEEK_DEFAULT_URL
-});
+// 当前默认使用的提供商类型
+let defaultProviderType: ProviderType = 'deepseek';
 
-let openaiclient = new OpenAIClient({
-  apiKey: '',
-  baseURL: OPENAI_DEFAULT_URL
-});
+// 初始化AI提供商
+function initDefaultProviders() {
+  // 初始化DeepSeek客户端
+  AIProviderFactory.getProvider('deepseek', {
+    apiKey: '',
+    baseURL: DEEPSEEK_DEFAULT_URL,
+    defaultModel: DEEPSEEK_MODELS.DEFAULT
+  });
+  
+  // 初始化OpenAI客户端
+  AIProviderFactory.getProvider('openai', {
+    apiKey: '',
+    baseURL: OPENAI_DEFAULT_URL,
+    defaultModel: OPENAI_MODELS.DEFAULT
+  });
+  
+  logger.log('Main', '已初始化默认AI提供商');
+}
+
+// 初始化默认提供商
+initDefaultProviders();
 
 // MCP客户端
 const mcpClient = new MCPClient("deepseek-client", "1.0.0");
@@ -117,9 +129,15 @@ function initClientsFromConfig() {
       logger.log('Main', `读取到的配置: ${JSON.stringify(config, null, 2).substring(0, 100)}...`);
       
       if (config.providers) {
+        // 默认提供商设置
+        if (config.defaultProvider) {
+          defaultProviderType = config.defaultProvider as ProviderType;
+          logger.log('Main', `设置默认提供商: ${defaultProviderType}`);
+        }
+        
         // 更新DeepSeek客户端
         if (config.providers.deepseek?.apiKey) {
-          deepseekClient.updateOptions({
+          AIProviderFactory.getProvider('deepseek', {
             apiKey: config.providers.deepseek.apiKey,
             baseURL: config.providers.deepseek.baseURL || DEEPSEEK_DEFAULT_URL,
             defaultModel: config.providers.deepseek.model || DEEPSEEK_MODELS.DEFAULT
@@ -129,7 +147,7 @@ function initClientsFromConfig() {
         
         // 更新OpenAI客户端
         if (config.providers.openai?.apiKey) {
-          openaiclient.updateOptions({
+          AIProviderFactory.getProvider('openai', {
             apiKey: config.providers.openai.apiKey,
             baseURL: config.providers.openai.baseURL || OPENAI_DEFAULT_URL,
             defaultModel: config.providers.openai.model || OPENAI_MODELS.DEFAULT
@@ -324,12 +342,21 @@ router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Respo
 
 // 创建新会话
 router.post('/api/sessions', routeHandler(async (req: Request, res: Response) => {
-  logger.log('Main', `接收到创建会话请求: ${JSON.stringify(req.body)}`);
+  logger.log('Main', `接收到创建会话请求: ${JSON.stringify(req.body || {})}`);
   try {
     logger.log('Main', '准备创建会话');
     
-    // 使用新的API创建会话
-    const sessionId = deepseekClient.createSession();
+    // 确保req.body存在，提供默认值
+    const reqBody = req.body || {};
+    const providerType = reqBody.provider || defaultProviderType;
+    
+    logger.log('Main', `使用提供商: ${providerType}`);
+    
+    // 使用AIProviderFactory获取客户端
+    const client = AIProviderFactory.getProvider(providerType as ProviderType);
+    
+    // 创建会话
+    const sessionId = client.createSession();
     
     if (!sessionId) {
       logger.error('Main', '创建会话失败');
@@ -338,7 +365,7 @@ router.post('/api/sessions', routeHandler(async (req: Request, res: Response) =>
       return;
     }
     
-    logger.log('Main', `成功创建会话，ID: ${sessionId}`);
+    logger.log('Main', `成功创建会话，ID: ${sessionId}，提供商: ${providerType}`);
     
     // 直接发送响应
     res.json(sessionId);
@@ -363,8 +390,14 @@ router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) =
     const getSessionsPromise = (async () => {
       try {
         logger.log('Main', '准备获取会话id列表');
-        // 使用新的API获取会话列表
-        const sessionIds = deepseekClient.listSessionIds();
+        const providerType = req.query.provider as ProviderType || defaultProviderType;
+        
+        // 使用AIProviderFactory获取客户端
+        const client = AIProviderFactory.getProvider(providerType);
+        
+        // 获取会话列表
+        const sessionIds = client.listSessionIds();
+        
         logger.log('Main', `成功获取会话id列表: ${JSON.stringify(sessionIds)}`);
         return sessionIds;
       } catch (innerErr) {
@@ -386,10 +419,14 @@ router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) =
 router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response) => {
   try {
     const sessionId = req.params.id;
+    const providerType = req.query.provider as ProviderType || defaultProviderType;
+    
+    // 使用AIProviderFactory获取客户端
+    const client = AIProviderFactory.getProvider(providerType);
     
     // 使用新的API获取会话历史
     try {
-      const messages = deepseekClient.getSessionMessages(sessionId);
+      const messages = client.getSessionMessages(sessionId);
       
       // 转换消息格式以适应前端需求
       const formattedMessages = messages.map(msg => ({
@@ -433,16 +470,45 @@ const streamRequestsStore: Map<string, { message: string, options?: any }> = new
 
 // 为SSE格式化并发送数据
 function sendData(res: Response, data: any) {
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-  // 使用兼容的方式尝试刷新流
   try {
-    // 某些Express环境支持flush，但不在类型定义中
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // 使用兼容的方式尝试刷新流
     const response = res as any;
     if (typeof response.flush === 'function') {
       response.flush();
     }
   } catch (error) {
     // 忽略刷新错误
+    logger.warn('Main', `刷新SSE流失败: ${error}`);
+  }
+}
+
+// 为SSE发送完成信号并关闭连接
+function endStream(res: Response, finalData?: any) {
+  try {
+    // 发送最终数据（如果有）
+    if (finalData) {
+      sendData(res, finalData);
+    }
+    
+    // 发送完成信号
+    sendData(res, { done: true });
+    
+    // 使用setTimeout避免立即关闭连接导致的问题
+    setTimeout(() => {
+      try {
+        res.end();
+      } catch (error) {
+        logger.error('Main', `关闭SSE连接失败: ${error}`);
+      }
+    }, 200);
+  } catch (error) {
+    logger.error('Main', `结束SSE流失败: ${error}`);
+    try {
+      res.end();
+    } catch (innerError) {
+      // 最后的尝试，忽略错误
+    }
   }
 }
 
@@ -493,6 +559,17 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // 防止Nginx缓冲
+  
+  // 设置超时时间为较长时间，避免连接过早关闭
+  req.socket.setTimeout(120000);
+  
+  // 监听客户端断开连接
+  req.on('close', () => {
+    logger.log('Main', `客户端断开SSE连接: ${requestId}`);
+    // 清理请求数据
+    streamRequestsStore.delete(requestId);
+  });
+  
   res.flushHeaders();
   
   const sessionId = req.params.id;
@@ -500,15 +577,21 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
   
   (async () => {
     try {
-      if (!deepseekClient) {
+      // 根据配置选择客户端
+      const providerName = options?.provider || defaultProviderType;
+      
+      // 使用AIProviderFactory获取客户端
+      const client = AIProviderFactory.getProvider(providerName as ProviderType);
+      
+      if (!client) {
         sendData(res, { error: 'API client not initialized' });
-        res.end();
+        endStream(res);
         return;
       }
       
       try {
         // 开始流式请求
-        const streamResult = await deepseekClient.sendStreamMessageToSession({
+        const streamResult = await client.sendStreamMessageToSession({
           sessionId, 
           message,
           options,
@@ -591,7 +674,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         }
 
         // 当前session
-        const session = deepseekClient.getSession(sessionId);
+        const session = client.getSession(sessionId);
         // 信息是否更新
         let isMessageUpdate = false;
 
@@ -643,31 +726,21 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           }
         }
 
-        // 流完成回调，传递参数，并等待工具调用完毕
-        await streamResult.onComplete(
-          fullContent,
-          fullReasoningContent,
-          toolCalls
-        );
-
-        // 发送完成信号并清理
-        sendData(res, { done: true });
-        streamRequestsStore.delete(requestId);
-        res.end();
+        // 完成响应
+        endStream(res, { complete: true });
       } catch (error) {
-        if (error instanceof Error && error.message === '会话不存在') {
-          sendData(res, { error: 'Session not found' });
-          streamRequestsStore.delete(requestId);
-          res.end();
-          return;
-        }
-        throw error;
+        logger.error('Main', `流式请求失败: ${error}`);
+        sendData(res, { 
+          error: `流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
+        });
+        endStream(res);
       }
-    } catch (err: any) {
-      logger.error('Main', `Failed to send streaming message: ${err}`);
-      sendData(res, { error: `Streaming error: ${err.message}` });
-      streamRequestsStore.delete(requestId);
-      res.end();
+    } catch (error) {
+      logger.error('Main', `处理流式请求失败: ${error}`);
+      sendData(res, { 
+        error: `处理流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
+      });
+      endStream(res);
     }
   })();
 });
@@ -676,8 +749,13 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 router.delete('/api/sessions/:id', routeHandler(async (req: Request, res: Response) => {
   try {
     const sessionId = req.params.id;
+    const providerType = req.query.provider as ProviderType || defaultProviderType;
+    
+    // 使用AIProviderFactory获取客户端
+    const client = AIProviderFactory.getProvider(providerType);
+    
     // 使用新的API结束会话
-    const success = deepseekClient.endSession(sessionId);
+    const success = client.endSession(sessionId);
     if (!success) {
       throw new Error('会话不存在');
     }
@@ -736,8 +814,11 @@ function createWindow() {
   
   // 创建浏览器窗口
   mainWindow = new BrowserWindow({
-    width: 1000,
+    width: 1200,
     height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    resizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

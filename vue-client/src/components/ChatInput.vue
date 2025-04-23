@@ -2,9 +2,10 @@
   <div class="input-area">
     <div class="textarea-container">
       <textarea 
+        ref="textareaRef"
         v-model="messageInput" 
         placeholder="输入您的问题..." 
-        rows="3"
+        rows="4"
         @keydown.enter.exact.prevent="handleEnterKey"
         :disabled="disabled"
       ></textarea>
@@ -24,13 +25,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, defineProps } from 'vue'
+import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps<{
   disabled?: boolean
 }>()
 
 const messageInput = ref('')
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const emit = defineEmits<{
   send: [message: string]
@@ -52,6 +54,26 @@ const handleEnterKey = (event: KeyboardEvent) => {
     handleSend()
   }
 }
+
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+  // 当按下回车键且当前不是在编辑状态时，聚焦到输入框
+  if (e.key === 'Enter' && 
+      document.activeElement !== textareaRef.value && 
+      !props.disabled) {
+    e.preventDefault()
+    textareaRef.value?.focus()
+  }
+}
+
+// 组件挂载时添加事件监听器
+onMounted(() => {
+  document.addEventListener('keydown', handleGlobalKeyDown)
+})
+
+// 组件卸载时移除事件监听器
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleGlobalKeyDown)
+})
 </script>
 
 <style scoped>
@@ -63,6 +85,9 @@ const handleEnterKey = (event: KeyboardEvent) => {
 }
 
 .textarea-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
   position: relative;
 }
@@ -70,7 +95,7 @@ const handleEnterKey = (event: KeyboardEvent) => {
 textarea {
   width: 100%;
   height: auto;
-  min-height: 50px;
+  min-height: 70px;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
   padding: 12px 16px;
@@ -97,7 +122,7 @@ textarea::placeholder {
   justify-content: center;
   margin-left: 12px;
   width: 46px;
-  height: 46px;
+  height: 60px;
   background-color: #1a73e8;
   color: white;
   border: none;

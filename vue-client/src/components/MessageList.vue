@@ -188,6 +188,8 @@ const md = new MarkdownIt({
 });
 
 const messagesContainer = ref<HTMLElement | null>(null);
+// 添加推理内容容器的ref
+const reasoningContentRef = ref<HTMLElement | null>(null);
 // 记录当前复制的消息索引，用于显示复制成功提示
 const copiedIndex = ref<number | null>(null);
 // 记录当前鼠标悬浮的按钮索引
@@ -283,6 +285,17 @@ const scrollToBottom = async () => {
   }
 };
 
+// 滚动推理内容到底部
+const scrollReasoningToBottom = async () => {
+  await nextTick();
+  // 查找所有包含reasoning-content类的元素
+  const reasoningElements = document.querySelectorAll('.reasoning-content');
+  // 对每个元素进行滚动处理
+  reasoningElements.forEach(element => {
+    element.scrollTop = element.scrollHeight;
+  });
+};
+
 // 监听消息变化，自动滚动
 watch(
   () => props.messages.length,
@@ -304,6 +317,7 @@ watch(
   () => props.streamingReasoningContent,
   () => {
     scrollToBottom();
+    scrollReasoningToBottom();
   },
   { immediate: true }
 );
@@ -315,6 +329,14 @@ watch(
     scrollToBottom();
   },
   { immediate: true }
+);
+
+// 监听展开的推理内容索引变化，展开时滚动到底部
+watch(
+  () => expandedReasoningIndex.value,
+  () => {
+    scrollReasoningToBottom();
+  }
 );
 
 // 初始化时滚动到底部

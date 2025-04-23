@@ -39,11 +39,14 @@
 import { ref, onMounted, watch, computed, inject, provide } from 'vue'
 import { Ref } from 'vue'
 // 使用类型断言
+import type { PropType } from 'vue'
+
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
 import SessionSidebar from '../components/SessionSidebar.vue'
 import ChatToolbar from '../components/ChatToolbar.vue'
 import { useSettingsStore } from '../store/settings'
+import { useRoute } from 'vue-router'
 import {
   createSession,
   listSessionIds,
@@ -91,7 +94,10 @@ const setActiveSessionId = (sessionId: string) => {
 // 创建新会话
 const handleCreateSession = async () => {
   try {
-    const sessionId = await createSession()
+    // 使用当前选择的提供商创建会话
+    const currentProvider = settingsStore.currentProvider
+    console.log(`使用提供商 ${currentProvider} 创建新会话`)
+    const sessionId = await createSession(currentProvider)
     activeSessionId.value = sessionId
   } catch (error) {
     console.error('创建会话失败:', error)
@@ -275,15 +281,85 @@ watch(() => activeSessionId.value, async (newSessionId) => {
   }
 })
 
-// 组件挂载时加载会话列表
-onMounted(async () => {
-  settingsStore.loadSettings()
+// 检查URL参数中的会话ID
+const route = useRoute()
+
+// 确保当前会话与选定的提供商匹配
+const ensureSessionMatchesProvider = async () => {
+  const currentProvider = settingsStore.currentProvider
+  console.log(`确认会话与当前提供商匹配: ${currentProvider}`)
   
-  // 如果已经有活动会话ID，加载其消息
-  if (activeSessionId.value) {
-    await loadSessionMessages(activeSessionId.value)
+  try {
+    // 如果已有活动会话，检查它是否属于当前提供商
+    // 此处无法直接检查会话属于哪个提供商，所以我们先尝试获取当前提供商的所有会话
+    const providerSessions = await listSessionIds(currentProvider)
+    
+    // 如果当前活动会话不在该提供商的会话列表中，则需要切换
+    if (activeSessionId.value && !providerSessions.includes(activeSessionId.value)) {
+      console.log(`当前会话 ${activeSessionId.value} 不属于提供商 ${currentProvider}，需要切换`)
+      
+      // 如果当前提供商有会话，切换到第一个
+      if (providerSessions.length > 0) {
+        console.log(`切换到${currentProvider}的现有会话: ${providerSessions[0]}`)
+        activeSessionId.value = providerSessions[0]
+        await loadSessionMessages(activeSessionId.value)
+      } else {
+        // 如果没有会话，创建一个新的
+        console.log(`为${currentProvider}创建新会话`)
+        const newSessionId = await createSession(currentProvider)
+        activeSessionId.value = newSessionId
+        await loadSessionMessages(newSessionId)
+      }
+    } else if (!activeSessionId.value) {
+      // 如果没有活动会话，尝试使用当前提供商的会话或创建新会话
+      if (providerSessions.length > 0) {
+        console.log(`使用${currentProvider}的现有会话: ${providerSessions[0]}`)
+        activeSessionId.value = providerSessions[0]
+        await loadSessionMessages(activeSessionId.value)
+      } else {
+        // 如果没有会话，创建一个新的
+        console.log(`为${currentProvider}创建新会话`)
+        const newSessionId = await createSession(currentProvider)
+        activeSessionId.value = newSessionId
+        await loadSessionMessages(newSessionId)
+      }
+    }
+  } catch (error) {
+    console.error(`确保会话匹配时出错:`, error)
   }
+}
+
+// 初始化时检查URL参数中的会话ID
+onMounted(async () => {
+  // 加载设置
+  await settingsStore.loadSettings()
+  
+  // 检查URL中是否有会话ID
+  const sessionIdFromUrl = route.query.sessionId as string
+  if (sessionIdFromUrl) {
+    console.log('从URL加载会话ID:', sessionIdFromUrl)
+    activeSessionId.value = sessionIdFromUrl
+    await loadSessionMessages(sessionIdFromUrl)
+  }
+  
+  // 确保会话与当前提供商匹配
+  await ensureSessionMatchesProvider()
 })
+
+// 监听路由变化
+watch(() => route.query.sessionId, async (newSessionId) => {
+  if (newSessionId && newSessionId !== activeSessionId.value) {
+    console.log('路由会话ID变更:', newSessionId)
+    activeSessionId.value = newSessionId as string
+    await loadSessionMessages(newSessionId as string)
+  }
+}, { immediate: true })
+
+// 监听提供商变化
+watch(() => settingsStore.currentProvider, async (newProvider) => {
+  console.log(`提供商变更为 ${newProvider}，确保会话匹配`)
+  await ensureSessionMatchesProvider()
+}, { immediate: false })
 </script>
 
 <style scoped>
@@ -292,6 +368,7 @@ onMounted(async () => {
   height: 100vh;
   max-height: 100vh;
   width: 100%;
+  overflow: hidden; /* 防止整体出现滚动条 */
 }
 
 .chat-content {
@@ -305,6 +382,7 @@ onMounted(async () => {
   background-color: #f5f5f5;
   padding: 10px 20px;
   border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0; /* 防止header被压缩 */
 }
 
 .header-content {
@@ -363,6 +441,8 @@ input:checked + .slider-compact:before {
 
 main {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   position: relative;
 }
@@ -371,12 +451,22 @@ main {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden; /* 确保容器不会溢出 */
+}
+
+.message-container {
+  flex: 1;
+  overflow-y: auto; /* 仅消息区域出现滚动条 */
+  padding: 10px;
 }
 
 .input-wrapper {
-  padding: 20px;
+  padding: 10px;
   border-top: 1px solid #e0e0e0;
   background-color: #fff;
+  flex-shrink: 0; /* 防止输入框被压缩 */
+  position: relative; /* 确保始终在底部 */
+  z-index: 2; /* 确保始终在顶层 */
 }
 
 h1 {
