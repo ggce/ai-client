@@ -111,10 +111,6 @@ const displayMessages = computed<ChatMessage[]>(() => {
     return [{ type: 'system', content: '请在右侧边栏选择或创建一个会话开始聊天' }]
   }
   
-  if (sessionMessages.value.length === 0) {
-    return [{ type: 'system', content: '这是一个新的会话，开始聊天吧！' }]
-  }
-  
   return sessionMessages.value.map(msg => {
     let type = msg.role
     

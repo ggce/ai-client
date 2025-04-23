@@ -10,6 +10,8 @@ import {
   MCPTool,
 } from './types';
 
+import logger from './logger';
+
 // 定义每个服务器实例的状态接口
 interface ServerInstance {
   client: Client;
@@ -37,16 +39,13 @@ export class MCPClient {
         config
       });
     });
-    
-    // 启动所有服务
-    this.startAllServers();
   }
 
   /**
    * 启动mcpServers中定义的所有具有command属性的服务器
    */
   async startAllServers(): Promise<void> {
-    console.log("正在启动所有MCP服务...");
+    logger.log('MCPClient', '正在启动所有MCP服务...');
     
     const serverEntries = Array.from(this.serverInstances.entries());
     const startupPromises = [];
@@ -56,11 +55,11 @@ export class MCPClient {
         // 将每个启动请求添加到promise数组中，但不等待结果
         startupPromises.push(
           this.startServer(key)
-            .then(() => console.log(`✓ 服务器 "${key}" 启动成功`))
-            .catch(err => console.error(`✗ 服务器 "${key}" 启动失败:`, err))
+            .then(() => logger.log('MCPClient', `✓ 服务器 "${key}" 启动成功`))
+            .catch(err => logger.error('MCPClient', `✗ 服务器 "${key}" 启动失败: ${err}`))
         );
       } else {
-        console.log(`跳过服务器 "${key}" (无启动命令)`);
+        logger.log('MCPClient', `跳过服务器 "${key}" (无启动命令)`);
       }
     }
     
@@ -69,7 +68,7 @@ export class MCPClient {
     
     // 列出启动成功的服务器
     const runningServers = this.getRunningServers();
-    console.log(`成功启动 ${runningServers.length}/${serverEntries.length} 个服务器: ${runningServers.join(', ')}`);
+    logger.log('MCPClient', `成功启动 ${runningServers.length}/${serverEntries.length} 个服务器: ${runningServers.join(', ')}`);
   }
 
   /**
@@ -88,27 +87,27 @@ export class MCPClient {
 
     // 如果已经有传输实例，尝试先判断是否已启动
     if (instance.transport) {
-      console.log(`服务器 "${serverKey}" 已有传输实例，检查连接状态`);
+      logger.log('MCPClient', `服务器 "${serverKey}" 已有传输实例，检查连接状态`);
       
       // 如果已连接，无需再启动
       if (instance.isConnected) {
-        console.log(`服务器 "${serverKey}" 已连接，跳过启动`);
+        logger.log('MCPClient', `服务器 "${serverKey}" 已连接，跳过启动`);
         return;
       }
       
       // 否则检查是否可以建立连接
       try {
         await this.connectToServer(serverKey);
-        console.log(`服务器 "${serverKey}" 已重新连接，跳过启动`);
+        logger.log('MCPClient', `服务器 "${serverKey}" 已重新连接，跳过启动`);
         return;
       } catch (error) {
-        console.log(`无法连接到现有传输，将重新创建 "${serverKey}" 的传输实例`);
+        logger.log('MCPClient', `无法连接到现有传输，将重新创建 "${serverKey}" 的传输实例`);
         // 继续执行启动逻辑
       }
     }
 
     try {
-      console.log(`正在启动MCP服务[${serverKey}]，命令: ${config.command} ${config.args?.join(' ') || ''}`);
+      logger.log('MCPClient', `正在启动MCP服务[${serverKey}]，命令: ${config.command} ${config.args?.join(' ') || ''}`);
     
       // 创建传输实例
       const transport = new StdioClientTransport({
@@ -123,21 +122,21 @@ export class MCPClient {
         // 连接并初始化，这会启动进程
         await instance.client.connect(transport);
         instance.isConnected = true;
-        console.log(`MCP服务[${serverKey}]进程已启动并成功连接`);
+        logger.log('MCPClient', `MCP服务[${serverKey}]进程已启动并成功连接`);
       } catch (error) {
-        console.error(`连接到MCP服务[${serverKey}]失败:`, error);
+        logger.error('MCPClient', `连接到MCP服务[${serverKey}]失败: ${error}`);
         
         if (error instanceof Error && error.message.includes('already started')) {
-          console.log(`检测到服务器 "${serverKey}" 已启动错误，验证连接状态`);
+          logger.log('MCPClient', `检测到服务器 "${serverKey}" 已启动错误，验证连接状态`);
           
           try {
             // 检查连接是否有效
             await instance.client.listTools();
             instance.isConnected = true;
-            console.log(`验证成功: 服务器 "${serverKey}" 已连接`);
+            logger.log('MCPClient', `验证成功: 服务器 "${serverKey}" 已连接`);
             return;
           } catch (validationError) {
-            console.warn(`连接验证失败，将重置连接: ${serverKey}`);
+            logger.warn('MCPClient', `连接验证失败，将重置连接: ${serverKey}`);
           }
         }
         
@@ -147,7 +146,7 @@ export class MCPClient {
         throw error;
       }
     } catch (error) {
-      console.error(`启动MCP服务[${serverKey}]失败:`, error);
+      logger.error('MCPClient', `启动MCP服务[${serverKey}]失败: ${error}`);
       throw error;
     }
   }
@@ -163,7 +162,7 @@ export class MCPClient {
 
     // 如果已经连接，无需重复操作
     if (instance.isConnected) {
-      console.log(`已处于连接状态: ${serverKey}`);
+      logger.log('MCPClient', `已处于连接状态: ${serverKey}`);
       return;
     }
 
@@ -176,40 +175,40 @@ export class MCPClient {
         if (instance.transport instanceof StdioClientTransport && 
             'isStarted' in instance.transport && 
             (instance.transport as any).isStarted) {
-          console.log(`传输已启动但未连接，尝试验证连接: ${serverKey}`);
+          logger.log('MCPClient', `传输已启动但未连接，尝试验证连接: ${serverKey}`);
           
           try {
             // 验证连接
             await instance.client.listTools();
             instance.isConnected = true;
-            console.log(`验证成功: 服务器 "${serverKey}" 可用`);
+            logger.log('MCPClient', `验证成功: 服务器 "${serverKey}" 可用`);
             return;
           } catch (validationError) {
-            console.warn(`连接验证失败: ${serverKey}`, validationError);
+            logger.warn('MCPClient', `连接验证失败: ${serverKey}`);
             // 继续尝试重新连接
           }
         }
         
         await instance.client.connect(instance.transport);
         instance.isConnected = true;
-        console.log(`使用现有传输连接到服务器: ${serverKey}`);
+        logger.log('MCPClient', `使用现有传输连接到服务器: ${serverKey}`);
         return;
       } catch (error) {
-        console.error(`使用现有传输连接到"${serverKey}"失败:`, error);
+        logger.error('MCPClient', `使用现有传输连接到"${serverKey}"失败: ${error}`);
         
         // 改进对"already started"错误的处理
         if (error instanceof Error && error.message.includes('already started')) {
-          console.log(`检测到"already started"错误，服务器可能已经可用: ${serverKey}`);
+          logger.log('MCPClient', `检测到"already started"错误，服务器可能已经可用: ${serverKey}`);
           
           // 尝试连接检查 - 如果服务已启动，应该能列出工具
           try {
             await instance.client.listTools();
             // 如果成功获取工具列表，说明连接是有效的
             instance.isConnected = true;
-            console.log(`确认服务器 "${serverKey}" 已连接并可用`);
+            logger.log('MCPClient', `确认服务器 "${serverKey}" 已连接并可用`);
             return;
           } catch (checkError) {
-            console.warn(`无法确认服务器 "${serverKey}" 连接状态`);
+            logger.warn('MCPClient', `无法确认服务器 "${serverKey}" 连接状态`);
             // 连接检查失败，继续尝试其他传输方式
           }
         } else {
@@ -229,10 +228,10 @@ export class MCPClient {
       instance.transport = transport;
       instance.isConnected = true;
       
-      console.log(`已使用StreamableHTTP传输连接到"${serverKey}"`);
+      logger.log('MCPClient', `已使用StreamableHTTP传输连接到"${serverKey}"`);
     } catch (error) {
       // 如果失败，尝试使用较旧的SSE传输
-      console.log(`"${serverKey}"的StreamableHTTP连接失败，正在回退到SSE传输`);
+      logger.log('MCPClient', `"${serverKey}"的StreamableHTTP连接失败，正在回退到SSE传输`);
       try {
         const baseUrl = new URL(config.url);
         const transport = new SSEClientTransport(baseUrl);
@@ -242,7 +241,7 @@ export class MCPClient {
         instance.transport = transport;
         instance.isConnected = true;
         
-        console.log(`已使用SSE传输连接到"${serverKey}"`);
+        logger.log('MCPClient', `已使用SSE传输连接到"${serverKey}"`);
       } catch (error: any) {
         // 如果两种传输都失败，如果提供了命令，则尝试Stdio传输
         if (config.command) {
@@ -265,14 +264,14 @@ export class MCPClient {
               } catch (reconnectError) {
                 // 处理"already started"错误
                 if (reconnectError instanceof Error && reconnectError.message.includes('already started')) {
-                  console.log(`检测到重连时"already started"错误，执行连接状态验证: ${serverKey}`);
+                  logger.log('MCPClient', `检测到重连时"already started"错误，执行连接状态验证: ${serverKey}`);
                   // 尝试执行一个操作来验证连接
                   try {
                     await instance.client.listTools();
                     instance.isConnected = true;
-                    console.log(`验证成功，服务器 "${serverKey}" 已连接并可用`);
+                    logger.log('MCPClient', `验证成功，服务器 "${serverKey}" 已连接并可用`);
                   } catch (validationError) {
-                    console.error(`连接验证失败`);
+                    logger.error('MCPClient', `连接验证失败`);
                     throw new Error(`无法验证服务器 "${serverKey}" 的连接`);
                   }
                 } else {
@@ -282,12 +281,12 @@ export class MCPClient {
             }
             
             if (instance.isConnected) {
-              console.log(`已使用Stdio传输连接到"${serverKey}"`);
+              logger.log('MCPClient', `已使用Stdio传输连接到"${serverKey}"`);
             } else {
               throw new Error(`无法建立到服务器 "${serverKey}" 的连接`);
             }
           } catch (stdioError) {
-            console.error(`Stdio传输连接到"${serverKey}"失败:`, stdioError);
+            logger.error('MCPClient', `Stdio传输连接到"${serverKey}"失败: ${stdioError}`);
             throw new Error(`使用所有可用传输连接到"${serverKey}"失败`);
           }
         } else {
@@ -303,11 +302,11 @@ export class MCPClient {
   private ensureServerConnected(serverKey: string): ServerInstance {
     const instance = this.serverInstances.get(serverKey);
     if (!instance) {
-      throw new Error(`找不到MCP服务器实例 "${serverKey}"`);
+      throw new Error(`[MCPClient] => 找不到MCP服务器实例 "${serverKey}"`);
     }
     
     if (!instance.isConnected) {
-      throw new Error(`MCP客户端未连接到服务器"${serverKey}"。请先调用connectToServer()。`);
+      throw new Error(`[MCPClient] => MCP客户端未连接到服务器"${serverKey}"。请先调用connectToServer()。`);
     }
     
     return instance;
@@ -366,7 +365,7 @@ export class MCPClient {
    * @param serverKey 必须指定服务器键名
    */
   async callTool(options: { name: string; arguments?: Record<string, any> }, serverKey: string) {
-    console.log(`在服务器 ${serverKey} 上调用工具 ${options.name}`, options);
+    logger.log('MCPClient', `在服务器 ${serverKey} 上调用工具 ${options.name}: ${JSON.stringify(options)}`);
     const instance = this.ensureServerConnected(serverKey);
     return await instance.client.callTool(options);
   }
@@ -385,9 +384,9 @@ export class MCPClient {
       }
       
       instance.isConnected = false;
-      console.log(`已断开与MCP服务器"${serverKey}"的连接`);
+      logger.log('MCPClient', `已断开与MCP服务器"${serverKey}"的连接`);
     } catch (error) {
-      console.error(`断开与MCP服务器"${serverKey}"的连接时出错:`, error);
+      logger.error('MCPClient', `断开与MCP服务器"${serverKey}"的连接时出错: ${error}`);
     }
   }
 
@@ -400,7 +399,7 @@ export class MCPClient {
       await this.disconnect(key);
     }
     
-    console.log(`已断开与所有MCP服务器的连接`);
+    logger.log('MCPClient', `已断开与所有MCP服务器的连接`);
   }
 
   /**
@@ -427,7 +426,7 @@ export class MCPClient {
   async stopServer(serverKey: string): Promise<void> {
     const instance = this.serverInstances.get(serverKey);
     if (!instance || !instance.transport) {
-      throw new Error(`服务器"${serverKey}"未运行`);
+      throw new Error(`[MCPClient] => 服务器"${serverKey}"未运行`);
     }
 
     // 先断开连接
@@ -436,7 +435,7 @@ export class MCPClient {
     // 释放transport资源
     instance.transport = null;
     
-    console.log(`服务器"${serverKey}"已成功停止`);
+    logger.log('MCPClient', `服务器"${serverKey}"已成功停止`);
   }
 
   /**
@@ -450,20 +449,13 @@ export class MCPClient {
     const runningServers = this.getRunningServers();
     for (const key of runningServers) {
       try {
-        const instance = this.serverInstances.get(key);
-        if (instance && instance.transport) {
-          // 确保释放transport资源
-          if ('close' in instance.transport && typeof instance.transport.close === 'function') {
-            await instance.transport.close();
-          }
-          instance.transport = null;
-        }
+        await this.stopServer(key);
       } catch (error) {
-        console.error(`停止服务器"${key}"失败:`, error);
+        logger.error('MCPClient', `停止服务器"${key}"失败: ${error}`);
       }
     }
 
-    console.log(`已停止所有 ${runningServers.length} 个运行中的服务器`);
+    logger.log('MCPClient', `已停止所有 ${runningServers.length} 个运行中的服务器`);
   }
 
   /**
@@ -480,13 +472,13 @@ export class MCPClient {
     // 获取所有运行中的服务器
     const runningServers = this.getRunningServers();
     if (runningServers.length === 0) {
-      console.warn('没有运行中的MCP服务器');
+      logger.warn('MCPClient', '没有运行中的MCP服务器');
       return allTools;
     }
     
     // 获取已连接的服务器
     const connectedServers = this.getConnectedServers();
-    console.log(`当前已连接服务器: ${connectedServers.join(', ') || '无'}, 运行中服务器: ${runningServers.join(', ') || '无'}`);
+    logger.log('MCPClient', `当前已连接服务器: ${connectedServers.join(', ') || '无'}, 运行中服务器: ${runningServers.join(', ') || '无'}`);
     
     // 遍历每个服务器收集工具
     const connectionPromises = [];
@@ -496,8 +488,8 @@ export class MCPClient {
       if (!connectedServers.includes(serverKey)) {
         connectionPromises.push(
           this.connectToServer(serverKey)
-            .then(() => console.log(`✓ 成功连接到服务器 ${serverKey}`))
-            .catch(err => console.error(`✗ 连接到服务器 ${serverKey} 失败:`, err))
+            .then(() => logger.log('MCPClient', `✓ 成功连接到服务器 ${serverKey}`))
+            .catch(err => logger.error('MCPClient', `✗ 连接到服务器 ${serverKey} 失败: ${err}`))
         );
       }
     }
@@ -507,7 +499,7 @@ export class MCPClient {
     
     // 重新获取已连接的服务器列表
     const updatedConnectedServers = this.getConnectedServers();
-    console.log(`连接尝试后，已连接的服务器: ${updatedConnectedServers.join(', ') || '无'}`);
+    logger.log('MCPClient', `连接尝试后，已连接的服务器: ${updatedConnectedServers.join(', ') || '无'}`);
     
     // 从每个已连接的服务器收集工具
     for (const serverKey of updatedConnectedServers) {
@@ -524,9 +516,9 @@ export class MCPClient {
         }));
         
         allTools.push(...toolsWithSource);
-        console.log(`从服务器 ${serverKey} 收集了 ${serverTools.length} 个工具`);
+        logger.log('MCPClient', `从服务器 ${serverKey} 收集了 ${serverTools.length} 个工具`);
       } catch (toolError) {
-        console.error(`从服务器 ${serverKey} 获取工具列表失败:`, toolError);
+        logger.error('MCPClient', `从服务器 ${serverKey} 获取工具列表失败: ${toolError}`);
       }
     }
     

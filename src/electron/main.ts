@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron';
 import * as path from 'path';
-import * as url from 'url';
 import express, { Request, Response, Express, Application } from 'express';
 import { NextFunction } from 'express';
 import bodyParser from 'body-parser';
@@ -9,9 +8,11 @@ import { AIProviderSwitcher } from '../ai-provider-switcher';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
 import { OpenAIClient } from '../providers/openai';
-import { Message, Role } from '../types';
+import MCPClient from '../mcpClient';
+import { MCPTool } from '../types';
 import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from '../constants';
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
+import logger from '../logger';
 
 // 加载环境变量
 dotenv.config();
@@ -34,6 +35,77 @@ let openaiclient = new OpenAIClient({
   baseURL: OPENAI_DEFAULT_URL
 });
 
+// MCP客户端
+const mcpClient = new MCPClient("deepseek-client", "1.0.0");
+// MCP工具
+let mcpTools: Array<MCPTool> = [];
+
+// 初始化所有MCP工具
+async function initMcpTools() {
+  // 启动所有服务
+  await mcpClient.startAllServers();
+  // 收集所有工具
+  mcpTools = await mcpClient.collectToolsFromAllServers();
+}
+initMcpTools();
+
+/**
+   * 调用mcp工具
+   */
+async function callMCPTool(
+  toolCall: ChatCompletionMessageToolCall
+) {
+  // 无工具
+  if (!toolCall.function || !toolCall.function.name) {
+    throw new Error('MCP工具不存在');
+  }
+
+  logger.log('Main', 'MCP工具调用开始');
+  logger.log('Main', `工具调用: ${JSON.stringify(toolCall)}`);
+
+  try {
+    // 解析参数 - 修复空字符串解析问题
+    let args = {};
+    if (toolCall.function.arguments && toolCall.function.arguments.trim() !== '') {
+      try {
+        args = JSON.parse(toolCall.function.arguments);
+      } catch (parseError) {
+        logger.error('Main', `MCP工具解析参数失败: ${parseError}`);
+        // 保持 args 为空对象并继续执行
+      }
+    }
+    
+    // 从工具名中提取服务器键和实际工具名
+    const [serverKey, actualToolName] = toolCall.function.name.split('_SERVERKEYTONAME_');
+    const result = await mcpClient.callTool(
+      {
+        name: actualToolName || toolCall.function.name,
+        arguments: args
+      },
+      serverKey
+    );
+
+    logger.log('Main', `MCP工具调用成功: ${JSON.stringify(result)}`);
+    
+    return {
+      status: true,
+      id: toolCall.id,
+      result: JSON.stringify(result)
+    }
+  } catch (err: any) {
+    // 类型安全的错误处理
+    const errorMessage = err instanceof Error ? err.message : String(err);
+
+    logger.error('Main', `MCP工具调用失败: ${errorMessage}`);
+
+    return {
+      status: false,
+      id: toolCall.id,
+      errorMessage: errorMessage
+    }
+  }
+}
+
 // 从配置文件加载配置
 function initClientsFromConfig() {
   try {
@@ -42,7 +114,7 @@ function initClientsFromConfig() {
       const configData = fs.readFileSync(configPath, 'utf8');
       const config = JSON.parse(configData);
       
-      console.log('读取到的配置:', JSON.stringify(config, null, 2).substring(0, 100) + '...');
+      logger.log('Main', `读取到的配置: ${JSON.stringify(config, null, 2).substring(0, 100)}...`);
       
       if (config.providers) {
         // 更新DeepSeek客户端
@@ -52,7 +124,7 @@ function initClientsFromConfig() {
             baseURL: config.providers.deepseek.baseURL || DEEPSEEK_DEFAULT_URL,
             defaultModel: config.providers.deepseek.model || DEEPSEEK_MODELS.DEFAULT
           });
-          console.log('已从配置文件加载DeepSeek API配置');
+          logger.log('Main', '已从配置文件加载DeepSeek API配置');
         }
         
         // 更新OpenAI客户端
@@ -62,12 +134,12 @@ function initClientsFromConfig() {
             baseURL: config.providers.openai.baseURL || OPENAI_DEFAULT_URL,
             defaultModel: config.providers.openai.model || OPENAI_MODELS.DEFAULT
           });
-          console.log('已更新OpenAI API配置');
+          logger.log('Main', '已更新OpenAI API配置');
         }
       }
     }
   } catch (error) {
-    console.error('从配置文件初始化客户端失败:', error);
+    logger.error('Main', `从配置文件初始化客户端失败: ${error}`);
   }
 }
 
@@ -100,9 +172,9 @@ router.get('/', routeHandler((req: Request, res: Response) => {
   if (!fs.existsSync(vueDistDir)) {
     try {
       fs.mkdirSync(vueDistDir, { recursive: true });
-      console.log('创建了Vue dist目录:', vueDistDir);
+      logger.log('Main', `创建了Vue dist目录: ${vueDistDir}`);
     } catch (error) {
-      console.error('创建Vue dist目录失败:', error);
+      logger.error('Main', `创建Vue dist目录失败: ${error}`);
     }
   }
   
@@ -111,7 +183,7 @@ router.get('/', routeHandler((req: Request, res: Response) => {
     res.sendFile(vueDist);
   } else {
     // 如果Vue构建不存在，回退到EJS模板
-    console.warn('Vue应用构建不存在，使用EJS模板替代');
+    logger.warn('Main', 'Vue应用构建不存在，使用EJS模板替代');
     res.render('index');
   }
 }));
@@ -139,7 +211,7 @@ function routeHandler(handler: RouterHandler) {
       // 显式发送响应
       res.json(result);
     } catch (error) {
-      console.error('路由处理错误:', error);
+      logger.error('Main', `路由处理错误: ${error}`);
       
       // 如果响应已结束，不执行后续代码
       if (res.headersSent) {
@@ -163,19 +235,19 @@ router.get('/api/config', routeHandler((req: Request, res: Response) => {
   try {
     // 读取配置文件，如果存在的话
     const configPath = path.join(app.getPath('userData'), 'config.json');
-    console.log('读取配置文件:', configPath);
+    logger.log('Main', `读取配置文件: ${configPath}`);
     
     if (fs.existsSync(configPath)) {
       const configData = fs.readFileSync(configPath, 'utf8');
       const config = JSON.parse(configData);
-      console.log('配置加载成功');
+      logger.log('Main', '配置加载成功');
       res.json(config);
     } else {
-      console.log('配置文件不存在，返回空配置');
+      logger.log('Main', '配置文件不存在，返回空配置');
       res.json({});
     }
   } catch (error) {
-    console.error('读取配置失败:', error);
+    logger.error('Main', `读取配置失败: ${error}`);
     res.status(500).json({ error: '读取配置失败' });
   }
 }));
@@ -185,8 +257,8 @@ router.post('/api/config', routeHandler((req: Request, res: Response) => {
   try {
     // 保存配置到文件
     const configPath = path.join(app.getPath('userData'), 'config.json');
-    console.log('保存配置到文件:', configPath);
-    console.log('配置内容:', JSON.stringify(req.body));
+    logger.log('Main', `保存配置到文件: ${configPath}`);
+    logger.log('Main', `配置内容: ${JSON.stringify(req.body)}`);
     
     // 确保目录存在
     const configDir = path.dirname(configPath);
@@ -199,10 +271,10 @@ router.post('/api/config', routeHandler((req: Request, res: Response) => {
     // 从配置文件加载配置
     initClientsFromConfig();
 
-    console.log('配置保存成功');
+    logger.log('Main', '配置保存成功');
     res.json({ success: true });
   } catch (error) {
-    console.error('保存配置失败:', error);
+    logger.error('Main', `保存配置失败: ${error}`);
     res.status(500).json({ error: '保存配置失败' });
   }
 }));
@@ -227,7 +299,7 @@ router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Respo
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      console.error('查询DeepSeek余额失败:', response.status, errorData);
+      logger.error('Main', `查询DeepSeek余额失败: ${response.status} ${JSON.stringify(errorData)}`);
       return res.status(response.status).json({ 
         error: '查询余额失败', 
         status: response.status,
@@ -237,10 +309,10 @@ router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Respo
     
     // 返回余额信息
     const balanceData = await response.json();
-    console.log('DeepSeek余额信息:', balanceData);
+    logger.log('Main', `DeepSeek余额信息: ${JSON.stringify(balanceData)}`);
     res.json(balanceData);
   } catch (error) {
-    console.error('查询DeepSeek余额错误:', error);
+    logger.error('Main', `查询DeepSeek余额错误: ${error}`);
     res.status(500).json({ 
       error: '查询余额失败', 
       details: error instanceof Error ? error.message : String(error) 
@@ -252,26 +324,26 @@ router.get('/api/deepseek/balance', routeHandler(async (req: Request, res: Respo
 
 // 创建新会话
 router.post('/api/sessions', routeHandler(async (req: Request, res: Response) => {
-  console.log('接收到创建会话请求', req.body);
+  logger.log('Main', `接收到创建会话请求: ${JSON.stringify(req.body)}`);
   try {
-    console.log('准备创建会话');
+    logger.log('Main', '准备创建会话');
     
     // 使用新的API创建会话
     const sessionId = deepseekClient.createSession();
     
     if (!sessionId) {
-      console.error('创建会话失败');
+      logger.error('Main', '创建会话失败');
       // 直接发送响应而不是返回值
       res.status(500).json({ error: '创建会话失败: 未返回sessionId' });
       return;
     }
     
-    console.log('成功创建会话，ID:', sessionId);
+    logger.log('Main', `成功创建会话，ID: ${sessionId}`);
     
     // 直接发送响应
     res.json(sessionId);
   } catch (err) {
-    console.error('创建会话失败', err);
+    logger.error('Main', `创建会话失败: ${err}`);
     // 直接发送错误响应
     res.status(500).json({
       error: `创建会话失败: ${err instanceof Error ? err.message : String(err)}`
@@ -281,7 +353,7 @@ router.post('/api/sessions', routeHandler(async (req: Request, res: Response) =>
 
 // 获取会话id列表
 router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) => {
-  console.log('接收到获取会话id列表请求');
+  logger.log('Main', '接收到获取会话id列表请求');
   try {
     // 设置超时处理
     const timeoutPromise = new Promise((_, reject) => {
@@ -290,16 +362,13 @@ router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) =
     
     const getSessionsPromise = (async () => {
       try {
-        console.log('准备获取会话id列表');
+        logger.log('Main', '准备获取会话id列表');
         // 使用新的API获取会话列表
         const sessionIds = deepseekClient.listSessionIds();
-        console.log(`找到 ${sessionIds.length} 个会话`);
-        
-        // 转换为前端需要的格式
-        console.log('成功获取会话id列表', sessionIds);
+        logger.log('Main', `成功获取会话id列表: ${JSON.stringify(sessionIds)}`);
         return sessionIds;
       } catch (innerErr) {
-        console.error('获取会话id列表内部错误', innerErr);
+        logger.error('Main', `获取会话id列表内部错误: ${innerErr}`);
         throw new Error(`获取会话id列表内部错误: ${innerErr instanceof Error ? innerErr.message : String(innerErr)}`);
       }
     })();
@@ -307,7 +376,7 @@ router.get('/api/sessionIds', routeHandler(async (req: Request, res: Response) =
     // 使用Promise.race防止请求卡住
     return await Promise.race([getSessionsPromise, timeoutPromise]);
   } catch (err) {
-    console.error('获取会话id列表失败', err);
+    logger.error('Main', `获取会话id列表失败: ${err}`);
     // 返回空列表，允许前端继续
     return [];
   }
@@ -339,7 +408,7 @@ router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response)
       throw error;
     }
   } catch (err) {
-    console.error('获取会话历史失败', err);
+    logger.error('Main', `获取会话历史失败: ${err}`);
     throw new Error(`获取会话历史失败: ${err instanceof Error ? err.message : String(err)}`);
   }
 }));
@@ -354,7 +423,7 @@ router.post('/api/sessions/:id/messages', routeHandler(async (req: Request, res:
       reasoningContent: "该端点已废弃，仅支持流式API"
     });
   } catch (err) {
-    console.error('发送消息失败', err);
+    logger.error('Main', `发送消息失败: ${err}`);
     throw new Error(`发送消息失败: ${err instanceof Error ? err.message : String(err)}`);
   }
 }));
@@ -390,13 +459,13 @@ router.post('/api/sessions/:id/messages/stream', (req: Request, res: Response) =
     // 设置过期时间，60秒后自动清理
     setTimeout(() => {
       streamRequestsStore.delete(requestId);
-      console.log(`已清理流式请求数据: ${requestId}`);
+      logger.log('Main', `已清理流式请求数据: ${requestId}`);
     }, 60000);
     
     // 返回请求ID
     res.json({ requestId });
   } catch (error) {
-    console.error('准备流式请求失败:', error);
+    logger.error('Main', `准备流式请求失败: ${error}`);
     res.status(500).json({ 
       error: `准备流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
     });
@@ -438,12 +507,13 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
       }
       
       try {
-        // 使用新的流式API
-        const streamResult = await deepseekClient.sendStreamMessageToSession(
+        // 开始流式请求
+        const streamResult = await deepseekClient.sendStreamMessageToSession({
           sessionId, 
           message,
-          options
-        );
+          options,
+          mcpTools
+        });
 
         // 完整的响应内容
         let fullContent = '';
@@ -456,7 +526,9 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         // 当前调用工具index
         let nowToolCallIndex = -1;
         
+        // 持续的流
         const stream = streamResult.stream;
+
         for await (const chunk of stream) {
           // 处理普通文字
           if (chunk.choices && chunk.choices[0]?.delta?.content) {
@@ -518,12 +590,6 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           }
         }
 
-        console.log('[DeepSeek] 流式响应完成:', {
-          fullContent,
-          fullReasoningContent,
-          toolCalls
-        });
-
         // 当前session
         const session = deepseekClient.getSession(sessionId);
         // 信息是否更新
@@ -535,16 +601,10 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           session?.addAssistantMessage(fullContent, fullReasoningContent);
           // 信息更新
           isMessageUpdate = true;
-
-          console.log('[DeepSeek] 响应已添加到会话历史');
         }
 
         // 有需要调用的工具
         if (toolCalls && toolCalls.length > 0) {
-          console.log("---------- 有需要调用的工具 ------------");
-          console.log(toolCalls);
-          console.log(toolTips);
-
           // 添加工具调用会话历史
           session?.addAssistantMessage(toolTips ? toolTips.join('\n') : '', '', toolCalls);
           // 信息更新
@@ -554,6 +614,30 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         if (isMessageUpdate) {
           // 提醒前端更新信息
           sendData(res, { isMessageUpdate: true, toolCalls });
+        }
+
+        // 遍历开始调用工具
+        if (toolCalls) {
+          for(const toolCall of toolCalls) {
+            // 调用工具获取结果
+            const res = await callMCPTool(toolCall);
+
+            if (res.status) {
+              // 调用成功
+              // 添加工具成功到会话
+              session?.addToolMessage(
+                res.id || '',
+                res.result || '',
+              );
+            } else {
+              // 调用失败
+              // 添加工具失败到会话
+              session?.addToolMessage(
+                res.id || '',
+                JSON.stringify({errorMessage: res.errorMessage}),
+              );
+            }
+          }
         }
 
         // 流完成回调，传递参数，并等待工具调用完毕
@@ -577,7 +661,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         throw error;
       }
     } catch (err: any) {
-      console.error('Failed to send streaming message:', err);
+      logger.error('Main', `Failed to send streaming message: ${err}`);
       sendData(res, { error: `Streaming error: ${err.message}` });
       streamRequestsStore.delete(requestId);
       res.end();
@@ -596,7 +680,7 @@ router.delete('/api/sessions/:id', routeHandler(async (req: Request, res: Respon
     }
     return { success: true };
   } catch (err) {
-    console.error('删除会话失败', err);
+    logger.error('Main', `删除会话失败: ${err}`);
     throw new Error(`删除会话失败: ${err instanceof Error ? err.message : String(err)}`);
   }
 }));
@@ -616,14 +700,14 @@ expressApp.use(middlewareHandler((req: Request, res: Response, next: NextFunctio
     res.sendFile(vueDist);
   } else {
     // 如果Vue构建不存在，回退到EJS模板或404
-    console.warn(`Vue应用构建不存在，无法处理路由: ${req.path}`);
+    logger.warn(`Main`, `Vue应用构建不存在，无法处理路由: ${req.path}`);
     res.status(404).send('Vue应用未构建，请先运行 npm run vue:build');
   }
 }));
 
 // 启动Express服务器
 let server = expressApp.listen(PORT, () => {
-  console.log(`Express服务器运行在 http://localhost:${PORT}`);
+  logger.log('Main', `Express服务器运行在 http://localhost:${PORT}`);
 });
 
 // 保存对主窗口的引用，避免被JavaScript的GC机制回收
@@ -635,7 +719,7 @@ function createWindow() {
   const preloadExists = fs.existsSync(preloadPath);
   
   if (!preloadExists) {
-    console.warn(`警告: Preload脚本不存在: ${preloadPath}`);
+    logger.warn('Main', `警告: Preload脚本不存在: ${preloadPath}`);
   }
   
   // 创建图标
@@ -669,12 +753,12 @@ function createWindow() {
   
   // 开发环境 - 尝试连接到Vue的开发服务器
   if (isDev && process.env.VUE_DEV_SERVER_URL) {
-    console.log(`加载开发服务器: ${process.env.VUE_DEV_SERVER_URL}`);
+    logger.log('Main', `加载开发服务器: ${process.env.VUE_DEV_SERVER_URL}`);
     mainWindow.loadURL(process.env.VUE_DEV_SERVER_URL);
   } else {
     // 尝试加载Express服务器上的页面
     const serverUrl = `http://localhost:${PORT}`;
-    console.log(`加载Express服务: ${serverUrl}`);
+    logger.log('Main', `加载Express服务: ${serverUrl}`);
     mainWindow.loadURL(serverUrl);
   }
   
@@ -721,7 +805,7 @@ app.on('ready', () => {
       const icon = nativeImage.createFromPath(iconPath);
       app.dock?.setIcon(icon);
     } catch (error) {
-      console.error('设置Dock图标失败:', error);
+      logger.error('Main', `设置Dock图标失败: ${error}`);
     }
   }
   
