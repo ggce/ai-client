@@ -613,30 +613,33 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         if (isMessageUpdate) {
           // 提醒前端更新信息
-          sendData(res, { isMessageUpdate: true, toolCalls });
+          sendData(res, { isMessageUpdate: true });
         }
 
         // 遍历开始调用工具
         if (toolCalls) {
           for(const toolCall of toolCalls) {
             // 调用工具获取结果
-            const res = await callMCPTool(toolCall);
+            const toolRes = await callMCPTool(toolCall);
 
-            if (res.status) {
+            if (toolRes.status) {
               // 调用成功
               // 添加工具成功到会话
               session?.addToolMessage(
-                res.id || '',
-                res.result || '',
+                toolRes.id || '',
+                toolRes.result || '',
               );
             } else {
               // 调用失败
               // 添加工具失败到会话
               session?.addToolMessage(
-                res.id || '',
-                JSON.stringify({errorMessage: res.errorMessage}),
+                toolRes.id || '',
+                JSON.stringify({errorMessage: toolRes.errorMessage}),
               );
             }
+
+            // 提醒前端更新信息
+            sendData(res, { isMessageUpdate: true, toolCall });
           }
         }
 

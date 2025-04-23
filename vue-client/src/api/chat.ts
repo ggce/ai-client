@@ -53,7 +53,7 @@ export interface MessageResponse {
 export interface MessageCallbackParams {
   content: string;
   reasoningContent: string;
-  toolCalls: Array<any>; // 替代 any 的推荐方案
+  toolCall: any; // 替代 any 的推荐方案
   isMessageUpdate: boolean;
 };
 
@@ -174,14 +174,14 @@ export async function sendStreamingSessionMessage(
         // 处理内容、推理内容、工具
         const content = data.content || '';
         const reasoningContent = data.reasoningContent || '';
-        const toolCalls = data.toolCalls || undefined;
+        const toolCall = data.toolCall || undefined;
         const isMessageUpdate = data.isMessageUpdate || false;
         
         // 通知所有消息回调
         messageCallbacks.forEach(callback => callback({
           content,
           reasoningContent,
-          toolCalls,
+          toolCall,
           isMessageUpdate
         }));
       } catch (error) {

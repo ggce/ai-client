@@ -217,7 +217,7 @@ const sendMessage = async function(message?: string) {
     stream.onMessage(({
       content,  // 文本内容
       reasoningContent, // 推理内容
-      toolCalls,  // 工具
+      toolCall,  // 工具
       isMessageUpdate // 消息是否更新
     }) => {
       // 文本内容
@@ -227,9 +227,9 @@ const sendMessage = async function(message?: string) {
         streamingReasoningContent.value += reasoningContent;
       }
       // 使用了工具
-      if (toolCalls) {
+      if (toolCall) {
         console.log("需要调用工具");
-        console.log(toolCalls);
+        console.log(toolCall);
         isUseToolCall = true;
       }
 
