@@ -5,13 +5,13 @@
         ref="textareaRef"
         v-model="messageInput" 
         placeholder="在这里输入消息..." 
-        rows="4"
+        rows="3"
         @keydown.enter.exact.prevent="handleEnterKey"
         :disabled="disabled"
       ></textarea>
       
       <!-- 工具列表悬浮面板 -->
-      <div v-if="showToolsList" class="tools-panel">
+      <div v-if="showToolsList" class="tools-panel" @click.stop>
         <div v-if="isLoading" class="tools-loading">
           <span class="loader"></span>
           <p>加载工具列表中...</p>
@@ -21,10 +21,10 @@
         </div>
         <div v-else class="tools-list">
           <div class="tools-header">使用工具</div>
-          <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click="toggleToolSelection(tool)"
+          <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click.stop="toggleToolSelection(tool)"
                :class="{ 'selected': selectedTools.includes(tool.name) }">
             <div class="tool-checkbox">
-              <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
+              <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
@@ -36,32 +36,43 @@
       <!-- 工具栏 -->
       <div class="toolbar">
         <button class="toolbar-btn" title="工具" @click.prevent="toggleToolsList">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
           </svg>
           <span v-if="selectedTools.length > 0" class="tool-badge">{{ selectedTools.length }}</span>
         </button>
         <button class="toolbar-btn" title="文件" @click.prevent="handleFileAction">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
         </button>
         <button class="toolbar-btn" title="上传图片" @click.prevent="openFileUpload">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
         </button>
         <button class="toolbar-btn" title="全屏模式" @click.prevent="toggleFullscreen">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
         </button>
       </div>
     </div>
+    <!-- 动态显示停止按钮或发送按钮 -->
     <button 
+      v-if="isStreamActive"
+      @click="handleStop" 
+      class="stop-button"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="6" width="12" height="12"></rect>
+      </svg>
+    </button>
+    <button 
+      v-else
       @click="handleSend" 
       :disabled="!canSend || disabled"
       class="send-button"
       :class="{ 'active': canSend && !disabled }"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="22" y1="2" x2="11" y2="13"></line>
         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
       </svg>
@@ -70,10 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted, inject } from 'vue'
 
 const props = defineProps<{
-  disabled?: boolean
+  disabled?: boolean,
+  isStreamActive?: boolean // 新增属性表示是否有活动的流传输
 }>()
 
 const messageInput = ref('')
@@ -84,6 +96,9 @@ const availableTools = ref<{ name: string; description: string }[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const selectedTools = ref<string[]>([])
+
+// 从父组件注入的isLoading状态
+const isStreamActive = computed(() => props.isStreamActive === true)
 
 interface MCPRawTool {
   name: string;
@@ -153,7 +168,8 @@ const getBackupToolData = () => {
 };
 
 const emit = defineEmits<{
-  send: [message: string, selectedTools?: string[]]
+  send: [message: string, selectedTools?: string[]],
+  stop: [] // 新增停止事件
 }>()
 
 const canSend = computed(() => messageInput.value.trim() !== '')
@@ -197,6 +213,11 @@ const handleSend = () => {
   const message = messageInput.value.trim()
   emit('send', message, selectedTools.value.length > 0 ? selectedTools.value : undefined)
   messageInput.value = ''
+}
+
+// 停止生成
+const handleStop = () => {
+  emit('stop')
 }
 
 // 点击页面其他位置时关闭工具列表
@@ -304,12 +325,12 @@ onUnmounted(() => {
 textarea {
   width: 100%;
   height: auto;
-  min-height: 70px;
+  min-height: 60px;
   border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 12px 16px;
-  padding-bottom: 45px; /* 为工具栏留出空间 */
-  font-size: 14px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  padding-bottom: 40px; /* 为工具栏留出空间 */
+  font-size: 13px;
   line-height: 1.5;
   resize: none;
   outline: none;
@@ -324,6 +345,7 @@ textarea:focus {
 
 textarea::placeholder {
   color: #999;
+  font-size: 12px;
 }
 
 /* 工具栏样式 */
@@ -334,7 +356,7 @@ textarea::placeholder {
   right: 0;
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background-color: transparent;
   border-top: none;
   z-index: 1;
@@ -344,8 +366,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   color: #666;
@@ -380,13 +402,13 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 12px;
-  width: 46px;
-  height: 60px;
+  margin-left: 10px;
+  width: 40px;
+  height: 50px;
   background-color: #1a73e8;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
@@ -408,6 +430,31 @@ textarea::placeholder {
   cursor: not-allowed;
 }
 
+/* 停止按钮样式 */
+.stop-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  width: 40px;
+  height: 50px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.stop-button:hover {
+  background-color: #c62828;
+}
+
+.stop-button:active {
+  background-color: #b71c1c;
+  transform: scale(0.95);
+}
+
 /* 全屏模式样式 */
 .input-area.fullscreen {
   position: fixed;
@@ -416,7 +463,7 @@ textarea::placeholder {
   right: 0;
   bottom: 0;
   z-index: 1000;
-  padding: 20px;
+  padding: 16px;
   background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(5px);
 }
@@ -428,24 +475,41 @@ textarea::placeholder {
 .input-area.fullscreen textarea {
   height: 100%;
   min-height: 100%;
-  font-size: 16px;
+  font-size: 14px;
   border: 1px solid #ddd;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.tool-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #e53935;
+  color: white;
+  border-radius: 8px;
+  font-size: 9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
 @media (max-width: 600px) {
   .toolbar-btn {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
   
   .toolbar {
-    padding: 6px 10px;
+    padding: 5px 8px;
   }
   
   textarea {
-    min-height: 60px;
-    padding-bottom: 40px;
+    min-height: 55px;
+    padding-bottom: 36px;
   }
 }
 
@@ -456,14 +520,14 @@ textarea::placeholder {
   left: 0;
   width: 100%;
   background-color: white;
-  border-radius: 10px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   z-index: 100;
-  margin-bottom: 8px;
-  max-height: 280px;
+  margin-bottom: 6px;
+  max-height: 260px;
   overflow-y: auto;
   animation: fadeInDown 0.2s ease-out;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* 加载状态样式 */
@@ -472,21 +536,21 @@ textarea::placeholder {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
   color: #616161;
   background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 8px;
-  margin: 8px;
+  border-radius: 6px;
+  margin: 6px;
 }
 
 .loader {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border: 2px solid #e0e0e0;
   border-top-color: #2196f3;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 @keyframes spin {
@@ -495,158 +559,85 @@ textarea::placeholder {
 
 /* 错误状态样式 */
 .tools-error {
-  padding: 16px;
+  padding: 14px;
   color: #d32f2f;
   text-align: center;
   background-color: rgba(211, 47, 47, 0.05);
-  border-radius: 8px;
-  margin: 8px;
+  border-radius: 6px;
+  margin: 6px;
   border: 1px solid rgba(211, 47, 47, 0.1);
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-.tools-list {
-  padding: 12px;
+  font-size: 12px;
 }
 
 .tools-header {
-  font-size: 14px;
+  padding: 10px 14px;
   font-weight: 600;
-  margin-bottom: 12px;
-  color: #616161;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 8px;
+  color: #424242;
+  border-bottom: 1px solid #eeeeee;
+  background-color: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 12px;
+}
+
+.tools-list {
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 .tool-item {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.25s ease;
-  margin-bottom: 6px;
-  background-color: #f9f9f9;
-  border: 1px solid transparent;
-  position: relative;
-}
-
-.tool-item:last-child {
-  margin-bottom: 0;
+  transition: background-color 0.2s;
 }
 
 .tool-item:hover {
-  background-color: #f2f2f2;
-  border-color: #e0e0e0;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background-color: #f5f5f5;
 }
 
 .tool-item.selected {
-  background-color: rgba(46, 125, 50, 0.06);
-  border: 1px solid rgba(46, 125, 50, 0.2);
-  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.15);
-}
-
-.tool-item.selected::before {
-  display: none;
+  background-color: #e8f0fe;
 }
 
 .tool-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #bdbdbd;
+  border-radius: 3px;
+  margin-right: 8px;
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  margin-right: 12px;
-  border-radius: 4px;
-  border: 1.5px solid #d0d0d0;
-  background-color: white;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.tool-item:hover .tool-checkbox {
-  border-color: #aaa;
+  justify-content: center;
+  transition: all 0.2s;
 }
 
 .tool-item.selected .tool-checkbox {
-  border-color: #2e7d32;
-  background-color: #2e7d32;
-  box-shadow: 0 1px 4px rgba(46, 125, 50, 0.4);
-  transform: scale(1.05);
+  border-color: #1a73e8;
+  background-color: #1a73e8;
 }
 
 .tool-check {
   color: white;
-  stroke: white;
-  stroke-width: 2.5;
-  animation: checkmark 0.2s ease-in-out;
-}
-
-@keyframes checkmark {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.tool-icon {
-  margin-right: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .tool-name {
-  font-size: 14px;
+  flex: 1;
+  font-size: 12px;
   color: #333;
-  font-weight: 500;
-  transition: color 0.2s ease;
 }
 
-.tool-item.selected .tool-name {
-  color: #2e7d32;
-}
-
-/* 已选工具数量标记 */
-.tool-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background-color: #1a73e8;
-  color: white;
-  font-size: 10px;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style> 

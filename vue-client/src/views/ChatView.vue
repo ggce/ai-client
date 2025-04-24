@@ -20,7 +20,13 @@
           />
           <ChatToolbar :messages="sessionMessages" />
           <div class="input-wrapper">
-            <ChatInput ref="chatInputRef" @send="sendMessage" :disabled="isLoading || !activeSessionId" />
+            <ChatInput 
+              ref="chatInputRef" 
+              @send="sendMessage" 
+              @stop="stopGeneration" 
+              :disabled="isLoading || !activeSessionId" 
+              :isStreamActive="isLoading"
+            />
           </div>
         </div>
       </main>
@@ -83,6 +89,8 @@ const sessionMessages = ref<SessionMessage[]>([])
 const isLoading = ref(false)
 const streamingMessage = ref<string>('')
 const streamingReasoningContent = ref<string>('') // 添加流式推理内容
+// 存储当前活动的流控制器
+const activeStreamController = ref<AbortController | null>(null)
 
 // 将isLoading提供给其他组件
 provide('isLoading', isLoading)
@@ -178,7 +186,28 @@ const loadSessionMessages = async (sessionId: string) => {
   }
 }
 
-// 发送消息
+// 添加停止生成函数
+const stopGeneration = () => {
+  if (activeStreamController.value) {
+    // 取消当前活动的流请求
+    activeStreamController.value.abort()
+    activeStreamController.value = null
+    
+    // 更新加载状态
+    isLoading.value = false
+    
+    // 重新加载当前会话的消息，以确保UI状态与后端一致
+    if (activeSessionId.value) {
+      loadSessionMessages(activeSessionId.value)
+    }
+    
+    // 清空流内容
+    streamingMessage.value = ''
+    streamingReasoningContent.value = ''
+  }
+}
+
+// 更新sendMessage函数
 const sendMessage = async function(message?: string, selectedTools?: string[]) {
   if (!isProviderConfigured()) {
     sessionMessages.value.push({
@@ -222,6 +251,9 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
         model: settingsStore.providers[settingsStore.currentProvider]?.model,
       }
     );
+    
+    // 保存流控制器，以便可以停止生成
+    activeStreamController.value = stream.controller
 
     // 正在接收流式信息
     stream.onMessage(({
@@ -252,8 +284,14 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
     
     // 等待流式响应完成
     await new Promise<void>((resolve) => {
-      stream.onComplete(() => resolve());
-      stream.onError(() => resolve());
+      stream.onComplete(() => {
+        activeStreamController.value = null
+        resolve()
+      });
+      stream.onError(() => {
+        activeStreamController.value = null
+        resolve()
+      });
     });
   } catch (error) {
     console.error('Failed to send message:', error)
@@ -272,6 +310,7 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
       isLoading.value = false
       streamingMessage.value = ''
       streamingReasoningContent.value = ''
+      activeStreamController.value = null
     }
   }
 }
