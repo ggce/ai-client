@@ -54,29 +54,30 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
         </button>
       </div>
+      
+      <!-- 动态显示停止按钮或发送按钮 (移到输入框内部右下角) -->
+      <button 
+        v-if="isStreamActive"
+        @click="handleStop" 
+        class="action-button stop-button"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="12" height="12"></rect>
+        </svg>
+      </button>
+      <button 
+        v-else
+        @click="handleSend" 
+        :disabled="!canSend || disabled"
+        class="action-button send-button"
+        :class="{ 'active': canSend && !disabled }"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
     </div>
-    <!-- 动态显示停止按钮或发送按钮 -->
-    <button 
-      v-if="isStreamActive"
-      @click="handleStop" 
-      class="stop-button"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="6" y="6" width="12" height="12"></rect>
-      </svg>
-    </button>
-    <button 
-      v-else
-      @click="handleSend" 
-      :disabled="!canSend || disabled"
-      class="send-button"
-      :class="{ 'active': canSend && !disabled }"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"></line>
-        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-      </svg>
-    </button>
   </div>
 </template>
 
@@ -313,6 +314,7 @@ onUnmounted(() => {
   background-color: white;
   position: relative;
   transition: all 0.3s ease;
+  width: 100%;
 }
 
 .textarea-container {
@@ -320,6 +322,7 @@ onUnmounted(() => {
   flex-direction: column;
   flex: 1;
   position: relative;
+  width: 100%;
 }
 
 textarea {
@@ -330,6 +333,7 @@ textarea {
   border-radius: 10px;
   padding: 10px 14px;
   padding-bottom: 40px; /* 为工具栏留出空间 */
+  padding-right: 50px; /* 为右侧发送按钮留出空间 */
   font-size: 13px;
   line-height: 1.5;
   resize: none;
@@ -353,7 +357,6 @@ textarea::placeholder {
   position: absolute;
   bottom: 0;
   left: 0;
-  right: 0;
   display: flex;
   align-items: center;
   padding: 6px 10px;
@@ -398,19 +401,27 @@ textarea::placeholder {
   background-color: rgba(26, 115, 232, 0.1);
 }
 
-.send-button {
+/* 发送和停止按钮的共享样式 */
+.action-button {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 10px;
-  width: 40px;
-  height: 50px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+/* 发送按钮样式 */
+.send-button {
   background-color: #1a73e8;
   color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
 }
 
 .send-button:hover {
@@ -419,6 +430,7 @@ textarea::placeholder {
 
 .send-button:active {
   background-color: #1356b0;
+  transform: scale(0.95);
 }
 
 .send-button.active {
@@ -432,18 +444,8 @@ textarea::placeholder {
 
 /* 停止按钮样式 */
 .stop-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px;
-  width: 40px;
-  height: 50px;
   background-color: #d32f2f;
   color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .stop-button:hover {
@@ -510,6 +512,13 @@ textarea::placeholder {
   textarea {
     min-height: 55px;
     padding-bottom: 36px;
+  }
+  
+  .action-button {
+    bottom: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
   }
 }
 

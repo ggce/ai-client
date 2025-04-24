@@ -100,11 +100,12 @@ onMounted(() => {
   align-items: center;
   background-color: transparent;
   box-shadow: none;
+  font-size: 14px;
 }
 
 .sidebar-header h2 {
   color: #1a73e8;
-  font-size: 15px;
+  font-size: 14px;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -116,7 +117,7 @@ onMounted(() => {
   background: none;
   border: none;
   color: #555;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
   padding: 4px;
   line-height: 1;
@@ -183,7 +184,7 @@ onMounted(() => {
 }
 
 .menu-icon {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .sidebar.collapsed .menu-icon-wrapper {
@@ -194,18 +195,34 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sidebar-footer {
   padding: 10px 12px;
   border-top: 1px solid #e9ecef;
-  font-size: 10px;
+  font-size: 9px;
   color: #888;
   text-align: center;
 }
 
 .sidebar.collapsed .sidebar-footer {
   padding: 10px 4px;
+}
+
+.sidebar-title {
+  font-size: 15px;
+}
+
+.sidebar-item {
+  font-size: 13px;
+}
+
+.item-timestamp {
+  font-size: 12px;
+}
+
+.empty-text {
+  font-size: 9px;
 }
 </style> 

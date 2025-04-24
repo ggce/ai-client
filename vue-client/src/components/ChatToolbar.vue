@@ -468,4 +468,52 @@ const closeDialog = () => {
   90% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-10px); }
 }
+
+.toolbar-label {
+  font-size: 11px;
+}
+
+.toolbar-card-title {
+  font-size: 12px;
+}
+
+.toolbar-card-info {
+  font-size: 13px;
+}
+
+.provider-title {
+  font-size: 18px;
+}
+
+.provider-description {
+  font-size: 24px;
+}
+
+.model-name {
+  font-size: 15px;
+}
+
+.option-label {
+  font-size: 15px;
+}
+
+.token-display {
+  font-size: 13px;
+}
+
+.expand-button {
+  font-size: 11px;
+}
+
+.form-group label {
+  font-size: 12px;
+}
+
+.model-option {
+  font-size: 13px;
+}
+
+.slider-label {
+  font-size: 13px;
+}
 </style>

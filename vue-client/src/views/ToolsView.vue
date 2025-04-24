@@ -615,12 +615,12 @@ main {
 
 .param-name {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #4338ca;
 }
 
 .param-type {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #6b7280;
   margin-left: 6px;
   background-color: #e5e7eb;

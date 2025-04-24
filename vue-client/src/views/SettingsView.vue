@@ -317,13 +317,13 @@ const maskApiKey = (apiKey: string): string => {
 }
 
 .compact-header h1 {
-  font-size: 20px;
+  font-size: 18px;
   display: flex;
   align-items: center;
 }
 
 .compact-header h1 small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: normal;
   color: #777;
   margin-left: 8px;
@@ -347,7 +347,7 @@ const maskApiKey = (apiKey: string): string => {
 }
 
 .settings-section h3 {
-  font-size: 16px;
+  font-size: 15px;
   margin-bottom: 12px;
   color: #444;
   border-bottom: 1px solid #f0f0f0;
@@ -376,7 +376,7 @@ const maskApiKey = (apiKey: string): string => {
 .api-key-section label {
   display: block;
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 13px;
   color: #555;
 }
 
@@ -385,7 +385,7 @@ const maskApiKey = (apiKey: string): string => {
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -413,7 +413,7 @@ const maskApiKey = (apiKey: string): string => {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   height: 38px;
   display: flex;
   align-items: center;
@@ -436,7 +436,7 @@ const maskApiKey = (apiKey: string): string => {
   background-color: #f0f7ff;
   border-radius: 4px;
   border-left: 3px solid #1a73e8;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .balance-status {
@@ -471,7 +471,7 @@ const maskApiKey = (apiKey: string): string => {
   border-radius: 4px;
   border-left: 3px solid #d32f2f;
   color: #d32f2f;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .primary-button {
@@ -480,7 +480,7 @@ const maskApiKey = (apiKey: string): string => {
   border: none;
   padding: 12px 20px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: background-color 0.2s;
   display: block;

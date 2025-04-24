@@ -68,8 +68,16 @@
             <div class="tool-prompt-header">
               <span class="tool-prompt-name">{{ getToolPromptTitle(message.content) }}</span>
             </div>
-            <div class="tool-prompt-container">
-              <div class="tool-prompt-content" v-html="formatToolPromptMessage(message.content)"></div>
+            <div 
+              class="tool-prompt-container" 
+              :class="{ 'collapsed': shouldCollapseToolPrompt(message.content) && !expandedToolPromptIndices.includes(index) }"
+              @click="shouldCollapseToolPrompt(message.content) && toggleToolPrompt(index)"
+            >
+              <div class="tool-prompt-content" v-html="formatToolPromptMessage(message.content, index, expandedToolPromptIndices.includes(index))"></div>
+              <div v-if="shouldCollapseToolPrompt(message.content)" class="toggle-indicator tool-prompt-toggle">
+                <span class="toggle-text">{{ expandedToolPromptIndices.includes(index) ? '收起' : '展开详情' }}</span>
+                <span class="toggle-icon">{{ expandedToolPromptIndices.includes(index) ? '▲' : '▼' }}</span>
+              </div>
             </div>
           </div>
 
@@ -282,6 +290,9 @@ const expandedReasoningIndex = ref<number | null>(null);
 // 添加工具消息展开/折叠状态
 const expandedToolIndex = ref<number | null>(null);
 
+// Add a ref for tracking expanded tool prompts after expandedToolIndex
+const expandedToolPromptIndices = ref<number[]>([]);
+
 // 检查消息是否为工具调用提示
 const isToolPromptMessage = (content: string): boolean => {
   return content.startsWith('#useTool<toolName>');
@@ -421,39 +432,41 @@ const formatMessage = (content: string): string => {
 };
 
 // 格式化特殊的工具调用提示消息
-const formatToolPromptMessage = (content: string): string => {
+const formatToolPromptMessage = (content: string, index?: number, isExpanded?: boolean): string => {
   try {
-    // 提取工具名称
+    // Extract tool name
     const toolNameMatch = content.match(/<toolName>(.*?)<\/toolName>/);
     const toolName = toolNameMatch ? toolNameMatch[1] : "未知工具";
     
-    // 提取工具参数
+    // Extract tool parameters
     const toolArgsMatch = content.match(/<toolArgs>(.*?)<\/toolArgs>/);
     let toolArgs = "{}";
     if (toolArgsMatch) {
       toolArgs = toolArgsMatch[1];
     }
     
-    // 尝试解析和美化JSON参数
+    // Check if parameters exceed the character limit
+    const shouldCollapse = toolArgs.length > 200;
+    
+    // Try to parse and beautify JSON parameters
     let formattedArgs = toolArgs;
     let argsObj: Record<string, any> = {};
     try {
       argsObj = JSON.parse(toolArgs);
       
-      // 特殊处理包含URL的参数，确保它们能够正确显示
+      // Special handling for parameters containing URLs
       if (argsObj.url) {
-        // 将URL包装在特殊的标记中，以便在CSS中处理它的显示
         argsObj.url = `<a href="${argsObj.url}" style="color: #0366d6; word-break: break-all; overflow-wrap: break-word; max-width: 100%; display: inline-block; font-size: 0.85em; text-decoration: none;" target="_blank" rel="noopener noreferrer">${argsObj.url}</a>`;
       }
       
-      // 创建更加用户友好的参数展示格式
+      // Create more user-friendly parameter display format
       let paramsList = '';
       if (Object.keys(argsObj).length > 0) {
         paramsList = Object.entries(argsObj).map(([key, value]) => {
-          // 格式化不同类型的值
+          // Format different types of values
           let displayValue;
           if (typeof value === 'string') {
-            // 处理字符串值，保留HTML标签
+            // Handle string values, preserve HTML tags
             if (value.includes('style="color: #0366d6; word-break: break-all;')) {
               displayValue = value;
             } else {
@@ -462,7 +475,7 @@ const formatToolPromptMessage = (content: string): string => {
           } else if (value === null) {
             displayValue = '<span style="color: #888;">null</span>';
           } else if (Array.isArray(value)) {
-            // 格式化数组，添加语法高亮
+            // Format arrays with syntax highlighting
             try {
               const formattedArray = JSON.stringify(value, null, 2)
                 .replace(/\n/g, '<br>')
@@ -475,7 +488,7 @@ const formatToolPromptMessage = (content: string): string => {
               displayValue = JSON.stringify(value);
             }
           } else if (typeof value === 'object') {
-            // 格式化对象，添加语法高亮
+            // Format objects with syntax highlighting
             try {
               const formattedObject = JSON.stringify(value, null, 2)
                 .replace(/\n/g, '<br>')
@@ -488,11 +501,11 @@ const formatToolPromptMessage = (content: string): string => {
               displayValue = JSON.stringify(value);
             }
           } else {
-            // 处理基本类型
+            // Handle basic types
             displayValue = String(value);
           }
           
-          // 返回格式化的参数行
+          // Return formatted parameter row
           return `<div style="display: flex; margin-bottom: 6px; line-height: 1.4; flex-wrap: wrap; align-items: flex-start; padding: 5px 8px; border-left: 2px solid #e0e0e0; background-color: rgba(0, 0, 0, 0.01); border-radius: 3px;">
             <span style="color: #666; min-width: 80px; font-weight: 600; padding-right: 10px; flex-shrink: 0; font-size: 0.85em;">${key}:</span>
             <span style="color: #333; word-break: break-word; white-space: pre-wrap; flex: 1; padding-left: 5px; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85em; max-width: 100%; overflow-wrap: break-word;">${displayValue}</span>
@@ -507,13 +520,13 @@ const formatToolPromptMessage = (content: string): string => {
       console.error("解析工具参数失败:", e);
     }
     
-    // 提取工具的实际名称（去除服务器前缀）
+    // Extract actual tool name (remove server prefix)
     let displayToolName = toolName;
     if (toolName.includes('_SERVERKEYTONAME_')) {
       displayToolName = toolName.split('_SERVERKEYTONAME_')[1];
     }
     
-    // 返回改进的HTML结构 - 更加清晰的卡片式布局
+    // Return improved HTML structure
     return `
       <div style="background-color: #FCFCFF; border-radius: 8px; border: 1px solid #E6E4F0; overflow: hidden; box-shadow: 0 2px 6px rgba(124, 98, 194, 0.1); transition: all 0.2s ease;">
         <div style="display: flex; align-items: center; padding: 8px 12px; background-color: #F7F5FF; border-bottom: 1px solid #E6E4F0; justify-content: space-between;">
@@ -718,6 +731,34 @@ const getToolPromptTitle = (content: string): string => {
     return "我即将调用工具";
   }
 };
+
+// Add a method to toggle tool prompt expansion after toggleTool
+const toggleToolPrompt = (index: number) => {
+  // Prevent event bubbling
+  event?.stopPropagation();
+  
+  if (expandedToolPromptIndices.value.includes(index)) {
+    // Remove from expanded indices (collapse)
+    expandedToolPromptIndices.value = expandedToolPromptIndices.value.filter(i => i !== index);
+  } else {
+    // Add to expanded indices (expand)
+    expandedToolPromptIndices.value.push(index);
+  }
+};
+
+// Add a method to check if a tool prompt should be collapsed initially
+const shouldCollapseToolPrompt = (content: string): boolean => {
+  try {
+    // Check if the tool parameter string length exceeds 200 characters
+    const toolArgsMatch = content.match(/<toolArgs>(.*?)<\/toolArgs>/);
+    if (toolArgsMatch && toolArgsMatch[1]) {
+      return toolArgsMatch[1].length > 200;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
 </script>
 
 <style scoped>
@@ -728,7 +769,7 @@ const getToolPromptTitle = (content: string): string => {
 }
 
 .message {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
 }
@@ -823,7 +864,7 @@ const getToolPromptTitle = (content: string): string => {
 .message-container {
   max-width: 80%;
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow-wrap: break-word;
@@ -863,15 +904,15 @@ const getToolPromptTitle = (content: string): string => {
 }
 
 .message-content {
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
   word-break: break-word;
 }
 
 /* 工具消息相关样式 */
 .tool-text {
-  padding: 8px 0;
-  line-height: 1.6;
+  padding: 6px 0;
+  line-height: 1.5;
   white-space: pre-wrap;
   max-height: 300px;
   overflow-y: auto;
@@ -907,9 +948,9 @@ const getToolPromptTitle = (content: string): string => {
 
 .tool-item {
   background-color: #f5f5f5;
-  padding: 8px;
+  padding: 6px;
   border-radius: 4px;
-  margin: 6px 0;
+  margin: 4px 0;
   font-family: monospace;
   white-space: pre-wrap;
   max-height: 300px;
@@ -918,10 +959,10 @@ const getToolPromptTitle = (content: string): string => {
 
 .tool-json {
   background-color: #f5f5f5;
-  padding: 12px;
+  padding: 8px;
   border-radius: 6px;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 11px;
   overflow-x: auto;
   color: #333;
   border: 1px solid #e0e0e0;
@@ -946,8 +987,8 @@ const getToolPromptTitle = (content: string): string => {
 .tool-error {
   background-color: #ffebee;
   border-left: 3px solid #ef5350;
-  padding: 10px 14px;
-  margin: 8px 0;
+  padding: 8px 10px;
+  margin: 6px 0;
   border-radius: 6px;
   max-height: 300px;
   overflow-y: auto;
@@ -1057,35 +1098,43 @@ const getToolPromptTitle = (content: string): string => {
 }
 
 /* 优化Markdown样式 */
-.message-content :deep(h1),
-.message-content :deep(h2),
-.message-content :deep(h3),
-.message-content :deep(h4),
-.message-content :deep(h5),
-.message-content :deep(h6) {
+.message-content :deep(h1) {
   margin-top: 12px;
   margin-bottom: 8px;
   font-weight: 600;
-}
-
-.message-content :deep(h1) {
-  font-size: 1.4em;
+  font-size: 1.2em;
   border-bottom: 1px solid #eaecef;
   padding-bottom: 0.3em;
 }
 
 .message-content :deep(h2) {
-  font-size: 1.3em;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 1.1em;
   border-bottom: 1px solid #eaecef;
   padding-bottom: 0.3em;
 }
 
 .message-content :deep(h3) {
-  font-size: 1.2em;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 1.0em;
 }
 
 .message-content :deep(h4) {
-  font-size: 1.1em;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.message-content :deep(h5),
+.message-content :deep(h6) {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
 .message-content :deep(ul),
@@ -1115,7 +1164,7 @@ const getToolPromptTitle = (content: string): string => {
 
 .message-content :deep(code) {
   font-family: "Menlo", "Monaco", "Courier New", monospace;
-  font-size: 90%;
+  font-size: 80%;
 }
 
 .message-content :deep(code:not(pre code)) {
@@ -1154,7 +1203,7 @@ const getToolPromptTitle = (content: string): string => {
 }
 
 .typing-text {
-  font-size: 14px;
+  font-size: 11px;
   margin-right: 8px;
   color: #666;
 }
@@ -1561,5 +1610,55 @@ const getToolPromptTitle = (content: string): string => {
 
 .tool-prompt-card:hover {
   box-shadow: 0 6px 15px rgba(124, 98, 194, 0.15);
+}
+
+/* Add CSS for collapsed tool prompts */
+.tool-prompt-container.collapsed .tool-prompt-content {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.tool-prompt-container.collapsed .tool-prompt-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, #f7f5ff);
+  pointer-events: none;
+}
+
+.tool-prompt-toggle {
+  margin-top: 8px;
+  width: fit-content;
+  background-color: rgba(124, 98, 194, 0.08);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.tool-prompt-toggle:hover {
+  background-color: rgba(124, 98, 194, 0.15);
+}
+
+.tool-prompt-toggle .toggle-text {
+  font-size: 12px;
+  color: #5D4DB3;
+  font-weight: 500;
+}
+
+.tool-prompt-toggle .toggle-icon {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #5D4DB3;
+}
+
+.tool-prompt-container {
+  cursor: default;
+}
+
+.tool-prompt-container.collapsed {
+  cursor: pointer;
 }
 </style>

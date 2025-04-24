@@ -478,7 +478,7 @@ input:checked + .slider-compact:before {
 }
 
 .toggle-label-compact {
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
 }
 
@@ -495,6 +495,7 @@ main {
   flex-direction: column;
   height: 100%;
   overflow: hidden; /* 确保容器不会溢出 */
+  font-size: 13px;
 }
 
 .message-container {
@@ -514,12 +515,12 @@ main {
 
 h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   color: #333;
 }
 
 h1 small {
-  font-size: 14px;
+  font-size: 13px;
   color: #888;
   font-weight: normal;
   margin-left: 8px;
@@ -530,5 +531,13 @@ h1 small {
   opacity: 0;
   height: 0;
   width: 0;
+}
+
+.model-title {
+  font-size: 18px;
+}
+
+.model-subtitle {
+  font-size: 13px;
 }
 </style>
