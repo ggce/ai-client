@@ -20,7 +20,7 @@
           />
           <ChatToolbar :messages="sessionMessages" />
           <div class="input-wrapper">
-            <ChatInput @send="sendMessage" :disabled="isLoading || !activeSessionId" />
+            <ChatInput ref="chatInputRef" @send="sendMessage" :disabled="isLoading || !activeSessionId" />
           </div>
         </div>
       </main>
@@ -69,6 +69,9 @@ interface ChatMessage {
 
 // 本地管理会话ID
 const activeSessionId = ref<string>('')
+
+// 聊天输入框
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
 // 将activeSessionId提供给可能需要的子组件
 provide('activeSessionId', activeSessionId)
@@ -176,7 +179,7 @@ const loadSessionMessages = async (sessionId: string) => {
 }
 
 // 发送消息
-const sendMessage = async function(message?: string) {
+const sendMessage = async function(message?: string, selectedTools?: string[]) {
   if (!isProviderConfigured()) {
     sessionMessages.value.push({
       role: 'system',
@@ -214,6 +217,7 @@ const sendMessage = async function(message?: string) {
     const stream = await sendStreamingSessionMessage(
       activeSessionId.value,
       message,
+      selectedTools,
       {
         model: settingsStore.providers[settingsStore.currentProvider]?.model,
       }
@@ -262,7 +266,7 @@ const sendMessage = async function(message?: string) {
 
     // 如果调用了工具，则再请求一次
     if (isUseToolCall) {
-      sendMessage();
+      sendMessage(undefined, chatInputRef.value?.getSelectedTools());
     } else {
       // 结束加载
       isLoading.value = false

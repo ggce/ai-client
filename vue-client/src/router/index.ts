@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ChatView from '@/views/ChatView.vue'
 import SettingsView from '@/views/SettingsView.vue'
+import ToolsView from '@/views/ToolsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -9,6 +10,14 @@ const router = createRouter({
       path: '/',
       name: 'chat',
       component: ChatView,
+      meta: {
+        keepAlive: true
+      }
+    },
+    {
+      path: '/tools',
+      name: 'tools',
+      component: ToolsView,
       meta: {
         keepAlive: true
       }

@@ -45,8 +45,15 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     url: "http://localhost:7004/fetch-server",
     command: "npx",
     args: [
-      "npx",
       "@kazuph/mcp-fetch"
+    ]
+  },
+  // excel操作
+  "excel-mcp-server": {
+    url: "http://localhost:7005/excel-mcp-server",
+    command: "npx",
+    args: [
+      "@negokaz/excel-mcp-server"
     ]
   },
 

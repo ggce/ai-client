@@ -22,21 +22,24 @@ app.name = 'AI-CLIENT';
 const expressApp: Application = express();
 const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务器冲突
 
-// 当前默认使用的提供商类型
+// 默认提供商类型
 let defaultProviderType: ProviderType = 'deepseek';
+
+// MCP工具列表
+let mcpTools: Array<MCPTool> = [];
 
 // 初始化AI提供商
 function initDefaultProviders() {
   // 初始化DeepSeek客户端
   AIProviderFactory.getProvider('deepseek', {
-    apiKey: '',
+  apiKey: '',
     baseURL: DEEPSEEK_DEFAULT_URL,
     defaultModel: DEEPSEEK_MODELS.DEFAULT
-  });
-  
+});
+
   // 初始化OpenAI客户端
   AIProviderFactory.getProvider('openai', {
-    apiKey: '',
+  apiKey: '',
     baseURL: OPENAI_DEFAULT_URL,
     defaultModel: OPENAI_MODELS.DEFAULT
   });
@@ -49,8 +52,6 @@ initDefaultProviders();
 
 // MCP客户端
 const mcpClient = new MCPClient("deepseek-client", "1.0.0");
-// MCP工具
-let mcpTools: Array<MCPTool> = [];
 
 // 初始化所有MCP工具
 async function initMcpTools() {
@@ -179,6 +180,20 @@ expressApp.use(bodyParser.urlencoded({ extended: true }));
 
 // 路由器实例，用于定义API路由
 const router = express.Router();
+
+// 获取MCP工具列表
+router.get('/api/tools', routeHandler(async (req: Request, res: Response) => {
+  try {
+    // 确保工具列表已初始化
+    if (mcpTools.length === 0) {
+      await initMcpTools();
+    }
+    res.json(mcpTools);
+  } catch (error) {
+    logger.error('Main', `获取MCP工具列表失败: ${error}`);
+    res.status(500).json({ error: '获取MCP工具列表失败' });
+  }
+}));
 
 // 主页路由 - 使用Vue应用代替EJS模板
 router.get('/', routeHandler((req: Request, res: Response) => {
@@ -466,13 +481,13 @@ router.post('/api/sessions/:id/messages', routeHandler(async (req: Request, res:
 }));
 
 // 添加一个临时存储来保存消息请求，用于流式接口
-const streamRequestsStore: Map<string, { message: string, options?: any }> = new Map();
+const streamRequestsStore: Map<string, { message: string, selectedTools?: string[] | undefined, options?: any }> = new Map();
 
 // 为SSE格式化并发送数据
 function sendData(res: Response, data: any) {
   try {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-    // 使用兼容的方式尝试刷新流
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // 使用兼容的方式尝试刷新流
     const response = res as any;
     if (typeof response.flush === 'function') {
       response.flush();
@@ -515,12 +530,12 @@ function endStream(res: Response, finalData?: any) {
 // 接收流式请求数据
 router.post('/api/sessions/:id/messages/stream', (req: Request, res: Response) => {
   try {
-    const { message, options } = req.body;
+    const { message, selectedTools, options } = req.body;
     const sessionId = req.params.id;
     
     // 存储请求数据，以便GET请求处理
     const requestId = `${sessionId}_${Date.now()}`;
-    streamRequestsStore.set(requestId, { message, options });
+    streamRequestsStore.set(requestId, { message, selectedTools, options });
     
     // 设置过期时间，60秒后自动清理
     setTimeout(() => {
@@ -573,7 +588,12 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
   res.flushHeaders();
   
   const sessionId = req.params.id;
-  const { message, options } = requestData;
+  const { message, selectedTools, options } = requestData;
+
+  console.log("!!!!!!!!!!!!!!!!!");
+  console.log(selectedTools);
+  console.log(mcpTools);
+  console.log(selectedTools?.[0]);
   
   (async () => {
     try {
@@ -595,7 +615,10 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           sessionId, 
           message,
           options,
-          mcpTools
+          // 根据用户选择过滤工具列表
+          mcpTools: selectedTools && selectedTools.length > 0
+            ? mcpTools.filter(tool => selectedTools.find(toolName => tool.name.startsWith(`${toolName}_SERVERKEYTONAME`)))
+            : undefined
         });
 
         // 完整的响应内容
@@ -724,7 +747,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 toolRes.id || '',
                 JSON.stringify({errorMessage: toolRes.errorMessage}),
               );
-            }
+        }
 
             // 提醒前端更新信息
             sendData(res, { isMessageUpdate: true, toolCall });

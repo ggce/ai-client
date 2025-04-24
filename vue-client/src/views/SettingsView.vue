@@ -317,7 +317,7 @@ const maskApiKey = (apiKey: string): string => {
 }
 
 .compact-header h1 {
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   align-items: center;
 }

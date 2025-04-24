@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { objToQueryStr } from '@/utils';
 
 export interface ChatRequestConfig {
   apiKey: string
@@ -105,6 +106,7 @@ export const getSessionMessages = async (sessionId: string): Promise<SessionMess
 export async function sendStreamingSessionMessage(
   sessionId: string,
   message?: string,
+  selectedTools?: string[] | undefined,
   options?: MessageOptions
 ): Promise<{
   controller: AbortController;
@@ -127,7 +129,7 @@ export async function sendStreamingSessionMessage(
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ message, options }),
+      body: JSON.stringify({ message, selectedTools, options }),
       signal: controller.signal
     });
 
@@ -143,7 +145,9 @@ export async function sendStreamingSessionMessage(
     }
 
     // 第二步：建立SSE连接获取流式数据
-    const eventSource = new EventSource(`/api/sessions/${sessionId}/messages/stream?requestId=${requestId}`);
+    const eventSource = new EventSource(`/api/sessions/${sessionId}/messages/stream${objToQueryStr({
+      requestId,
+    })}`);
     
     // 错误处理
     eventSource.onerror = (error) => {

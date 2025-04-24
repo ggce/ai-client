@@ -661,8 +661,15 @@ const handleLinkClick = (event: MouseEvent) => {
   
   // Only handle links with href
   if (link && link.href) {
-    // Only handle http/https links
-    if (link.href.startsWith('http://') || link.href.startsWith('https://')) {
+    // 检查是否为外部链接
+    const isExternalLink = (
+      (link.href.startsWith('http://') || link.href.startsWith('https://')) &&
+      !link.href.startsWith(window.location.origin) && // 不是当前域名的链接
+      !link.hasAttribute('target') // 没有指定target属性的链接
+    );
+    
+    // 只处理外部链接
+    if (isExternalLink) {
       event.preventDefault();
       
       try {

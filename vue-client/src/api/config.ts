@@ -15,6 +15,7 @@ interface SettingsState {
   }
   currentProvider: Provider
   isSidebarCollapsed: boolean
+  selectedTools?: string[] // 存储选中的工具名称数组
 }
 
 // 加载配置

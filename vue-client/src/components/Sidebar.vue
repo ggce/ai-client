@@ -19,6 +19,17 @@
       </router-link>
       
       <router-link 
+        to="/tools" 
+        class="menu-item" 
+        active-class="active"
+      >
+        <div class="menu-icon-wrapper">
+          <span class="menu-icon">🛠️</span>
+        </div>
+        <span class="menu-text">工具</span>
+      </router-link>
+      
+      <router-link 
         to="/settings" 
         class="menu-item" 
         active-class="active"
