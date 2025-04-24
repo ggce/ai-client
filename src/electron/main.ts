@@ -526,7 +526,7 @@ router.post('/api/sessions/:id/messages/stream', (req: Request, res: Response) =
     setTimeout(() => {
       streamRequestsStore.delete(requestId);
       logger.log('Main', `已清理流式请求数据: ${requestId}`);
-    }, 60000);
+    }, 120000);
     
     // 返回请求ID
     res.json({ requestId });
@@ -653,9 +653,9 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 toolTips = [];
               }
               if (!toolTips[nowToolCallIndex]) {
-                toolTips[nowToolCallIndex] = '';
-                toolTips[nowToolCallIndex] += `工具名称: ${toolCalls[nowToolCallIndex].function.name}`;
-                toolTips[nowToolCallIndex] += `\n工具参数:`;
+                toolTips[nowToolCallIndex] = '#useTool';
+                toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
+                toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
               }
             }
 
@@ -688,6 +688,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         // 有需要调用的工具
         if (toolCalls && toolCalls.length > 0) {
+          // 添加末尾的</toolArgs>
+          if (toolTips) {
+            toolTips = toolTips?.map(tip => tip += '</toolArgs>');
+          }
+          
           // 添加工具调用会话历史
           session?.addAssistantMessage(toolTips ? toolTips.join('\n') : '', '', toolCalls);
           // 信息更新

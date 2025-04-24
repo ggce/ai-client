@@ -25,6 +25,8 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
+    "@modelcontextprotocol/server-filesystem": "^2025.3.28",
+    "@playwright/mcp": "^0.0.15",
     "axios": "^1.8.4",
     "body-parser": "^2.2.0",
     "dotenv": "^16.5.0",

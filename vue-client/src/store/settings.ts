@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { loadConfig, saveConfig, saveApiKey, saveModel } from '../api/config'
-import { createSession, listSessionIds } from '../api/chat'
 import router from '../router'
 
 type Provider = 'deepseek' | 'openai'

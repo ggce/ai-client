@@ -25,7 +25,14 @@
         >
           <div class="session-info">
             <div class="session-number">{{ index + 1 }}</div>
-            <span class="session-id">{{ sessionId.substring(0, 6) }}</span>
+            <div class="session-title">
+              <div class="title-text" :title="sessionTitles[sessionId] || sessionId.substring(0, 6)">
+                {{ sessionTitles[sessionId] || sessionId.substring(0, 6) }}
+              </div>
+              <div class="session-id" v-if="!isSessionSidebarCollapsed">
+                {{ sessionId.substring(0, 6) }}
+              </div>
+            </div>
           </div>
           <button 
             v-if="sessionId === activeSessionId && !isSessionSidebarCollapsed"
@@ -45,7 +52,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, inject } from 'vue'
 import { useSettingsStore } from '../store/settings'
-import { createSession, listSessionIds, deleteSession as apiDeleteSession } from '../api/chat'
+import { createSession, listSessionIds, deleteSession as apiDeleteSession, getSessionMessages } from '../api/chat'
 
 const props = defineProps<{
   activeSessionId: string
@@ -64,6 +71,29 @@ const settingsStore = useSettingsStore()
 const isSessionSidebarCollapsed = computed(() => settingsStore.sessionSidebarCollapsed)
 const sessionIds = ref<string[]>([])
 const isLoading = ref(false)
+
+// 存储会话标题 (sessionId -> title)
+const sessionTitles = ref<Record<string, string>>({})
+
+// 获取会话第一条用户消息作为标题
+const fetchSessionTitle = async (sessionId: string) => {
+  try {
+    const messages = await getSessionMessages(sessionId)
+    // 寻找第一条用户消息
+    const firstUserMessage = messages.find(msg => msg.role === 'user')
+    if (firstUserMessage) {
+      // 截取消息内容作为标题
+      let title = firstUserMessage.content.trim()
+      // 如果消息过长则截断显示
+      if (title.length > 20) {
+        title = title.substring(0, 20) + '...'
+      }
+      sessionTitles.value[sessionId] = title
+    }
+  } catch (error) {
+    console.error(`获取会话 ${sessionId} 标题失败:`, error)
+  }
+}
 
 // 切换侧边栏
 const toggleSessionSidebar = () => {
@@ -91,6 +121,8 @@ const deleteSession = async (sessionId: string) => {
     await apiDeleteSession(sessionId)
     // 从列表中移除
     sessionIds.value = sessionIds.value.filter(id => id !== sessionId)
+    // 删除相关标题
+    delete sessionTitles.value[sessionId]
     // 通知父组件
     emit('session-deleted', sessionId)
   } catch (error) {
@@ -103,6 +135,11 @@ const loadSessions = async () => {
   isLoading.value = true
   try {
     sessionIds.value = await listSessionIds()
+    
+    // 获取每个会话的标题
+    for (const sessionId of sessionIds.value) {
+      await fetchSessionTitle(sessionId)
+    }
   } catch (error) {
     console.error('加载会话列表失败:', error)
   } finally {
@@ -111,10 +148,15 @@ const loadSessions = async () => {
 }
 
 // 监听活动会话ID变化
-watch(() => props.activeSessionId, (newId) => {
-  if (newId && !sessionIds.value.includes(newId)) {
+watch(() => props.activeSessionId, async (newId) => {
+  if (newId) {
+    if (!sessionIds.value.includes(newId)) {
     // 如果活动会话ID不在列表中，刷新列表
-    loadSessions()
+      await loadSessions()
+    } else if (!sessionTitles.value[newId]) {
+      // 如果存在但没有标题，获取标题
+      await fetchSessionTitle(newId)
+    }
   }
 })
 
@@ -279,49 +321,47 @@ onMounted(async () => {
 }
 
 .session-info {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0; /* 确保flex子项可以收缩 */
 }
 
-.session-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  background: rgba(74, 137, 220, 0.15);
-  color: #4a89dc;
-  font-size: 11px;
-  font-weight: 500;
-  margin-right: 8px;
-  transition: all 0.2s ease;
-  padding: 0 4px;
-  position: relative;
-  z-index: 1;
+.session-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.session-item.active .session-number {
-  background: rgba(58, 123, 213, 0.25);
-  color: #3a7bd5;
-  font-weight: 600;
-}
-
-.session-item:hover .session-number {
-  background: rgba(74, 137, 220, 0.25);
+.title-text {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: #333;
 }
 
 .session-id {
   font-size: 10px;
   color: #888;
-  margin-left: 4px;
-  background-color: #f0f0f0;
-  padding: 1px 4px;
-  border-radius: 3px;
+  margin-top: 2px;
+}
+
+.session-number {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background-color: #e0e7ff;
+  color: #5c6bc0;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .delete-btn {
