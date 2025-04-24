@@ -20,7 +20,7 @@
           <p>{{ error }}</p>
         </div>
         <div v-else class="tools-list">
-          <div class="tools-header">可用工具</div>
+          <div class="tools-header">使用工具</div>
           <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click="toggleToolSelection(tool)"
                :class="{ 'selected': selectedTools.includes(tool.name) }">
             <div class="tool-checkbox">
@@ -126,7 +126,7 @@ const fetchTools = async () => {
     // 转换为工具列表格式
     availableTools.value = Object.keys(toolsByPrefix).map(key => ({
       name: key.startsWith('mcp_') ? key.substring(4) : key,
-      description: `${key.startsWith('mcp_') ? key.substring(4) : key} 提供的工具和服务`
+      description: `工具集合`
     }));
     
     isLoading.value = false;
@@ -143,12 +143,12 @@ const fetchTools = async () => {
 // 备用工具数据
 const getBackupToolData = () => {
   return [
-    { name: "smithery-ai-server-sequential-thinking", description: "Sequential Thinking Tool" },
-    { name: "smithery-ai-fetch", description: "Fetch Data Tool" },
-    { name: "files", description: "File Management" },
-    { name: "playwright", description: "Browser Automation" },
-    { name: "excel-mcp-server", description: "Excel Operations" },
-    { name: "mcp-doc", description: "Document Operations" }
+    { name: "smithery-ai-server-sequential-thinking", description: "工具集合" },
+    { name: "smithery-ai-fetch", description: "工具集合" },
+    { name: "files", description: "工具集合" },
+    { name: "playwright", description: "工具集合" },
+    { name: "excel-mcp-server", description: "工具集合" },
+    { name: "mcp-doc", description: "工具集合" }
   ];
 };
 

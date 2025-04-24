@@ -161,7 +161,7 @@ const fetchTools = async () => {
       if (!toolsByPrefix[serverKey]) {
         toolsByPrefix[serverKey] = {
           name: `mcp_${serverKey}`,
-          description: `${serverKey} 提供的工具和服务`,
+          description: `包含 0 个可用方法`,
           methods: []
         };
       }
@@ -189,6 +189,9 @@ const fetchTools = async () => {
         description: tool.description || '无描述',
         parameters: parameters
       });
+      
+      // 更新描述，显示工具数量
+      toolsByPrefix[serverKey].description = `包含 ${toolsByPrefix[serverKey].methods.length} 个可用方法`;
     });
     
     // 将分组转换为数组
@@ -204,256 +207,8 @@ const fetchTools = async () => {
     error.value = '获取工具列表失败，请稍后重试';
     isLoading.value = false;
     
-    // 使用模拟数据作为备份
-    tools.value = getBackupToolData();
-    filteredTools.value = [...tools.value];
+    filteredTools.value = [];
   }
-};
-
-// 备份的模拟数据，在 API 请求失败时使用
-const getBackupToolData = (): Tool[] => {
-  return [
-    {
-      name: "mcp_files",
-      description: "文件操作工具，用于读写和管理文件系统中的文件",
-      methods: [
-        {
-          name: "read_file",
-          description: "读取文件内容",
-          parameters: [
-            {
-              name: "path",
-              type: "string",
-              description: "文件路径",
-              required: true
-            }
-          ]
-        },
-        {
-          name: "write_file",
-          description: "写入内容到文件",
-          parameters: [
-            {
-              name: "path",
-              type: "string",
-              description: "文件路径",
-              required: true
-            },
-            {
-              name: "content",
-              type: "string",
-              description: "要写入的内容",
-              required: true
-            }
-          ]
-        },
-        {
-          name: "list_directory",
-          description: "列出目录内容",
-          parameters: [
-            {
-              name: "path",
-              type: "string",
-              description: "目录路径",
-              required: true
-            }
-          ]
-        }
-      ]
-    },
-    {
-      name: "mcp_playwright",
-      description: "网页自动化工具，用于控制浏览器执行操作",
-      methods: [
-        {
-          name: "navigate",
-          description: "导航到指定URL",
-          parameters: [
-            {
-              name: "url",
-              type: "string",
-              description: "要访问的网址",
-              required: true
-            },
-            {
-              name: "browserType",
-              type: "string",
-              description: "浏览器类型",
-              required: false
-            }
-          ]
-        },
-        {
-          name: "screenshot",
-          description: "截取当前页面的截图",
-          parameters: [
-            {
-              name: "name",
-              type: "string",
-              description: "截图名称",
-              required: true
-            },
-            {
-              name: "fullPage",
-              type: "boolean",
-              description: "是否截取整个页面",
-              required: false
-            }
-          ]
-        },
-        {
-          name: "click",
-          description: "点击页面元素",
-          parameters: [
-            {
-              name: "selector",
-              type: "string",
-              description: "CSS选择器",
-              required: true
-            }
-          ]
-        }
-      ]
-    },
-    {
-      name: "mcp_web_research",
-      description: "网络研究工具，用于搜索和抓取网页内容",
-      methods: [
-        {
-          name: "search_google",
-          description: "在Google上搜索",
-          parameters: [
-            {
-              name: "query",
-              type: "string",
-              description: "搜索查询",
-              required: true
-            }
-          ]
-        },
-        {
-          name: "visit_page",
-          description: "访问网页并提取内容",
-          parameters: [
-            {
-              name: "url",
-              type: "string",
-              description: "要访问的URL",
-              required: true
-            },
-            {
-              name: "takeScreenshot",
-              type: "boolean",
-              description: "是否截图",
-              required: false
-            }
-          ]
-        }
-      ]
-    },
-    {
-      name: "mcp_firecrawl",
-      description: "网页爬虫工具，用于抓取和分析网站",
-      methods: [
-        {
-          name: "scrape",
-          description: "抓取单个网页",
-          parameters: [
-            {
-              name: "url",
-              type: "string",
-              description: "要抓取的URL",
-              required: true
-            },
-            {
-              name: "formats",
-              type: "array",
-              description: "要提取的内容格式",
-              required: false
-            }
-          ]
-        },
-        {
-          name: "crawl",
-          description: "爬取整个网站",
-          parameters: [
-            {
-              name: "url",
-              type: "string",
-              description: "起始URL",
-              required: true
-            },
-            {
-              name: "maxDepth",
-              type: "number",
-              description: "最大爬取深度",
-              required: false
-            }
-          ]
-        },
-        {
-          name: "search",
-          description: "在网页中搜索内容",
-          parameters: [
-            {
-              name: "query",
-              type: "string",
-              description: "搜索查询",
-              required: true
-            }
-          ]
-        }
-      ]
-    },
-    {
-      name: "mcp_excel",
-      description: "Excel操作工具，用于读写Excel文件",
-      methods: [
-        {
-          name: "read_sheet_data",
-          description: "读取Excel表格数据",
-          parameters: [
-            {
-              name: "fileAbsolutePath",
-              type: "string",
-              description: "Excel文件的绝对路径",
-              required: true
-            },
-            {
-              name: "sheetName",
-              type: "string",
-              description: "工作表名称",
-              required: true
-            }
-          ]
-        },
-        {
-          name: "write_sheet_data",
-          description: "写入数据到Excel表格",
-          parameters: [
-            {
-              name: "fileAbsolutePath",
-              type: "string",
-              description: "Excel文件的绝对路径",
-              required: true
-            },
-            {
-              name: "sheetName",
-              type: "string",
-              description: "工作表名称",
-              required: true
-            },
-            {
-              name: "data",
-              type: "array",
-              description: "要写入的数据",
-              required: true
-            }
-          ]
-        }
-      ]
-    }
-  ];
 };
 
 // 格式化工具名称
@@ -584,7 +339,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 12px 0;
 }
 
 .tools-search {
@@ -600,18 +355,18 @@ main {
 
 .tools-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-top: 24px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 20px;
 }
 
 .tool-card {
   background-color: white;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -620,45 +375,33 @@ main {
 }
 
 .tool-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.08);
 }
 
 .tool-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(to right, rgba(66, 133, 244, 0.7), rgba(66, 133, 244, 0.9));
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.tool-card:hover::after {
-  opacity: 1;
+  display: none;
 }
 
 .tool-header {
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: 12px;
   background-color: white;
   border-bottom: 1px solid #f3f4f6;
 }
 
 .tool-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: white;
-  margin-right: 14px;
+  margin-right: 10px;
   flex-shrink: 0;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -668,8 +411,8 @@ main {
 }
 
 .tool-title h3 {
-  margin: 0 0 6px 0;
-  font-size: 1rem;
+  margin: 0 0 4px 0;
+  font-size: 0.9rem;
   color: #111827;
   font-weight: 600;
   white-space: nowrap;
@@ -679,14 +422,14 @@ main {
 
 .tool-description {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #6b7280;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 /* 工具详情弹窗样式 */
@@ -722,7 +465,7 @@ main {
 .modal-header {
   display: flex;
   align-items: center;
-  padding: 24px 28px;
+  padding: 18px 24px;
   border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 0;
@@ -731,16 +474,16 @@ main {
 }
 
 .tool-icon-large {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   font-weight: 600;
   color: white;
-  margin-right: 20px;
+  margin-right: 16px;
   flex-shrink: 0;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
@@ -750,8 +493,8 @@ main {
 }
 
 .modal-title h2 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
+  margin: 0 0 6px 0;
+  font-size: 1.3rem;
   color: #111827;
   font-weight: 600;
   line-height: 1.2;
@@ -760,8 +503,8 @@ main {
 .modal-title p {
   margin: 0;
   color: #4b5563;
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .close-button {
@@ -786,22 +529,23 @@ main {
 }
 
 .modal-body {
-  padding: 28px;
+  padding: 22px;
 }
 
 .tool-methods {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .method-item {
   background-color: #f9fafb;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 16px;
   border-left: 4px solid #4285F4;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
+  margin-bottom: 14px;
 }
 
 .method-item:hover {
@@ -817,16 +561,16 @@ main {
 
 .method-name {
   font-weight: 600;
-  font-size: 1.1rem;
-  margin-right: 12px;
+  font-size: 1rem;
+  margin-right: 10px;
   color: #1f2937;
 }
 
 .method-tag {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   background-color: #e0e7ff;
   color: #4338ca;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 20px;
   text-transform: uppercase;
   font-weight: 500;
@@ -834,33 +578,34 @@ main {
 }
 
 .method-description {
-  margin: 0 0 16px 0;
-  font-size: 0.95rem;
+  margin: 0 0 14px 0;
+  font-size: 0.85rem;
   color: #4b5563;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .method-params h4 {
-  margin: 0 0 12px 0;
-  font-size: 0.85rem;
+  margin: 0 0 10px 0;
+  font-size: 0.8rem;
   color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   font-weight: 600;
 }
 
 .param-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .param-item {
-  padding: 12px 16px;
+  padding: 10px 14px;
   background-color: #f3f4f6;
-  border-radius: 8px;
+  border-radius: 6px;
   transition: all 0.2s;
   border: 1px solid #e5e7eb;
+  margin-bottom: 8px;
 }
 
 .param-item:hover {
@@ -870,35 +615,35 @@ main {
 
 .param-name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #4338ca;
 }
 
 .param-type {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #6b7280;
-  margin-left: 8px;
+  margin-left: 6px;
   background-color: #e5e7eb;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 4px;
   font-family: monospace;
 }
 
 .param-required {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #ef4444;
-  margin-left: 8px;
+  margin-left: 6px;
   font-weight: 500;
   background-color: #fee2e2;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 4px;
 }
 
 .param-description {
-  margin: 8px 0 0 0;
-  font-size: 0.9rem;
+  margin: 6px 0 0 0;
+  font-size: 0.8rem;
   color: #4b5563;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .empty-state {
@@ -939,19 +684,25 @@ main {
 }
 
 /* 响应式调整 */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+  .tools-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
   .tools-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .tools-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 500px) {
   .tools-grid {
     grid-template-columns: 1fr;
     gap: 16px;
