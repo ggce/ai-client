@@ -31,11 +31,6 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     command: "npx",
     args: ["@playwright/mcp"]
   },
-  // "browser-server": {
-  //   url: "http://localhost:8001/browserServer",
-  //   command: "node",
-  //   args: ["./dist/mcpServers/BrowserServer.js"]
-  // },
   // 文件操作
   "file-server": {
     url: "http://localhost:7003/fileServer",
@@ -45,6 +40,22 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "/Users/guogangchuan/develop/git-project/ai-client/agent"
     ]
   },
+  // 网络请求操作
+  "fetch-server": {
+    url: "http://localhost:7004/fetch-server",
+    command: "npx",
+    args: [
+      "npx",
+      "@kazuph/mcp-fetch"
+    ]
+  },
+
+  // 本地demo
+  // "browser-server": {
+  //   url: "http://localhost:8001/browserServer",
+  //   command: "node",
+  //   args: ["./dist/mcpServers/BrowserServer.js"]
+  // },
   "weather-server": {
     url: "http://localhost:8002/weatherServer",
     command: "node",

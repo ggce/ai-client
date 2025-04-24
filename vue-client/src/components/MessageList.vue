@@ -45,31 +45,6 @@
           <!-- 工具消息标题显示 -->
           <div v-if="message.type === 'tool'" class="tool-header">
             <span class="tool-name">{{ getToolName(message.content) }}</span>
-            <button
-              class="copy-button"
-              @click.stop="copyToClipboard(message.content, index)"
-              @mouseenter="hoveredButton = index"
-              @mouseleave="hoveredButton = null"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path
-                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                ></path>
-              </svg>
-              <span v-if="hoveredButton === index" class="hover-tooltip">复制</span>
-              <span v-if="copiedIndex === index" class="copy-tooltip">已复制</span>
-            </button>
           </div>
 
           <!-- 工具内容区域，添加可折叠功能 -->
@@ -86,9 +61,21 @@
             </div>
           </div>
 
-          <!-- 非工具内容正常显示 -->
+          <!-- 工具调用提示消息 - 单独的条件分支 -->
           <div
-            v-if="message.type !== 'tool'"
+            v-if="message.type === 'assistant' && isToolPromptMessage(message.content)"
+          >
+            <div class="tool-prompt-header">
+              <span class="tool-prompt-name">{{ getToolPromptTitle(message.content) }}</span>
+            </div>
+            <div class="tool-prompt-container">
+              <div class="tool-prompt-content" v-html="formatToolPromptMessage(message.content)"></div>
+            </div>
+          </div>
+
+          <!-- 普通消息内容显示 -->
+          <div
+            v-if="message.type !== 'tool' && !(message.type === 'assistant' && isToolPromptMessage(message.content))"
             class="message-content"
             v-html="formatMessage(message.content)"
           ></div>
@@ -102,7 +89,7 @@
           ></div>
 
           <!-- 只在AI消息下添加复制按钮 -->
-          <div v-if="message.type === 'assistant'" class="message-actions">
+          <div v-if="message.type === 'assistant' && !isToolPromptMessage(message.content)" class="message-actions">
             <button
               class="copy-button"
               @click="copyToClipboard(message.content, index)"
@@ -218,8 +205,23 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, ref, watch, onMounted, nextTick } from "vue";
+import { defineProps, ref, watch, onMounted, nextTick, onUnmounted } from "vue";
 import MarkdownIt from "markdown-it";
+
+// Define the window interface for Electron APIs
+declare global {
+  interface Window {
+    electronAPI?: {
+      openExternalLink: (url: string) => void;
+      getAppVersion: () => Promise<string>;
+      openFile: () => Promise<string | null>;
+      saveFile: (content: string) => Promise<boolean>;
+    };
+    electron?: {
+      openExternal: (url: string) => void;
+    };
+  }
+}
 
 interface ChatMessage {
   type: 'user' | 'assistant' | 'system' | 'tool'
@@ -241,6 +243,28 @@ const md = new MarkdownIt({
   typographer: true, // 启用一些排版替换
 });
 
+// Configure md to add target="_blank" to all links
+md.renderer.rules.link_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
+  // Add target="_blank" and rel="noopener noreferrer" to all links
+  const token = tokens[idx];
+  const aIndex = token.attrIndex('target');
+  
+  if (aIndex < 0) {
+    token.attrPush(['target', '_blank']);
+    token.attrPush(['rel', 'noopener noreferrer']);
+  } else if (token.attrs) {
+    token.attrs[aIndex][1] = '_blank';
+    
+    const relIndex = token.attrIndex('rel');
+    if (relIndex < 0) {
+      token.attrPush(['rel', 'noopener noreferrer']);
+    }
+  }
+  
+  // Return default renderer result
+  return self.renderToken(tokens, idx, options);
+};
+
 const messagesContainer = ref<HTMLElement | null>(null);
 // 添加推理内容容器的ref
 const reasoningContentRef = ref<HTMLElement | null>(null);
@@ -257,6 +281,11 @@ const expandedReasoningIndex = ref<number | null>(null);
 
 // 添加工具消息展开/折叠状态
 const expandedToolIndex = ref<number | null>(null);
+
+// 检查消息是否为工具调用提示
+const isToolPromptMessage = (content: string): boolean => {
+  return content.startsWith('#useTool<toolName>');
+};
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = (index: number) => {
@@ -386,11 +415,7 @@ const formatToolPreview = (content: string): string => {
 const formatMessage = (content: string): string => {
   if (!content) return "";
 
-  // 检查是否为特殊工具调用提示格式
-  if (content.startsWith('#useTool<toolName>')) {
-    return formatToolPromptMessage(content);
-  }
-
+  // 不再在这里处理工具调用提示消息，而是在模板中单独处理
   // 使用markdown-it解析Markdown文本为HTML
   return md.render(content);
 };
@@ -414,7 +439,70 @@ const formatToolPromptMessage = (content: string): string => {
     let argsObj: Record<string, any> = {};
     try {
       argsObj = JSON.parse(toolArgs);
-      formattedArgs = JSON.stringify(argsObj, null, 2);
+      
+      // 特殊处理包含URL的参数，确保它们能够正确显示
+      if (argsObj.url) {
+        // 将URL包装在特殊的标记中，以便在CSS中处理它的显示
+        argsObj.url = `<a href="${argsObj.url}" style="color: #0366d6; word-break: break-all; overflow-wrap: break-word; max-width: 100%; display: inline-block; font-size: 0.85em; text-decoration: none;" target="_blank" rel="noopener noreferrer">${argsObj.url}</a>`;
+      }
+      
+      // 创建更加用户友好的参数展示格式
+      let paramsList = '';
+      if (Object.keys(argsObj).length > 0) {
+        paramsList = Object.entries(argsObj).map(([key, value]) => {
+          // 格式化不同类型的值
+          let displayValue;
+          if (typeof value === 'string') {
+            // 处理字符串值，保留HTML标签
+            if (value.includes('style="color: #0366d6; word-break: break-all;')) {
+              displayValue = value;
+            } else {
+              displayValue = `"${value}"`;
+            }
+          } else if (value === null) {
+            displayValue = '<span style="color: #888;">null</span>';
+          } else if (Array.isArray(value)) {
+            // 格式化数组，添加语法高亮
+            try {
+              const formattedArray = JSON.stringify(value, null, 2)
+                .replace(/\n/g, '<br>')
+                .replace(/\s{2}/g, '&nbsp;&nbsp;')
+                .replace(/(\[|\])/g, '<span style="color: #0366d6;">$1</span>')
+                .replace(/"([^"]+)":/g, '<span style="color: #7c62c2;">"$1"</span>:')
+                .replace(/: "([^"]+)"/g, ': <span style="color: #2e7d32;">"$1"</span>');
+              displayValue = formattedArray;
+            } catch (e) {
+              displayValue = JSON.stringify(value);
+            }
+          } else if (typeof value === 'object') {
+            // 格式化对象，添加语法高亮
+            try {
+              const formattedObject = JSON.stringify(value, null, 2)
+                .replace(/\n/g, '<br>')
+                .replace(/\s{2}/g, '&nbsp;&nbsp;')
+                .replace(/({|})/g, '<span style="color: #0366d6;">$1</span>')
+                .replace(/"([^"]+)":/g, '<span style="color: #7c62c2;">"$1"</span>:')
+                .replace(/: "([^"]+)"/g, ': <span style="color: #2e7d32;">"$1"</span>');
+              displayValue = formattedObject;
+            } catch (e) {
+              displayValue = JSON.stringify(value);
+            }
+          } else {
+            // 处理基本类型
+            displayValue = String(value);
+          }
+          
+          // 返回格式化的参数行
+          return `<div style="display: flex; margin-bottom: 6px; line-height: 1.4; flex-wrap: wrap; align-items: flex-start; padding: 5px 8px; border-left: 2px solid #e0e0e0; background-color: rgba(0, 0, 0, 0.01); border-radius: 3px;">
+            <span style="color: #666; min-width: 80px; font-weight: 600; padding-right: 10px; flex-shrink: 0; font-size: 0.85em;">${key}:</span>
+            <span style="color: #333; word-break: break-word; white-space: pre-wrap; flex: 1; padding-left: 5px; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85em; max-width: 100%; overflow-wrap: break-word;">${displayValue}</span>
+          </div>`;
+        }).join('');
+      } else {
+        paramsList = '<div style="color: #888; font-style: italic; font-size: 0.85em;">无参数</div>';
+      }
+      
+      formattedArgs = paramsList;
     } catch (e) {
       console.error("解析工具参数失败:", e);
     }
@@ -425,38 +513,14 @@ const formatToolPromptMessage = (content: string): string => {
       displayToolName = toolName.split('_SERVERKEYTONAME_')[1];
     }
     
-    // 为不同类型的工具提供友好说明
-    let actionDescription = "即将调用工具";
-    let toolIcon = "🔧";
-    
-    // 根据工具名称提供不同的描述和图标
-    if (displayToolName.includes('navigate') || displayToolName.includes('browser')) {
-      toolIcon = "🌐";
-    } else if (displayToolName.includes('search')) {
-      toolIcon = "🔍";
-    } else if (displayToolName.includes('read') || displayToolName.includes('get')) {
-      toolIcon = "📥";
-    } else if (displayToolName.includes('write') || displayToolName.includes('create')) {
-      toolIcon = "📝";
-    } else if (displayToolName.includes('delete') || displayToolName.includes('remove')) {
-      toolIcon = "🗑️";
-    }
-    
-    // 返回格式化后的HTML - 与工具消息结构一致
+    // 返回改进的HTML结构 - 更加清晰的卡片式布局
     return `
-      <div class="tool-plan">
-        <div class="tool-plan-header">
-          ${toolIcon} 即将调用工具
+      <div style="background-color: #FCFCFF; border-radius: 8px; border: 1px solid #E6E4F0; overflow: hidden; box-shadow: 0 2px 6px rgba(124, 98, 194, 0.1); transition: all 0.2s ease;">
+        <div style="display: flex; align-items: center; padding: 8px 12px; background-color: #F7F5FF; border-bottom: 1px solid #E6E4F0; justify-content: space-between;">
+          <span style="font-weight: 600; font-family: monospace; color: #5D4DB3; font-size: 0.95em; padding: 3px 8px; background-color: rgba(124, 98, 194, 0.12); border-radius: 4px; display: inline-block; letter-spacing: 0.01em; border-left: 2px solid #7C62C2;">${displayToolName}</span>
         </div>
-        <div class="tool-plan-content">
-          <div class="tool-plan-name">
-            <span class="tool-plan-label">工具名称：</span> 
-            <span class="tool-plan-value">${displayToolName}</span>
-          </div>
-          <div class="tool-plan-params">
-            <span class="tool-plan-label">参数：</span>
-            <pre class="tool-plan-json">${formattedArgs}</pre>
-          </div>
+        <div style="padding: 10px 12px; font-family: monospace; font-size: 0.85em; background-color: #FCFCFF; border-radius: 0 0 8px 8px; overflow: hidden;">
+          ${formattedArgs}
         </div>
       </div>
     `;
@@ -585,7 +649,68 @@ watch(
 // 初始化时滚动到底部
 onMounted(() => {
   scrollToBottom();
+  
+  // Add event listener for all link clicks in the messages container
+  document.addEventListener('click', handleLinkClick);
 });
+
+// Handle link clicks to open in default browser
+const handleLinkClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  const link = target.closest('a');
+  
+  // Only handle links with href
+  if (link && link.href) {
+    // Only handle http/https links
+    if (link.href.startsWith('http://') || link.href.startsWith('https://')) {
+      event.preventDefault();
+      
+      try {
+        // Use the electron API if available - try both ways
+        if (window.electronAPI && typeof window.electronAPI.openExternalLink === 'function') {
+          window.electronAPI.openExternalLink(link.href);
+        } else if (window.electron && typeof window.electron.openExternal === 'function') {
+          window.electron.openExternal(link.href);
+        } else {
+          // Fallback for non-electron environments or if APIs aren't available
+          window.open(link.href, '_blank', 'noopener,noreferrer');
+        }
+      } catch (error) {
+        console.error('Error opening link:', error);
+        // Final fallback if any error occurs
+        window.open(link.href, '_blank', 'noopener,noreferrer');
+      }
+    }
+  }
+};
+
+// Clean up event listeners when component is unmounted
+onUnmounted(() => {
+  document.removeEventListener('click', handleLinkClick);
+});
+
+// 添加获取工具调用提示标题的函数
+const getToolPromptTitle = (content: string): string => {
+  try {
+    // 提取工具名称
+    const toolNameMatch = content.match(/<toolName>(.*?)<\/toolName>/);
+    const toolName = toolNameMatch ? toolNameMatch[1] : "未知工具";
+    
+    // 提取工具的实际名称（去除服务器前缀）
+    let displayToolName = toolName;
+    if (toolName.includes('_SERVERKEYTONAME_')) {
+      displayToolName = toolName.split('_SERVERKEYTONAME_')[1];
+    }
+    
+    // 为不同类型的工具提供友好图标和描述
+    const actionDescription = "我即将调用工具";
+    
+    return `${actionDescription}`;
+  } catch (e) {
+    console.error("获取工具标题失败:", e);
+    return "我即将调用工具";
+  }
+};
 </script>
 
 <style scoped>
@@ -623,7 +748,8 @@ onMounted(() => {
 }
 
 .ai-avatar {
-  background-color: white;
+  background: none;
+  border-radius: none;
 }
 
 .ai-logo {
@@ -693,6 +819,9 @@ onMounted(() => {
   padding: 12px 16px;
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 .message.system .message-container {
@@ -748,22 +877,25 @@ onMounted(() => {
 
 .tool-image img {
   max-width: 100%;
+  height: auto;
   border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
 }
 
 .tool-url {
   padding: 6px 0;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .tool-url a {
   color: #1976d2;
   text-decoration: none;
   word-break: break-all;
-}
-
-.tool-url a:hover {
-  text-decoration: underline;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  display: inline-block;
 }
 
 .tool-item {
@@ -790,6 +922,9 @@ onMounted(() => {
   max-height: 300px;
   overflow-y: auto;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .tool-result {
@@ -906,9 +1041,11 @@ onMounted(() => {
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(-5px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -966,6 +1103,7 @@ onMounted(() => {
   overflow-x: auto;
   margin: 10px 0;
   color: #abb2bf;
+  max-width: 100%;
 }
 
 .message-content :deep(code) {
@@ -977,6 +1115,24 @@ onMounted(() => {
   background-color: rgba(0, 0, 0, 0.05);
   padding: 2px 4px;
   border-radius: 3px;
+}
+
+/* 确保链接不会溢出容器 */
+.message-content :deep(a) {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  display: inline-block;
+}
+
+/* 确保图片不会溢出容器 */
+.message-content :deep(img),
+.tool-image img,
+.message-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 /* 新的打字中效果样式 */
@@ -1196,56 +1352,84 @@ onMounted(() => {
   overflow-y: auto;
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
   animation: fadeIn 0.3s ease-in-out;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.tool-expanded-content img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
 }
 
-/* 工具调用提示消息样式 - 与工具消息一致 */
-.tool-plan {
-  width: 100%;
+.tool-expanded-content a {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  display: inline-block;
 }
 
-.tool-plan-header {
-  font-weight: 600;
-  color: #2e7d32;
-  padding-bottom: 6px;
+/* 工具调用提示消息样式 */
+.tool-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
-  border-bottom: 1px solid #c8e6c9;
+  border-bottom: 1px solid #d2d0f0;
+  padding-bottom: 6px;
+}
+
+.tool-prompt-name {
+  font-weight: 600;
+  color: #5d4db3;
   font-size: 14px;
 }
 
-.tool-plan-content {
-  background-color: #f0f8f0;
-  border-radius: 8px;
-  border: 1px solid #d7ecd8;
-  padding: 10px;
+.tool-prompt-container {
+  transition: all 0.2s ease;
 }
 
-.tool-plan-name {
-  margin-bottom: 8px;
+.tool-prompt-container:hover {
+  background-color: #e8e6fa;
+  border-color: #c8c4f0;
 }
 
-.tool-plan-label {
+.tool-prompt-content {
+}
+
+.tool-prompt-info {
+  padding: 5px 0;
+}
+
+.tool-prompt-tool {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.tool-prompt-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.tool-prompt-label {
   font-weight: 500;
   color: #555;
+  margin-right: 5px;
 }
 
-.tool-plan-value {
-  color: #2e7d32;
+.tool-prompt-value {
+  color: #5d4db3;
   font-family: 'Consolas', monospace;
   font-weight: 500;
 }
 
-.tool-plan-json {
+.tool-prompt-params {
+  margin-top: 5px;
+}
+
+.tool-prompt-json {
   background-color: rgba(255, 255, 255, 0.5);
   padding: 10px;
   margin: 5px 0 0 0;
@@ -1258,5 +1442,117 @@ onMounted(() => {
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid rgba(0, 0, 0, 0.05);
+  word-break: break-word; /* 添加长词断行 */
+  overflow-wrap: break-word; /* 确保长URL能够断行 */
+}
+
+/* 特殊URL参数样式 */
+.tool-param-url {
+  color: var(--url-color, #0366d6);
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  display: inline-block;
+}
+
+.dark-theme {
+  --tool-prompt-border: #3e3e3e;
+  --tool-prompt-bg: #282828;
+  --tool-prompt-header-bg: #323232;
+  --tool-prompt-name-color: #b580ff;
+  --tool-param-name-color: #b580ff;
+  --tool-param-value-color: #e1e1e1;
+  --url-color: #58a6ff;
+}
+
+.light-theme {
+  --tool-prompt-border: #e0e0e0;
+  --tool-prompt-bg: #f8f8f8;
+  --tool-prompt-header-bg: #f0f0f0;
+  --tool-prompt-name-color: #7c62c2;
+  --tool-param-name-color: #7c62c2;
+  --tool-param-value-color: #333;
+  --url-color: #0366d6;
+}
+
+.tool-prompt-name-value {
+  font-weight: 700;
+  font-family: var(--code-font);
+  color: #5D4DB3;
+  font-size: 1.15em;
+  padding: 5px 12px;
+  background-color: rgba(124, 98, 194, 0.15);
+  border-radius: 6px;
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-left: 3px solid #7C62C2;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tool-prompt-header-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background-color: #F7F5FF;
+  border-bottom: 2px solid #E6E4F0;
+  justify-content: space-between;
+}
+
+.tool-prompt-params-section {
+  padding: 16px;
+  font-family: var(--code-font);
+  font-size: 0.93em;
+  background-color: var(--tool-prompt-bg);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+
+.tool-param-row {
+  display: flex;
+  margin-bottom: 10px;
+  line-height: 1.5;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-left: 3px solid #e0e0e0;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.tool-param-name {
+  color: #666;
+  min-width: 100px;
+  font-weight: 600;
+  padding-right: 15px;
+  flex-shrink: 0;
+  font-size: 0.9em;
+  text-transform: lowercase;
+}
+
+.tool-param-value {
+  color: #333;
+  word-break: break-word;
+  white-space: pre-wrap;
+  flex: 1;
+  padding-left: 8px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.95em;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.tool-prompt-card {
+  background-color: #FCFCFF;
+  border-radius: 10px;
+  border: 1px solid #E6E4F0;
+  overflow: hidden;
+  margin: 12px 0 16px;
+  box-shadow: 0 4px 10px rgba(124, 98, 194, 0.1);
+  transition: all 0.2s ease;
+}
+
+.tool-prompt-card:hover {
+  box-shadow: 0 6px 15px rgba(124, 98, 194, 0.15);
 }
 </style>
