@@ -51,7 +51,7 @@
           <div
             v-if="message.type === 'tool'"
             class="tool-content-container"
-            :class="{ 'collapsed': expandedToolIndex !== index }"
+            :class="{ 'collapsed': expandedToolIndex !== index, 'has-error': isToolError(message.content) }"
             @click="toggleTool(index)"
           >
             <div class="message-content" v-html="formatToolPreview(message.content)"></div>
@@ -92,6 +92,7 @@
           <div
             v-if="message.type === 'tool' && expandedToolIndex === index"
             class="tool-expanded-content"
+            :class="{ 'error-content': isToolError(message.content) }"
             v-html="formatToolMessage(message.content)"
             @click.stop
           ></div>
@@ -395,7 +396,10 @@ const formatToolPreview = (content: string): string => {
     if (parsed.errorMessage) {
       const errorMessage = parsed.errorMessage.toString();
       const firstLine = errorMessage.split('\n')[0] || "错误信息";
-      return `<div class="tool-preview">${firstLine}${errorMessage.includes('\n') ? '...' : ''}</div>`;
+      // 添加更明显的错误样式和图标
+      return `<div class="tool-preview tool-error-preview">
+        <span class="error-icon">⚠️</span> ${firstLine}${errorMessage.includes('\n') ? '...' : ''}
+      </div>`;
     }
     
     // 处理常见工具消息格式
@@ -553,8 +557,14 @@ const formatToolMessage = (content: string): string => {
     // 处理工具错误消息
     if (parsed.errorMessage) {
       return `<div class="tool-error">
-        <div class="tool-error-title">错误信息</div>
-        <div class="tool-error-message">${parsed.errorMessage}</div>
+        <div class="tool-error-header">
+          <div class="tool-error-title">
+            <span class="error-icon">⚠️</span> 工具调用失败
+          </div>
+        </div>
+        <div class="tool-error-content">
+          <div class="tool-error-message">${parsed.errorMessage}</div>
+        </div>
       </div>`;
     }
     
@@ -755,6 +765,16 @@ const shouldCollapseToolPrompt = (content: string): boolean => {
       return toolArgsMatch[1].length > 200;
     }
     return false;
+  } catch (e) {
+    return false;
+  }
+};
+
+// Add a method to check if a tool message contains an error
+const isToolError = (content: string): boolean => {
+  try {
+    const parsed = JSON.parse(content);
+    return !!parsed.errorMessage;
   } catch (e) {
     return false;
   }
@@ -985,26 +1005,78 @@ const shouldCollapseToolPrompt = (content: string): boolean => {
 }
 
 .tool-error {
-  background-color: #ffebee;
-  border-left: 3px solid #ef5350;
-  padding: 8px 10px;
+  background-color: #fff6f6;
+  border: 1px solid #e70013;
+  padding: 0;
   margin: 6px 0;
-  border-radius: 6px;
-  max-height: 300px;
+  border-radius: 8px;
+  max-height: 400px;
   overflow-y: auto;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(231, 0, 19, 0.15);
+}
+
+.tool-error-header {
+  background-color: #fff0f0;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ffdfdf;
 }
 
 .tool-error-title {
   font-weight: bold;
-  color: #c62828;
-  margin-bottom: 4px;
+  color: #e70013;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.tool-error-content {
+  padding: 12px;
 }
 
 .tool-error-message {
-  color: #b71c1c;
+  color: #d32f2f;
   font-family: monospace;
   white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.error-icon {
+  margin-right: 6px;
+  font-size: 16px;
+}
+
+.tool-error-preview {
+  color: #e70013;
+  display: flex;
+  align-items: center;
+  background-color: #fff0f0;
+  border-left: 3px solid #e70013;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Add styles for the tool container when it contains an error */
+.tool-content-container.has-error {
+  background-color: #fff6f6;
+  border-color: #e70013;
+}
+
+.tool-content-container.has-error .toggle-indicator {
+  background-color: rgba(231, 0, 19, 0.08);
+}
+
+.tool-content-container.has-error .toggle-text,
+.tool-content-container.has-error .toggle-icon {
+  color: #e70013;
+}
+
+.tool-content-container.has-error:hover {
+  background-color: #fff0f0;
+  border-color: #e70013;
+}
+
+.tool-content-container.has-error:hover .toggle-indicator {
+  background-color: rgba(231, 0, 19, 0.15);
 }
 
 /* 添加工具消息内容容器统一样式 */
@@ -1660,5 +1732,11 @@ const shouldCollapseToolPrompt = (content: string): boolean => {
 
 .tool-prompt-container.collapsed {
   cursor: pointer;
+}
+
+.tool-expanded-content.error-content {
+  background-color: #fff6f6;
+  border: 1px solid #e70013;
+  box-shadow: 0 2px 8px rgba(231, 0, 19, 0.08);
 }
 </style>
