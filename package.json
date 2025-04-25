@@ -27,6 +27,7 @@
     "@kazuph/mcp-fetch": "^1.1.3",
     "@modelcontextprotocol/sdk": "^1.10.1",
     "@modelcontextprotocol/server-filesystem": "^2025.3.28",
+    "@modelcontextprotocol/server-sequential-thinking": "^0.6.2",
     "@negokaz/excel-mcp-server": "^0.5.2",
     "@playwright/mcp": "^0.0.15",
     "axios": "^1.8.4",
@@ -37,6 +38,7 @@
     "express": "^5.1.0",
     "openai": "^4.95.0",
     "pinia": "^2.1.7",
+    "tavily-mcp": "^0.1.4",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
     "zod": "^3.24.3"

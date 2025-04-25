@@ -113,6 +113,7 @@ export class MCPClient {
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args || [],
+        env: config.env,
       });
       
       // 更新实例状态

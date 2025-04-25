@@ -537,12 +537,6 @@ router.post('/api/sessions/:id/messages/stream', (req: Request, res: Response) =
     const requestId = `${sessionId}_${Date.now()}`;
     streamRequestsStore.set(requestId, { message, selectedTools, options });
     
-    // 设置过期时间，60秒后自动清理
-    setTimeout(() => {
-      streamRequestsStore.delete(requestId);
-      logger.log('Main', `已清理流式请求数据: ${requestId}`);
-    }, 120000);
-    
     // 返回请求ID
     res.json({ requestId });
   } catch (error) {
@@ -678,6 +672,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
               if (!toolTips[nowToolCallIndex]) {
                 toolTips[nowToolCallIndex] = '#useTool';
                 toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
+
                 toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
               }
             }
@@ -693,6 +688,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 toolTips[nowToolCallIndex] += addStr;
               }
             }
+
+            // 实时发送工具信息
+            if (toolTips && toolTips[nowToolCallIndex]) {
+              sendData(res, { content: toolTips[nowToolCallIndex] });
+            }
           }
         }
 
@@ -702,7 +702,10 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         let isMessageUpdate = false;
 
         // 文字流
-        if (fullContent || fullReasoningContent) {
+        if (
+          (fullContent || fullReasoningContent)
+          && (!fullContent.startsWith('#useTool'))
+        ) {
           // 将完整响应添加到会话历史
           session?.addAssistantMessage(fullContent, fullReasoningContent);
           // 信息更新
