@@ -169,8 +169,8 @@ onMounted(async () => {
 <style scoped>
 .session-sidebar {
   width: 200px;
-  background-color: #f0f2f5;
-  border-right: 1px solid #e9ecef;
+  background-color: #f8f9fb;
+  border-right: 1px solid #eaecf1;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -183,8 +183,8 @@ onMounted(async () => {
 }
 
 .sidebar-header {
-  padding: 10px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eaecf1;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -192,7 +192,8 @@ onMounted(async () => {
 
 .sidebar-header h2 {
   color: #1a73e8;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -225,7 +226,7 @@ onMounted(async () => {
 
 .sidebar-content {
   flex: 1;
-  padding: 8px;
+  padding: 10px 8px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -234,24 +235,25 @@ onMounted(async () => {
 .new-session-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 32px;
-  padding: 0 8px;
+  padding: 0 12px;
   background-color: #1a73e8;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  margin-bottom: 12px;
-  transition: all 0.3s ease;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
   font-size: 13px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(26, 115, 232, 0.2);
   position: relative;
   overflow: hidden;
 }
 
 .new-session-btn:hover {
-  background-color: #1558b3;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  background-color: #1765cc;
+  box-shadow: 0 3px 6px rgba(26, 115, 232, 0.3);
   transform: translateY(-1px);
 }
 
@@ -289,35 +291,44 @@ onMounted(async () => {
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
 }
 
 .session-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px;
-  border-radius: 4px;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  background-color: white;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   position: relative;
-  overflow: visible;
 }
 
 .session-item:hover {
-  background-color: #e8f0fe;
-  border-color: #dae8fc;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background-color: #f5f8ff;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.08);
+  transform: translateY(-1px);
 }
 
 .session-item.active {
-  background-color: #e8f0fe;
-  border-color: #bbdefb;
-  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.15);
+  background-color: #e6f0ff;
+  box-shadow: 0 2px 5px rgba(26, 115, 232, 0.15);
+  border-left: 3px solid #1a73e8;
+  padding-left: 7px;
+}
+
+.session-item.active .session-number {
+  background-color: #1a73e8;
+  color: white;
+}
+
+.session-item.active .title-text {
+  color: #1a73e8;
+  font-weight: 600;
 }
 
 .session-info {
@@ -332,80 +343,85 @@ onMounted(async () => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .title-text {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #222;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
-  color: #333;
 }
 
 .session-id {
   font-size: 10px;
-  color: #888;
+  color: #8c9aa8;
   margin-top: 2px;
 }
 
 .session-number {
-  min-width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  background-color: #e0e7ff;
-  color: #5c6bc0;
-  font-size: 11px;
+  min-width: 22px;
+  min-height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
+  background-color: #ecf2ff;
+  color: #1a73e8;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 500;
   flex-shrink: 0;
+  margin-right: 10px;
 }
 
 .delete-btn {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background-color: #f5f5f5;
+  background-color: transparent;
   border: none;
   font-size: 14px;
   line-height: 1;
+  color: #aaa;
   cursor: pointer;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s, background-color 0.2s;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.session-item:hover .delete-btn {
+  opacity: 0.7;
 }
 
 .delete-btn:hover {
-  background-color: #ffcdd2;
-  opacity: 1;
+  background-color: #fee7e7;
+  color: #d32f2f;
+  opacity: 1 !important;
 }
 
 .loading-indicator {
   padding: 12px;
   text-align: center;
-  color: #666;
+  color: #8c9aa8;
   font-size: 12px;
 }
 
-.session-sidebar.collapsed .session-number {
-  margin-right: 0;
+.session-sidebar.collapsed .session-title {
+  display: none;
 }
 
 .session-sidebar.collapsed .session-info {
   justify-content: center;
   width: 100%;
+  padding-left: 0;
 }
 
-.session-sidebar.collapsed .session-item {
-  justify-content: center;
-  padding: 8px 4px;
+.session-sidebar.collapsed .session-number {
+  margin-right: 0;
 }
 
 .session-item.disabled {
@@ -427,5 +443,11 @@ button:disabled {
 .delete-btn:disabled {
   background-color: #e0e0e0;
   opacity: 0.5;
+}
+
+.session-sidebar.collapsed .session-item {
+  padding: 6px 4px;
+  justify-content: center;
+  overflow: hidden;
 }
 </style> 

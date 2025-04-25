@@ -1,82 +1,86 @@
 <template>
   <div class="input-area">
-    <div class="textarea-container">
-      <textarea 
-        ref="textareaRef"
-        v-model="messageInput" 
-        placeholder="在这里输入消息..." 
-        rows="3"
-        @keydown.enter.exact.prevent="handleEnterKey"
-        :disabled="disabled"
-      ></textarea>
-      
-      <!-- 工具列表悬浮面板 -->
-      <div v-if="showToolsList" class="tools-panel" @click.stop>
-        <div v-if="isLoading" class="tools-loading">
-          <span class="loader"></span>
-          <p>加载工具列表中...</p>
-        </div>
-        <div v-else-if="error" class="tools-error">
-          <p>{{ error }}</p>
-        </div>
-        <div v-else class="tools-list">
-          <div class="tools-header">使用工具</div>
-          <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click.stop="toggleToolSelection(tool)"
-               :class="{ 'selected': selectedTools.includes(tool.name) }">
-            <div class="tool-checkbox">
-              <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
+    <div class="input-wrapper">
+      <div class="textarea-container">
+        <textarea 
+          ref="textareaRef"
+          class="input-textarea"
+          v-model="messageInput" 
+          placeholder="在这里输入消息..." 
+          rows="2"
+          @input="autoResize"
+          @keydown.enter.exact.prevent="handleEnterKey"
+          :disabled="disabled"
+        ></textarea>
+        
+        <!-- 工具列表悬浮面板 -->
+        <div v-if="showToolsList" class="tools-panel" @click.stop>
+          <div v-if="isLoading" class="tools-loading">
+            <span class="loader"></span>
+            <p>加载工具列表中...</p>
+          </div>
+          <div v-else-if="error" class="tools-error">
+            <p>{{ error }}</p>
+          </div>
+          <div v-else class="tools-list">
+            <div class="tools-header">使用工具</div>
+            <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click.stop="toggleToolSelection(tool)"
+                 :class="{ 'selected': selectedTools.includes(tool.name) }">
+              <div class="tool-checkbox">
+                <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="tool-name">{{ tool.name }}</span>
             </div>
-            <span class="tool-name">{{ tool.name }}</span>
           </div>
         </div>
-      </div>
-      
-      <!-- 工具栏 -->
-      <div class="toolbar">
-        <button class="toolbar-btn" title="工具" @click.prevent="toggleToolsList">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+        
+        <!-- 工具栏 -->
+        <div class="toolbar">
+          <button class="toolbar-btn" title="工具" @click.prevent="toggleToolsList">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+            </svg>
+            <span v-if="selectedTools.length > 0" class="tool-badge">{{ selectedTools.length }}</span>
+          </button>
+          <button class="toolbar-btn" title="文件" @click.prevent="handleFileAction">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+          </button>
+          <button class="toolbar-btn" title="上传图片" @click.prevent="openFileUpload">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          </button>
+          <button class="toolbar-btn" title="全屏模式" @click.prevent="toggleFullscreen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          </button>
+        </div>
+        
+        <!-- 动态显示停止按钮或发送按钮 (移到输入框内部右下角) -->
+        <button 
+          v-if="isStreamActive"
+          @click="handleStop" 
+          class="action-button stop-button"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="6" width="12" height="12"></rect>
           </svg>
-          <span v-if="selectedTools.length > 0" class="tool-badge">{{ selectedTools.length }}</span>
         </button>
-        <button class="toolbar-btn" title="文件" @click.prevent="handleFileAction">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
+        <button 
+          v-else
+          @click="handleSend" 
+          :disabled="!canSend || disabled"
+          class="action-button send-button"
+          :class="{ 'active': canSend && !disabled }"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
           </svg>
         </button>
-        <button class="toolbar-btn" title="上传图片" @click.prevent="openFileUpload">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-        </button>
-        <button class="toolbar-btn" title="全屏模式" @click.prevent="toggleFullscreen">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-        </button>
       </div>
-      
-      <!-- 动态显示停止按钮或发送按钮 (移到输入框内部右下角) -->
-      <button 
-        v-if="isStreamActive"
-        @click="handleStop" 
-        class="action-button stop-button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="6" y="6" width="12" height="12"></rect>
-        </svg>
-      </button>
-      <button 
-        v-else
-        @click="handleSend" 
-        :disabled="!canSend || disabled"
-        class="action-button send-button"
-        :class="{ 'active': canSend && !disabled }"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
     </div>
   </div>
 </template>
@@ -214,6 +218,13 @@ const handleSend = () => {
   const message = messageInput.value.trim()
   emit('send', message, selectedTools.value.length > 0 ? selectedTools.value : undefined)
   messageInput.value = ''
+  
+  // Reset textarea height after sending
+  setTimeout(() => {
+    if (textareaRef.value) {
+      textareaRef.value.style.height = '40px';
+    }
+  }, 0);
 }
 
 // 停止生成
@@ -288,6 +299,15 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
   }
 }
 
+// Auto resize textarea based on content
+const autoResize = () => {
+  if (textareaRef.value) {
+    textareaRef.value.style.height = 'auto';
+    const newHeight = Math.max(textareaRef.value.scrollHeight, 40); // Min height equivalent to ~3 lines
+    textareaRef.value.style.height = `${newHeight}px`;
+  }
+}
+
 defineExpose({
   getSelectedTools: () => selectedTools.value
 })
@@ -297,6 +317,11 @@ onMounted(() => {
   document.addEventListener('keydown', handleGlobalKeyDown)
   document.addEventListener('click', handleDocumentClick)
   fetchTools(); // 获取工具列表
+  
+  // Set initial size
+  setTimeout(() => {
+    autoResize();
+  }, 0);
 })
 
 // 组件卸载时移除事件监听器
@@ -317,52 +342,70 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.textarea-container {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+.input-wrapper {
   position: relative;
   width: 100%;
-}
-
-textarea {
-  width: 100%;
-  height: auto;
-  min-height: 60px;
-  border: 1px solid #e5e5e5;
-  border-radius: 10px;
-  padding: 10px 14px;
-  padding-bottom: 40px; /* 为工具栏留出空间 */
-  padding-right: 50px; /* 为右侧发送按钮留出空间 */
-  font-size: 13px;
-  line-height: 1.5;
-  resize: none;
-  outline: none;
-  background-color: #fafafa;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-textarea:focus {
-  border-color: #1a73e8;
+  padding: 5px 3px;
   background-color: white;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 0;
 }
 
-textarea::placeholder {
-  color: #999;
-  font-size: 12px;
+.textarea-container {
+  position: relative;
+  margin: 0;
+  display: flex;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 6px 36px 30px 8px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.textarea-container:focus-within {
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+.input-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background-color: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 2px 0;
+  min-height: 40px;
+  height: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.input-textarea::placeholder {
+  color: #9ca3af;
+  opacity: 0.8;
 }
 
 /* 工具栏样式 */
 .toolbar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
   display: flex;
-  align-items: center;
-  padding: 6px 10px;
-  background-color: transparent;
-  border-top: none;
-  z-index: 1;
+  padding: 2px 4px;
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  opacity: 0.8;
+  border-radius: 6px;
+  background-color: rgba(240, 240, 240, 0.8);
+  transition: opacity 0.2s ease;
+}
+
+.toolbar:hover {
+  opacity: 1;
 }
 
 .toolbar-btn {
@@ -420,36 +463,48 @@ textarea::placeholder {
 
 /* 发送按钮样式 */
 .send-button {
-  background-color: #1a73e8;
-  color: white;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background-color: transparent;
+  color: #3b82f6;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
 }
 
 .send-button:hover {
-  background-color: #1666d0;
-}
-
-.send-button:active {
-  background-color: #1356b0;
-  transform: scale(0.95);
-}
-
-.send-button.active {
-  background-color: #1a73e8;
-}
-
-.send-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 /* 停止按钮样式 */
 .stop-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background-color: #d32f2f;
   color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .stop-button:hover {
-  background-color: #c62828;
+  background-color: #e33e3e;
+  transform: scale(1.05);
 }
 
 .stop-button:active {
@@ -648,5 +703,32 @@ textarea::placeholder {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.stop-generating-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f56c6c;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stop-generating-button:hover {
+  background-color: #f78989;
+  transform: scale(1.05);
+}
+
+.stop-generating-button:active {
+  background-color: #dd6161;
+  transform: scale(0.95);
 }
 </style> 
