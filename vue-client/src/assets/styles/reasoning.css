@@ -1,0 +1,61 @@
+/* Reasoning Component Styles */
+.reasoning-container,
+.streaming-reasoning-container {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #f0f8ff;
+  min-height: 20px;
+  border: 1px solid #6495ed;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  cursor: pointer; /* 添加指针样式表明可点击 */
+  transition: all 0.3s ease;
+}
+
+.reasoning-container.collapsed {
+  min-height: 16px;
+  padding: 8px 10px;
+}
+
+.reasoning-header {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #4169e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  margin-left: 5px;
+  color: #6495ed;
+}
+
+.reasoning-container.collapsed .reasoning-header {
+  margin-bottom: 0;
+}
+
+.reasoning-container.collapsed .toggle-icon {
+  color: #7a7a7a;
+}
+
+.reasoning-content {
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: #333;
+  background-color: transparent;
+  border: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px;
+  min-height: 20px;
+  scroll-behavior: smooth; /* 添加平滑滚动 */
+  transition: max-height 0.3s ease;
+} 

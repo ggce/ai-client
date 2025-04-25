@@ -1,0 +1,235 @@
+/* Tool Prompt Styles */
+.tool-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #d2d0f0;
+  padding-bottom: 6px;
+}
+
+.tool-prompt-name {
+  font-weight: 600;
+  color: #5d4db3;
+  font-size: 12px;
+}
+
+.tool-prompt-container {
+  transition: all 0.2s ease;
+}
+
+.tool-prompt-container:hover {
+  background-color: #e8e6fa;
+  border-color: #c8c4f0;
+}
+
+.tool-prompt-content {
+}
+
+.tool-prompt-info {
+  padding: 5px 0;
+}
+
+.tool-prompt-tool {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.tool-prompt-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.tool-prompt-label {
+  font-weight: 500;
+  color: #555;
+  margin-right: 5px;
+}
+
+.tool-prompt-value {
+  color: #5d4db3;
+  font-family: 'Consolas', monospace;
+  font-weight: 500;
+}
+
+.tool-prompt-params {
+  margin-top: 5px;
+}
+
+.tool-prompt-json {
+  background-color: rgba(255, 255, 255, 0.5);
+  padding: 10px;
+  margin: 5px 0 0 0;
+  border-radius: 6px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  color: #37474f;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 特殊URL参数样式 */
+.tool-param-url {
+  color: var(--url-color, #0366d6);
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  display: inline-block;
+}
+
+.dark-theme {
+  --tool-prompt-border: #3e3e3e;
+  --tool-prompt-bg: #282828;
+  --tool-prompt-header-bg: #323232;
+  --tool-prompt-name-color: #b580ff;
+  --tool-param-name-color: #b580ff;
+  --tool-param-value-color: #e1e1e1;
+  --url-color: #58a6ff;
+}
+
+.light-theme {
+  --tool-prompt-border: #e0e0e0;
+  --tool-prompt-bg: #f8f8f8;
+  --tool-prompt-header-bg: #f0f0f0;
+  --tool-prompt-name-color: #7c62c2;
+  --tool-param-name-color: #7c62c2;
+  --tool-param-value-color: #333;
+  --url-color: #0366d6;
+}
+
+.tool-prompt-name-value {
+  font-weight: 700;
+  font-family: var(--code-font);
+  color: #5D4DB3;
+  font-size: 1.15em;
+  padding: 5px 12px;
+  background-color: rgba(124, 98, 194, 0.15);
+  border-radius: 6px;
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-left: 3px solid #7C62C2;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tool-prompt-header-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background-color: #F7F5FF;
+  border-bottom: 2px solid #E6E4F0;
+  justify-content: space-between;
+}
+
+.tool-prompt-params-section {
+  padding: 16px;
+  font-family: var(--code-font);
+  font-size: 0.93em;
+  background-color: var(--tool-prompt-bg);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+
+.tool-param-row {
+  display: flex;
+  margin-bottom: 10px;
+  line-height: 1.5;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-left: 3px solid #e0e0e0;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.tool-param-name {
+  color: #666;
+  min-width: 100px;
+  font-weight: 600;
+  padding-right: 15px;
+  flex-shrink: 0;
+  font-size: 0.9em;
+  text-transform: lowercase;
+}
+
+.tool-param-value {
+  color: #333;
+  word-break: break-word;
+  white-space: pre-wrap;
+  flex: 1;
+  padding-left: 8px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.95em;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.tool-prompt-card {
+  background-color: #FCFCFF;
+  border-radius: 10px;
+  border: 1px solid #E6E4F0;
+  overflow: hidden;
+  margin: 12px 0 16px;
+  box-shadow: 0 4px 10px rgba(124, 98, 194, 0.1);
+  transition: all 0.2s ease;
+}
+
+.tool-prompt-card:hover {
+  box-shadow: 0 6px 15px rgba(124, 98, 194, 0.15);
+}
+
+/* Collapsed tool prompts */
+.tool-prompt-container.collapsed .tool-prompt-content {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.tool-prompt-container.collapsed .tool-prompt-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, #f7f5ff);
+  pointer-events: none;
+}
+
+.tool-prompt-toggle {
+  margin-top: 8px;
+  width: fit-content;
+  background-color: rgba(124, 98, 194, 0.08);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.tool-prompt-toggle:hover {
+  background-color: rgba(124, 98, 194, 0.15);
+}
+
+.tool-prompt-toggle .toggle-text {
+  font-size: 12px;
+  color: #5D4DB3;
+  font-weight: 500;
+}
+
+.tool-prompt-toggle .toggle-icon {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #5D4DB3;
+}
+
+.tool-prompt-container {
+  cursor: default;
+}
+
+.tool-prompt-container.collapsed {
+  cursor: pointer;
+} 
