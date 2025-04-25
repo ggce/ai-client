@@ -1,4 +1,8 @@
 /* Tool Prompt Styles */
+.message-container {
+  padding: 8px;
+}
+
 .tool-prompt-header {
   display: flex;
   justify-content: space-between;

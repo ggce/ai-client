@@ -36,6 +36,7 @@
         <ToolPromptMessage 
           v-if="isToolPromptMessage(message.content)"
           :content="message.content"
+          @tool-click="handleToolClick"
         />
         <AssistantMessage
           v-else
@@ -61,6 +62,12 @@
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
     />
+
+    <!-- Tool info popup -->
+    <ToolInfoPopup
+      v-model:visible="showToolInfo"
+      ref="toolInfoPopup"
+    />
   </div>
 </template>
 
@@ -77,6 +84,7 @@ import ToolPromptMessage from "./messages/ToolPromptMessage.vue";
 import LoadingMessage from "./messages/LoadingMessage.vue";
 import StreamingMessage from "./messages/StreamingMessage.vue";
 import StreamingReasoningMessage from "./messages/StreamingReasoningMessage.vue";
+import ToolInfoPopup from './messages/ToolInfoPopup.vue';
 
 // Define the window interface for Electron APIs
 declare global {
@@ -107,6 +115,8 @@ const props = defineProps<{
 }>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
+const toolInfoPopup = ref<any>(null);
+const showToolInfo = ref(false);
 
 // 检查消息是否为工具调用提示
 const isToolPromptMessage = (content: string): boolean => {
@@ -216,6 +226,13 @@ const handleLinkClick = (event: MouseEvent) => {
 onUnmounted(() => {
   document.removeEventListener('click', handleLinkClick);
 });
+
+// Handle tool clicks by delegating to the ToolInfoPopup component
+const handleToolClick = (toolName: string) => {
+  if (toolInfoPopup.value) {
+    toolInfoPopup.value.showTool(toolName);
+  }
+};
 </script>
 
 <style>

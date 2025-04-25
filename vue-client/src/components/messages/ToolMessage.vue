@@ -3,11 +3,6 @@
     <div class="message-row">
       <MessageAvatar type="tool" />
       <div class="message-container">
-        <!-- 工具消息标题显示 -->
-        <div class="tool-header">
-          <span class="tool-name">{{ getToolName(content) }}</span>
-        </div>
-
         <!-- 工具内容区域，添加可折叠功能 -->
         <div
           class="tool-content-container"
@@ -50,22 +45,6 @@ const toggleExpand = () => {
   // 防止事件冒泡
   event?.stopPropagation();
   isExpanded.value = !isExpanded.value;
-};
-
-// 提取工具名称
-const getToolName = (content: string): string => {
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed.name) {
-      return parsed.name;
-    }
-    if (parsed.errorMessage) {
-      return "工具调用失败";
-    }
-    return "工具调用成功";
-  } catch (e) {
-    return "工具调用失败";
-  }
 };
 
 // 工具结果预览（只显示第一行）

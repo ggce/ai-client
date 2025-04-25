@@ -1,4 +1,8 @@
 /* Tool Message Styles */
+.message-container {
+  padding: 8px;
+}
+
 .tool-header {
   display: flex;
   justify-content: space-between;
@@ -18,12 +22,9 @@
 .tool-content-container {
   cursor: pointer;
   position: relative;
-  padding: 10px 14px;
-  background-color: #f0f8f0;
   border-radius: 8px;
   margin-bottom: 8px;
   transition: all 0.2s ease;
-  border: 1px solid #d7ecd8;
 }
 
 .tool-content-container:hover {
@@ -73,8 +74,8 @@
 }
 
 .tool-expanded-content {
-  margin-top: 12px;
-  padding: 15px;
+  margin-top: 6px;
+  padding: 8px;
   background-color: #f7fbf7;
   border-radius: 8px;
   border: 1px solid #d7ecd8;
@@ -84,6 +85,8 @@
   animation: fadeIn 0.3s ease-in-out;
   word-break: break-word;
   overflow-wrap: break-word;
+  font-size: 0.85em;
+  color: #666;
 }
 
 .tool-expanded-content img {
