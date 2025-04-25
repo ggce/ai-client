@@ -231,7 +231,7 @@
 }
 
 .tool-prompt-container {
-  cursor: default;
+  cursor: pointer;
 }
 
 .tool-prompt-container.collapsed {

@@ -1,8 +1,4 @@
 /* Tool Message Styles */
-.message-container {
-  padding: 8px;
-}
-
 .tool-header {
   display: flex;
   justify-content: space-between;
@@ -23,7 +19,6 @@
   cursor: pointer;
   position: relative;
   border-radius: 8px;
-  margin-bottom: 8px;
   transition: all 0.2s ease;
 }
 
@@ -180,20 +175,16 @@
 
 /* Tool Error Styles */
 .tool-error {
-  background-color: #fff6f6;
-  border: 1px solid #e70013;
   padding: 0;
   margin: 6px 0;
   border-radius: 8px;
   max-height: 400px;
   overflow-y: auto;
-  box-shadow: 0 2px 8px rgba(231, 0, 19, 0.15);
 }
 
 .tool-error-header {
   background-color: #fff0f0;
   padding: 8px 12px;
-  border-bottom: 1px solid #ffdfdf;
 }
 
 .tool-error-title {
@@ -224,30 +215,13 @@
   color: #e70013;
   display: flex;
   align-items: center;
-  background-color: #fff0f0;
-  border-left: 3px solid #e70013;
   padding: 4px 8px;
   border-radius: 4px;
-}
-
-/* Error States */
-.tool-content-container.has-error {
-  background-color: #fff6f6;
-  border-color: #e70013;
-}
-
-.tool-content-container.has-error .toggle-indicator {
-  background-color: rgba(231, 0, 19, 0.08);
 }
 
 .tool-content-container.has-error .toggle-text,
 .tool-content-container.has-error .toggle-icon {
   color: #e70013;
-}
-
-.tool-content-container.has-error:hover {
-  background-color: #fff0f0;
-  border-color: #e70013;
 }
 
 .tool-content-container.has-error:hover .toggle-indicator {
@@ -256,7 +230,6 @@
 
 .tool-expanded-content.error-content {
   background-color: #fff6f6;
-  border: 1px solid #e70013;
   box-shadow: 0 2px 8px rgba(231, 0, 19, 0.08);
 }
 

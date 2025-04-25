@@ -6,10 +6,42 @@
         <div 
           class="tool-prompt-container" 
           :class="{ 'collapsed': shouldCollapseToolPrompt && !isExpanded }"
-          @click="shouldCollapseToolPrompt && toggleExpand()"
         >
-          <div class="tool-prompt-content" v-html="formattedPrompt"></div>
-          <div v-if="shouldCollapseToolPrompt" class="toggle-indicator tool-prompt-toggle">
+          <div class="tool-prompt-content">
+            <!-- 解析后没有工具调用，直接显示原始内容 -->
+            <div v-if="toolCalls.length === 0" v-html="props.content"></div>
+            
+            <!-- 有工具调用，显示工具卡片 -->
+            <div v-else>
+              <div 
+                v-for="(toolCall, index) in toolCalls" 
+                :key="index"
+                :style="{ marginTop: index !== 0 ? '8px' : '0' }"
+                style="background-color: #FCFCFF; border-radius: 8px; border: 1px solid #E6E4F0; overflow: hidden; box-shadow: 0 2px 6px rgba(124, 98, 194, 0.1); transition: all 0.2s ease;"
+              >
+                <div style="display: flex; align-items: center; padding: 8px 12px; background-color: #F7F5FF; border-bottom: 1px solid #E6E4F0; justify-content: space-between;">
+                  <div style="display: flex; align-items: center;">
+                    <span 
+                      style="font-weight: 600; font-family: monospace; color: #5D4DB3; font-size: 0.95em; padding: 3px 8px; background-color: rgba(124, 98, 194, 0.12); border-radius: 4px; display: inline-block; letter-spacing: 0.01em; border-left: 2px solid #7C62C2; cursor: pointer;"
+                      title="点击查看工具详情"
+                      @click="emit('tool-click', toolCall.name)"
+                    >{{ toolCall.displayName }}</span>
+                    <div style="min-width: 40px; display: flex; align-items: center; justify-content: center; margin-left: 10px; background: linear-gradient(to bottom, #3ac264, #34a853); color: white; font-size: 0.7em; padding: 3px 8px; border-radius: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3); border: 1px solid rgba(52, 168, 83, 0.2);">
+                      工具{{ toolCalls.length > 1 ? index + 1 : '' }}
+                    </div>
+                  </div>
+                </div>
+                <div style="padding: 10px 12px; font-family: monospace; font-size: 0.85em; background-color: #FCFCFF; border-radius: 0 0 8px 8px; overflow: hidden;">
+                  <div v-html="toolCall.formattedArgs"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            v-if="shouldCollapseToolPrompt"
+            class="toggle-indicator tool-prompt-toggle"
+            @click="shouldCollapseToolPrompt && toggleExpand()"
+          >
             <span class="toggle-text">{{ isExpanded ? '收起' : '展开详情' }}</span>
             <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
           </div>
@@ -40,20 +72,27 @@ const toggleExpand = () => {
   isExpanded.value = !isExpanded.value;
 };
 
-// 格式化特殊的工具调用提示消息
-const formattedPrompt = computed(() => {
+// 处理工具调用数据
+interface ToolCall {
+  name: string;
+  displayName: string;
+  formattedArgs: string;
+}
+
+// 解析工具调用
+const toolCalls = computed<ToolCall[]>(() => {
   try {
     // Find all tool calls in the content
     const toolNameMatches = [...props.content.matchAll(/<toolName>(.*?)<\/toolName>/g)];
     const toolArgsMatches = [...props.content.matchAll(/<toolArgs>(.*?)<\/toolArgs>/g)];
     
-    // If no tool calls found, return original content
+    // If no tool calls found, return empty array
     if (toolNameMatches.length === 0) {
-      return props.content;
+      return [];
     }
     
-    // Process each tool call and combine the results
-    const toolCallsHtml = [];
+    // Process each tool call
+    const toolCalls: ToolCall[] = [];
     
     for (let i = 0; i < toolNameMatches.length; i++) {
       const toolNameMatch = toolNameMatches[i];
@@ -144,35 +183,17 @@ const formattedPrompt = computed(() => {
         displayToolName = toolName.split('_SERVERKEYTONAME_')[1];
       }
       
-      // Create HTML for this tool call
-      const toolCallHtml = `
-        <div style="${i !== 0 ? 'margin-top: 8px;' : ''}; background-color: #FCFCFF; border-radius: 8px; border: 1px solid #E6E4F0; overflow: hidden; box-shadow: 0 2px 6px rgba(124, 98, 194, 0.1); transition: all 0.2s ease;">
-          <div style="display: flex; align-items: center; padding: 8px 12px; background-color: #F7F5FF; border-bottom: 1px solid #E6E4F0; justify-content: space-between;">
-            <div style="display: flex; align-items: center;">
-              <span 
-                style="font-weight: 600; font-family: monospace; color: #5D4DB3; font-size: 0.95em; padding: 3px 8px; background-color: rgba(124, 98, 194, 0.12); border-radius: 4px; display: inline-block; letter-spacing: 0.01em; border-left: 2px solid #7C62C2; cursor: pointer;"
-                @click.stop="$emit('tool-click', toolName)"
-                title="点击查看工具详情"
-              >${displayToolName}</span>
-              <div style="min-width: 40px; display: flex; align-items: center; justify-content: center; margin-left: 10px; background: linear-gradient(to bottom, #3ac264, #34a853); color: white; font-size: 0.7em; padding: 3px 8px; border-radius: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3); border: 1px solid rgba(52, 168, 83, 0.2);">
-                工具${toolNameMatches.length > 1 ? i + 1 : ''}
-              </div>
-            </div>
-          </div>
-          <div style="padding: 10px 12px; font-family: monospace; font-size: 0.85em; background-color: #FCFCFF; border-radius: 0 0 8px 8px; overflow: hidden;">
-            ${formattedArgs}
-          </div>
-        </div>
-      `;
-      
-      toolCallsHtml.push(toolCallHtml);
+      toolCalls.push({
+        name: toolName,
+        displayName: displayToolName,
+        formattedArgs
+      });
     }
     
-    // Return all tool calls HTML combined
-    return toolCallsHtml.join('');
+    return toolCalls;
   } catch (e) {
-    console.error("格式化工具提示消息失败:", e);
-    return props.content;
+    console.error("解析工具调用失败:", e);
+    return [];
   }
 });
 

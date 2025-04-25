@@ -7,10 +7,9 @@
         <div
           class="tool-content-container"
           :class="{ 'collapsed': !isExpanded, 'has-error': isToolError(content) }"
-          @click="toggleExpand"
         >
           <div class="message-content" v-html="toolPreview"></div>
-          <div class="toggle-indicator">
+          <div class="toggle-indicator" @click="toggleExpand">
             <span class="toggle-text">{{ isExpanded ? '收起' : '展开详情' }}</span>
             <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
           </div>
