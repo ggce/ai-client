@@ -769,7 +769,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         if (toolCalls && toolCalls.length > 0) {
           // 添加末尾的</toolArgs>
           if (toolTips) {
-            toolTips = toolTips?.map(tip => tip += '</toolArgs>');
+            toolTips = toolTips?.map(tip => {
+              const addStr = '</toolArgs>';
+              sendData(res, { content: addStr });
+              return tip += addStr;
+            });
           }
           
           // 添加工具调用会话历史

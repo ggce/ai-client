@@ -61,6 +61,7 @@
       v-if="isLoading && streamingMessage"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
+      @tool-click="handleToolClick"
     />
 
     <!-- Tool info popup -->

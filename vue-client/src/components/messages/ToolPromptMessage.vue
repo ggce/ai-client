@@ -22,7 +22,7 @@
                 <div style="display: flex; align-items: center; padding: 8px 12px; background-color: #F7F5FF; border-bottom: 1px solid #E6E4F0; justify-content: space-between;">
                   <div style="display: flex; align-items: center;">
                     <span 
-                      style="font-weight: 600; font-family: monospace; color: #5D4DB3; font-size: 0.95em; padding: 3px 8px; background-color: rgba(124, 98, 194, 0.12); border-radius: 4px; display: inline-block; letter-spacing: 0.01em; border-left: 2px solid #7C62C2; cursor: pointer;"
+                      style="font-weight: 600; font-family: monospace; color: #5D4DB3; font-size: 0.95em; padding: 3px 8px; background-color: rgba(124, 98, 194, 0.12); border-radius: 4px; display: inline-block; letter-spacing: 0.01em; border-left: 2px solid #7C62C2; cursor: pointer; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
                       title="点击查看工具详情"
                       @click="emit('tool-click', toolCall.name)"
                     >{{ toolCall.displayName }}</span>
@@ -46,6 +46,11 @@
             <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
           </div>
         </div>
+        <div v-if="showStreamingIndicator" class="streaming-indicator">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -57,6 +62,7 @@ import MessageAvatar from './MessageAvatar.vue';
 
 const props = defineProps<{
   content: string;
+  showStreamingIndicator: boolean;
 }>();
 
 // Add the emit declaration

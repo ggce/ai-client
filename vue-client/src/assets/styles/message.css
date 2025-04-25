@@ -374,6 +374,7 @@
 /* Streaming Indicator */
 .streaming-indicator {
   display: flex;
-  margin-top: 4px;
+  margin-top: 10px;
   height: 8px;
+  justify-content: center;
 } 
