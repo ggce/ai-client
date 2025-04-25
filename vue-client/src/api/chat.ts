@@ -115,10 +115,10 @@ export async function sendStreamingSessionMessage(
   onComplete: (callback: () => void) => void;
 }> {
   const controller = new AbortController();
+  let eventSource: EventSource | null = null;
 
   // 存储回调函数
   const messageCallbacks: ((params: MessageCallbackParams) => void)[] = [];
-
   const errorCallbacks: ((error: string) => void)[] = [];
   const completeCallbacks: (() => void)[] = [];
 
@@ -130,7 +130,7 @@ export async function sendStreamingSessionMessage(
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ message, selectedTools, options }),
-      signal: controller.signal
+      signal: controller.signal // 添加abort信号
     });
 
     if (!prepareResponse.ok) {
@@ -144,8 +144,16 @@ export async function sendStreamingSessionMessage(
       throw new Error('服务器没有返回有效的请求ID');
     }
 
+    // 设置中止事件监听器
+    controller.signal.addEventListener('abort', () => {
+      console.log('请求被用户中止，关闭SSE连接');
+      if (eventSource) {
+        eventSource.close();
+      }
+    });
+
     // 第二步：建立SSE连接获取流式数据
-    const eventSource = new EventSource(`/api/sessions/${sessionId}/messages/stream${objToQueryStr({
+    eventSource = new EventSource(`/api/sessions/${sessionId}/messages/stream${objToQueryStr({
       requestId,
     })}`);
     
@@ -154,7 +162,10 @@ export async function sendStreamingSessionMessage(
       console.error('SSE连接错误:', error);
       // 通知所有错误回调
       errorCallbacks.forEach(callback => callback('流式连接错误'));
-      eventSource.close();
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
     };
     
     // 消息处理
@@ -165,14 +176,20 @@ export async function sendStreamingSessionMessage(
         // 检查错误
         if (data.error) {
           errorCallbacks.forEach(callback => callback(data.error));
-          eventSource.close();
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
           return;
         }
         
         // 检查完成信号
         if (data.done) {
           completeCallbacks.forEach(callback => callback());
-          eventSource.close();
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
           return;
         }
         

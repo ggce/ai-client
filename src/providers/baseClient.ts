@@ -86,6 +86,36 @@ export class Session {
   public getMessages(): Message[] {
     return this.messages;
   }
+  
+  // 检查并删除最后一条用户消息，如果存在
+  public removeLastMessageIfUser(): boolean {
+    if (this.messages.length === 0) {
+      return false;
+    }
+    
+    // 从后向前查找最后一条用户消息的索引
+    let lastUserMessageIndex = -1;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (this.messages[i].role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+    
+    // 如果找到了用户消息
+    if (lastUserMessageIndex !== -1) {
+      // 记录删除信息
+      const deletedCount = this.messages.length - lastUserMessageIndex;
+      
+      // 删除该用户消息及其后所有消息
+      this.messages = this.messages.slice(0, lastUserMessageIndex);
+      
+      logger.log(this.loggerPrefix, `删除最后一条 [user] message 及其后的所有消息，共 ${deletedCount} 条`);
+      return true;
+    }
+    
+    return false;
+  }
 }
 
 // 基础客户端类
@@ -188,7 +218,8 @@ export abstract class BaseClient {
     options?: {
       model?: string;
     },
-    mcpTools?: Array<MCPTool>
+    mcpTools?: Array<MCPTool>,
+    signal?: AbortSignal
   }) {
     const session = this.getSession(params.sessionId);
     if (!session) {
@@ -199,7 +230,8 @@ export abstract class BaseClient {
       session,
       message: params.message,
       options: params.options,
-      mcpTools: params.mcpTools
+      mcpTools: params.mcpTools,
+      signal: params.signal
     });
   }
 
@@ -235,7 +267,8 @@ export abstract class BaseClient {
     options?: {
       model?: string;
     },
-    mcpTools?: Array<MCPTool>
+    mcpTools?: Array<MCPTool>,
+    signal?: AbortSignal
   }) {
     const {
       messages, model
@@ -245,7 +278,8 @@ export abstract class BaseClient {
     const streamResponse = await this.chat.completions.createStream({
       model,
       messages,
-      mcpTools: params.mcpTools
+      mcpTools: params.mcpTools,
+      signal: params.signal
     });
     
     // 使用tee方法创建两个独立的流
@@ -276,6 +310,7 @@ export abstract class BaseClient {
         model: string;
         messages: Array<{ role: string; content: string, tool_call_id?: string, tool_calls?: Array<ChatCompletionMessageToolCall> }>;
         mcpTools?: Array<MCPTool>;
+        signal?: AbortSignal;
       }) => Promise<any>;
     }
   };

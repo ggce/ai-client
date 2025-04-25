@@ -480,8 +480,12 @@ router.post('/api/sessions/:id/messages', routeHandler(async (req: Request, res:
   }
 }));
 
-// 添加一个临时存储来保存消息请求，用于流式接口
-const streamRequestsStore: Map<string, { message: string, selectedTools?: string[] | undefined, options?: any }> = new Map();
+// 存储流式请求
+const streamRequestsStore = new Map<string, any>();
+// 存储进行中的工具调用
+const activeToolCalls = new Map<string, boolean>();
+// 存储活动的流请求和它们的控制器
+const activeStreamRequests = new Map<string, AbortController>();
 
 // 为SSE格式化并发送数据
 function sendData(res: Response, data: any) {
@@ -577,17 +581,21 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
     logger.log('Main', `客户端断开SSE连接: ${requestId}`);
     // 清理请求数据
     streamRequestsStore.delete(requestId);
+    
+    // 当客户端断开连接时，也应该中断API请求
+    const sessionId = req.params.id;
+    const controller = activeStreamRequests.get(sessionId);
+    if (controller) {
+      logger.log('Main', `客户端断开连接，中断会话 ${sessionId} 的外部API流请求`);
+      controller.abort();
+      activeStreamRequests.delete(sessionId);
+    }
   });
   
   res.flushHeaders();
   
   const sessionId = req.params.id;
   const { message, selectedTools, options } = requestData;
-
-  console.log("!!!!!!!!!!!!!!!!!");
-  console.log(selectedTools);
-  console.log(mcpTools);
-  console.log(selectedTools?.[0]);
   
   (async () => {
     try {
@@ -604,16 +612,29 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
       }
       
       try {
-        // 开始流式请求
+        // 创建用于控制外部API请求的AbortController
+        const apiController = new AbortController();
+        logger.log('Main', `为会话 ${sessionId} 创建新的AbortController`);
+        
+        // 将controller存储在会话id下
+        activeStreamRequests.set(sessionId, apiController);
+        
+        // 开始流式请求，传递AbortSignal
+        logger.log('Main', `开始会话 ${sessionId} 的外部API流请求，已传递abort信号`);
         const streamResult = await client.sendStreamMessageToSession({
           sessionId, 
           message,
           options,
           // 根据用户选择过滤工具列表
           mcpTools: selectedTools && selectedTools.length > 0
-            ? mcpTools.filter(tool => selectedTools.find(toolName => tool.name.startsWith(`${toolName}_SERVERKEYTONAME`)))
-            : undefined
+            ? mcpTools.filter(tool => selectedTools.find((toolName: string) => tool.name.startsWith(`${toolName}_SERVERKEYTONAME`)))
+            : undefined,
+          // 传递AbortSignal以允许取消
+          signal: apiController.signal
         });
+        
+        // 验证流对象已正确获取
+        logger.log('Main', `会话 ${sessionId} 的外部API流请求已创建`);
 
         // 完整的响应内容
         let fullContent = '';
@@ -629,69 +650,91 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         // 持续的流
         const stream = streamResult.stream;
 
-        for await (const chunk of stream) {
-          // 处理普通文字
-          if (chunk.choices && chunk.choices[0]?.delta?.content) {
-            const content = chunk.choices[0].delta.content;
-            fullContent += content;
-            sendData(res, { content });
-          }
+        // 注册中断检测
+        apiController.signal.addEventListener('abort', () => {
+          logger.log('Main', `会话 ${sessionId} 的外部API流请求已触发abort事件`);
+        });
+
+        try {
+          for await (const chunk of stream) {
+            // 检查是否已中断
+            if (apiController.signal.aborted) {
+              logger.log('Main', `会话 ${sessionId} 的外部API流处理已中断，停止处理后续块`);
+              break;
+            }
+            
+            // 处理普通文字
+            if (chunk.choices && chunk.choices[0]?.delta?.content) {
+              const content = chunk.choices[0].delta.content;
+              fullContent += content;
+              sendData(res, { content });
+            }
           
-          // 处理推理内容（如果有）
-          if (chunk.choices && 
-              chunk.choices[0]?.delta && 
-              'reasoning_content' in chunk.choices[0].delta) {
-            const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
-            if (reasoningContent) {
-              fullReasoningContent += reasoningContent;
-              sendData(res, { reasoningContent });
+            // 处理推理内容（如果有）
+            if (chunk.choices && 
+                chunk.choices[0]?.delta && 
+                'reasoning_content' in chunk.choices[0].delta) {
+              const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
+              if (reasoningContent) {
+                fullReasoningContent += reasoningContent;
+                sendData(res, { reasoningContent });
+              }
+            }
+
+            // 处理工具调用（如果有）
+            if (
+              chunk.choices && 
+              chunk.choices[0] &&
+              chunk.choices[0].delta?.tool_calls &&
+              chunk.choices[0].delta?.tool_calls[0]
+            ) {
+              // 从chunk中获取工具调用
+              if (chunk.choices[0].delta?.tool_calls[0].type === 'function') {
+                // 工具index+1
+                nowToolCallIndex += 1;
+                // 赋值
+                if (!toolCalls) {
+                  toolCalls = [];
+                }
+                if (!toolCalls[nowToolCallIndex]) {
+                  toolCalls[nowToolCallIndex] = chunk.choices[0].delta?.tool_calls[0] as ChatCompletionMessageToolCall;
+                }
+                if (!toolTips) {
+                  toolTips = [];
+                }
+                if (!toolTips[nowToolCallIndex]) {
+                  toolTips[nowToolCallIndex] = '#useTool';
+                  toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
+
+                  toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
+                  
+                  sendData(res, { content: toolTips[nowToolCallIndex] });
+                }
+              }
+
+              // 从chunk中获取第一个工具调用的参数
+              if (chunk.choices[0].delta.tool_calls[0].function) {
+                const addStr = chunk.choices[0].delta.tool_calls[0].function.arguments;
+                
+                if (toolCalls && toolCalls[nowToolCallIndex]) {
+                  toolCalls[nowToolCallIndex].function.arguments += addStr;
+                }
+                if(toolTips && toolTips[nowToolCallIndex]) {
+                  toolTips[nowToolCallIndex] += addStr;
+                }
+
+                sendData(res, { content: addStr });
+              }
             }
           }
-
-          // 处理工具调用（如果有）
-          if (
-            chunk.choices && 
-            chunk.choices[0] &&
-            chunk.choices[0].delta?.tool_calls &&
-            chunk.choices[0].delta?.tool_calls[0]
-          ) {
-            // 从chunk中获取工具调用
-            if (chunk.choices[0].delta?.tool_calls[0].type === 'function') {
-              // 工具index+1
-              nowToolCallIndex += 1;
-              // 赋值
-              if (!toolCalls) {
-                toolCalls = [];
-              }
-              if (!toolCalls[nowToolCallIndex]) {
-                toolCalls[nowToolCallIndex] = chunk.choices[0].delta?.tool_calls[0] as ChatCompletionMessageToolCall;
-              }
-              if (!toolTips) {
-                toolTips = [];
-              }
-              if (!toolTips[nowToolCallIndex]) {
-                toolTips[nowToolCallIndex] = '#useTool';
-                toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
-
-                toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
-                
-                sendData(res, { content: toolTips[nowToolCallIndex] });
-              }
-            }
-
-            // 从chunk中获取第一个工具调用的参数
-            if (chunk.choices[0].delta.tool_calls[0].function) {
-              const addStr = chunk.choices[0].delta.tool_calls[0].function.arguments;
-              
-              if (toolCalls && toolCalls[nowToolCallIndex]) {
-                toolCalls[nowToolCallIndex].function.arguments += addStr;
-              }
-              if(toolTips && toolTips[nowToolCallIndex]) {
-                toolTips[nowToolCallIndex] += addStr;
-              }
-
-              sendData(res, { content: addStr });
-            }
+        } catch (streamError) {
+          // 检查是否是中止错误
+          if (streamError instanceof Error && streamError.name === 'AbortError') {
+            logger.log('Main', `会话 ${sessionId} 的流循环被中断: ${streamError.message}`);
+            sendData(res, { content: "\n\n[生成已停止]" });
+          } else {
+            logger.error('Main', `会话 ${sessionId} 的流循环发生错误: ${streamError}`);
+            throw streamError;
           }
         }
 
@@ -699,6 +742,17 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         const session = client.getSession(sessionId);
         // 信息是否更新
         let isMessageUpdate = false;
+
+        // 检查是否已中断
+        if (apiController.signal.aborted) {
+          logger.log('Main', `会话 ${sessionId} 的外部API流已处理完所有块，检测到中断状态，不添加消息到会话`);
+          // 已中断，不添加消息
+          sendData(res, { isMessageUpdate: true });
+          endStream(res, { complete: true });
+          // 清理会话的控制器
+          activeStreamRequests.delete(sessionId);
+          return;
+        }
 
         // 文字流
         if (
@@ -731,10 +785,25 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         // 遍历开始调用工具
         if (toolCalls) {
+          // 标记会话有活动的工具调用
+          activeToolCalls.set(sessionId, true);
+          
           for(const toolCall of toolCalls) {
+            // 检查是否应该中止工具调用
+            if (activeToolCalls.get(sessionId) === false || apiController.signal.aborted) {
+              logger.log('Main', `会话 ${sessionId} 的工具调用被用户中止`);
+              break;
+            }
+            
             // 调用工具获取结果
             const toolRes = await callMCPTool(toolCall);
 
+            // 检查是否应该中止后续工具调用
+            if (activeToolCalls.get(sessionId) === false || apiController.signal.aborted) {
+              logger.log('Main', `会话 ${sessionId} 的后续工具调用被用户中止`);
+              break;
+            }
+            
             if (toolRes.status) {
               // 调用成功
               // 添加工具成功到会话
@@ -749,20 +818,37 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 toolRes.id || '',
                 JSON.stringify({errorMessage: toolRes.errorMessage}),
               );
-        }
+            }
 
             // 提醒前端更新信息
             sendData(res, { isMessageUpdate: true, toolCall });
           }
+          
+          // 清理会话的工具调用状态
+          activeToolCalls.delete(sessionId);
         }
 
         // 完成响应
         endStream(res, { complete: true });
+        
+        // 清理会话的控制器
+        activeStreamRequests.delete(sessionId);
       } catch (error) {
-        logger.error('Main', `流式请求失败: ${error}`);
-        sendData(res, { 
-          error: `流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
-        });
+        // 检查是否是中止错误
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.log('Main', `流式请求已被用户中止: ${sessionId}`);
+          sendData(res, { 
+            content: "\n\n[已停止生成]"
+          });
+        } else {
+          logger.error('Main', `流式请求失败: ${error}`);
+          sendData(res, { 
+            error: `流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
+          });
+        }
+        
+        // 清理控制器
+        activeStreamRequests.delete(sessionId);
         endStream(res);
       }
     } catch (error) {
@@ -770,6 +856,9 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
       sendData(res, { 
         error: `处理流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
       });
+      
+      // 清理控制器
+      activeStreamRequests.delete(sessionId);
       endStream(res);
     }
   })();
@@ -795,6 +884,44 @@ router.delete('/api/sessions/:id', routeHandler(async (req: Request, res: Respon
     throw new Error(`删除会话失败: ${err instanceof Error ? err.message : String(err)}`);
   }
 }));
+
+// 处理停止生成请求
+router.post('/api/sessions/:id/stop-generation', (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    logger.log('Main', `收到停止生成请求: ${sessionId}`);
+    
+    // 标记该会话的工具调用应该被中断
+    activeToolCalls.set(sessionId, false);
+    
+    // 中断正在进行的API流请求
+    const controller = activeStreamRequests.get(sessionId);
+    if (controller) {
+      logger.log('Main', `中断会话 ${sessionId} 的外部API流请求`);
+      controller.abort();
+      activeStreamRequests.delete(sessionId);
+    }
+    
+    // 获取会话并删除最后一条用户消息
+    const providerType = req.query.provider as ProviderType || defaultProviderType;
+    const client = AIProviderFactory.getProvider(providerType);
+    const session = client.getSession(sessionId);
+    
+    // 如果会话存在，删除最后一条用户消息及其后的所有消息
+    if (session) {
+      const removed = session.removeLastMessageIfUser();
+      logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
+    }
+    
+    // 返回成功响应
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Main', `处理停止生成请求失败: ${error}`);
+    res.status(500).json({ 
+      error: `处理停止生成请求失败: ${error instanceof Error ? error.message : String(error)}` 
+    });
+  }
+});
 
 // 使用路由器
 expressApp.use(router);

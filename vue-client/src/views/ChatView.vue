@@ -61,6 +61,7 @@ import {
   deleteSession,
   SessionMessage
 } from '../api/chat'
+import axios from 'axios'
 
 // 定义组件名称
 defineOptions({
@@ -187,7 +188,7 @@ const loadSessionMessages = async (sessionId: string) => {
 }
 
 // 添加停止生成函数
-const stopGeneration = () => {
+const stopGeneration = async () => {
   if (activeStreamController.value) {
     // 取消当前活动的流请求
     activeStreamController.value.abort()
@@ -196,9 +197,43 @@ const stopGeneration = () => {
     // 更新加载状态
     isLoading.value = false
     
-    // 重新加载当前会话的消息，以确保UI状态与后端一致
+    // 通知服务器终止工具调用
     if (activeSessionId.value) {
-      loadSessionMessages(activeSessionId.value)
+      // 获取当前提供商
+      const currentProvider = settingsStore.currentProvider
+      
+      // 尝试3次确保服务器收到停止请求
+      let retryCount = 0;
+      let success = false;
+      
+      console.log('开始发送停止生成请求...');
+      
+      while (retryCount < 3 && !success) {
+        try {
+          // 发送请求通知服务器停止工具调用，并传递提供商参数
+          const response = await axios.post(
+            `/api/sessions/${activeSessionId.value}/stop-generation?provider=${currentProvider}`,
+            {},
+            { timeout: 5000 } // 5秒超时
+          );
+          
+          if (response.data.success) {
+            console.log('停止生成请求成功');
+            success = true;
+          } else {
+            console.warn('停止生成请求返回失败状态');
+            retryCount++;
+          }
+        } catch (error) {
+          console.error(`停止生成请求失败(尝试${retryCount + 1}/3):`, error);
+          retryCount++;
+          // 短暂延迟后重试
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      // 重新加载当前会话的消息，以确保UI状态与后端一致
+      await loadSessionMessages(activeSessionId.value);
     }
     
     // 清空流内容
