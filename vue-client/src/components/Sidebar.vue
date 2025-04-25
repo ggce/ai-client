@@ -1,7 +1,7 @@
 <template>
   <div class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
     <div class="sidebar-header">
-      <h2>AI聊天</h2>
+      <h2>Luna</h2>
       <button @click="toggleSidebar" class="toggle-btn">≡</button>
     </div>
     
@@ -73,8 +73,8 @@ onMounted(() => {
 <style scoped>
 .sidebar {
   width: 200px;
-  background-color: #f0f2f5;
-  border-right: 1px solid #e9ecef;
+  background-color: #f8f9fb;
+  border-right: 1px solid #eaecf1;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -93,14 +93,11 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 10px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eaecf1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: transparent;
-  box-shadow: none;
-  font-size: 14px;
 }
 
 .sidebar-header h2 {
@@ -117,17 +114,16 @@ onMounted(() => {
   background: none;
   border: none;
   color: #555;
-  font-size: 15px;
+  font-size: 16px;
   cursor: pointer;
   padding: 4px;
   line-height: 1;
-  border-radius: 3px;
-  transition: all 0.2s;
-  opacity: 1;
+  transition: all 0.2s ease;
 }
 
 .toggle-btn:hover {
   background-color: rgba(0,0,0,0.05);
+  color: #1a73e8;
 }
 
 .sidebar.collapsed .toggle-btn {
@@ -136,55 +132,62 @@ onMounted(() => {
 
 .sidebar-menu {
   flex: 1;
-  padding: 10px 0;
+  padding: 10px 8px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 10px;
   margin: 4px 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   color: #555;
-  border-radius: 4px;
+  border-radius: 6px;
   text-decoration: none;
-  border: 1px solid transparent;
-  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .sidebar.collapsed .menu-item {
-  padding: 10px 0;
+  padding: 6px 4px;
   justify-content: center;
   margin: 4px;
+  overflow: hidden;
 }
 
 .menu-item:hover {
-  background-color: #e8f0fe;
+  background-color: #f5f8ff;
   color: #1a73e8;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.08);
   transform: translateY(-1px);
 }
 
 .menu-item.active {
-  background-color: #e8f0fe;
+  background-color: #e6f0ff;
   color: #1a73e8;
-  border-color: #bbdefb;
-  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.15);
+  border-left: 3px solid #1a73e8;
+  padding-left: 7px;
+  box-shadow: 0 2px 5px rgba(26, 115, 232, 0.15);
 }
 
 .menu-icon-wrapper {
+  min-width: 22px;
+  min-height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
-}
-
-.menu-icon {
-  font-size: 13px;
+  background-color: #ecf2ff;
+  color: #1a73e8;
+  border-radius: 50%;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-right: 10px;
 }
 
 .sidebar.collapsed .menu-icon-wrapper {
@@ -196,11 +199,13 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 12px;
+  font-weight: 500;
+  color: #222;
 }
 
 .sidebar-footer {
   padding: 10px 12px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid #eaecf1;
   font-size: 9px;
   color: #888;
   text-align: center;
@@ -224,5 +229,39 @@ onMounted(() => {
 
 .empty-text {
   font-size: 9px;
+}
+
+.menu-icon {
+  font-size: 10px;
+}
+
+.sidebar.collapsed .menu-item.active {
+  border-left: none;
+  border-left-width: 0;
+  padding-left: 0;
+  border-radius: 50%;
+  background-color: #e6f0ff;
+}
+
+.menu-item.active .menu-icon-wrapper {
+  background-color: #1a73e8;
+  color: white;
+}
+
+.menu-item.active .menu-text {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.sidebar.collapsed .menu-icon-wrapper {
+  margin-right: 0;
+}
+
+.sidebar.collapsed .menu-item {
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 4px auto;
+  padding: 0;
 }
 </style> 

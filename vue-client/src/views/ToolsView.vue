@@ -1,7 +1,7 @@
 <template>
   <div class="panel">
     <header class="compact-header">
-      <h1>可用工具 <small>AI助手可调用的工具和服务</small></h1>
+      <h1>可用工具 <small>Luna可调用的工具和服务</small></h1>
     </header>
     
     <main>

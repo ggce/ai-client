@@ -3,7 +3,7 @@
     <div class="chat-content">
       <header class="compact-header">
         <div class="header-content">
-          <h1>AI聊天 <small>{{ modelDisplay }}</small></h1>
+          <h1>Luna <small>{{ modelDisplay }}</small></h1>
           <div class="header-controls">
             <!-- 删除流式开关 -->
           </div>

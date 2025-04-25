@@ -6,7 +6,7 @@
           ref="textareaRef"
           class="input-textarea"
           v-model="messageInput" 
-          placeholder="在这里输入消息..." 
+          placeholder="问一问Luna吧..." 
           rows="2"
           @input="autoResize"
           @keydown.enter.exact.prevent="handleEnterKey"
