@@ -674,6 +674,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
 
                 toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
+                
+                sendData(res, { content: toolTips[nowToolCallIndex] });
               }
             }
 
@@ -687,11 +689,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
               if(toolTips && toolTips[nowToolCallIndex]) {
                 toolTips[nowToolCallIndex] += addStr;
               }
-            }
 
-            // 实时发送工具信息
-            if (toolTips && toolTips[nowToolCallIndex]) {
-              sendData(res, { content: toolTips[nowToolCallIndex] });
+              sendData(res, { content: addStr });
             }
           }
         }

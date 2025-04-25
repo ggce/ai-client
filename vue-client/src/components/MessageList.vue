@@ -1337,7 +1337,7 @@ const shouldCollapseToolPrompt = (content: string): boolean => {
 .tool-name {
   font-weight: 600;
   color: #2e7d32;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* 工具消息可折叠容器样式 */
@@ -1439,7 +1439,7 @@ const shouldCollapseToolPrompt = (content: string): boolean => {
 .tool-prompt-name {
   font-weight: 600;
   color: #5d4db3;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .tool-prompt-container {
