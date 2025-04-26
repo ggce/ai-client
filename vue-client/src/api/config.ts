@@ -37,7 +37,7 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
           qwen: {
             apiKey: '',
             baseURL: '',
-            model: 'qwen-max'
+            model: 'qwen-max-latest'
           }
         },
         currentProvider: 'deepseek',
@@ -161,7 +161,7 @@ export function getDefaultModel(provider: Provider): string {
     case 'anthropic':
       return 'claude-3-7-sonnet-20250219';
     case 'qwen':
-      return 'qwen-max';
+      return 'qwen-max-latest';
     default:
       return 'deepseek-chat';
   }

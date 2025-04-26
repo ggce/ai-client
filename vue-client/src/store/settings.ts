@@ -30,7 +30,7 @@ export const useSettingsStore = defineStore('settings', {
         qwen: {
           apiKey: '',
           baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-          model: 'qwen-max'
+          model: 'qwen-max-latest'
         }
       },
       currentProvider: 'deepseek',

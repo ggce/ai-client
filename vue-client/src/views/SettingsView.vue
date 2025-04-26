@@ -143,9 +143,9 @@
               v-model="geminiModel" 
               class="model-select"
             >
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-              <option value="gemini-2.5-pro-exp-03-25">Gemini 2.5 Pro</option>
-              <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+              <option value="gemini-2.5-pro-exp-03-25">gemini-2.5-pro-exp-03-25</option>
+              <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview-04-17</option>
             </select>
           </div>
 
@@ -171,8 +171,8 @@
               v-model="anthropicModel" 
               class="model-select"
             >
-              <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
-              <option value="claude-3-7-sonnet-20250219-thinking">Claude 3.7 Sonnet (Thinking)</option>
+              <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219</option>
+              <option value="claude-3-7-sonnet-20250219-thinking">claude-3-7-sonnet-20250219-thinking</option>
             </select>
           </div>
 
@@ -198,7 +198,7 @@
               v-model="qwenModel" 
               class="model-select"
             >
-              <option value="qwen-max">Qwen Max</option>
+              <option value="qwen-max-latest">qwen-max-latest</option>
               <option value="qwen-turbo">Qwen Turbo</option>
             </select>
           </div>
@@ -247,7 +247,7 @@ const anthropicBaseUrl = ref('')
 const anthropicModel = ref('claude-3-7-sonnet-20250219')
 const qwenApiKey = ref('')
 const qwenBaseUrl = ref('')
-const qwenModel = ref('qwen-max')
+const qwenModel = ref('qwen-max-latest')
 const showDebugConfig = ref(false)
 
 // DeepSeek余额查询相关状态
@@ -384,7 +384,7 @@ const loadSettings = async () => {
   if (qwenConfig) {
     qwenApiKey.value = qwenConfig.apiKey || ''
     qwenBaseUrl.value = qwenConfig.baseURL || ''
-    qwenModel.value = qwenConfig.model || 'qwen-max'
+    qwenModel.value = qwenConfig.model || 'qwen-max-latest'
   }
 
   console.log('设置已加载：', {

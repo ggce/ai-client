@@ -56,8 +56,8 @@ export const ANTHROPIC_MODELS = {
 // Qwen对应的服务
 export const QWEN_DEFAULT_URL: string = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 export const QWEN_MODELS = {
-  DEFAULT: 'qwen-max',
-  QWEN_MAX: 'qwen-max',
+  DEFAULT: 'qwen-max-latest',
+  QWEN_MAX: 'qwen-max-latest',
   QWEN_TURBO: 'qwen-turbo',
-  ALL: ['qwen-max', 'qwen-turbo']
+  ALL: ['qwen-max-latest', 'qwen-turbo']
 }; 

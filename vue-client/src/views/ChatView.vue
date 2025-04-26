@@ -5,7 +5,7 @@
         <div class="header-content">
           <h1>Luna <small>{{ modelDisplay }}</small></h1>
           <div class="header-controls">
-            <!-- 删除流式开关 -->
+            <!-- 这里可以放置其他控制按钮 -->
           </div>
         </div>
       </header>
@@ -62,6 +62,7 @@ import {
 } from '../api/chat'
 import { SessionMessage, ChatMessage, ToolCall } from '../types';
 import axios from 'axios'
+import { tips } from '../utils/tips'
 
 // 定义组件名称
 defineOptions({
@@ -108,6 +109,7 @@ const handleCreateSession = async () => {
     activeSessionId.value = sessionId
   } catch (error) {
     console.error('创建会话失败:', error)
+    tips.error('创建会话失败，请检查网络连接或刷新页面重试')
   }
 }
 
@@ -176,6 +178,7 @@ const loadSessionMessages = async (sessionId: string) => {
   } catch (error) {
     console.error('加载会话历史失败:', error)
     sessionMessages.value = []
+    tips.error('加载会话历史失败，请刷新页面重试')
   }
 }
 
@@ -224,6 +227,11 @@ const stopGeneration = async () => {
         }
       }
       
+      // 如果所有重试都失败，显示提示
+      if (!success) {
+        tips.warning('停止生成请求失败，但已在本地中断响应');
+      }
+      
       // 重新加载当前会话的消息，以确保UI状态与后端一致
       await loadSessionMessages(activeSessionId.value);
     }
@@ -237,6 +245,7 @@ const stopGeneration = async () => {
 // 更新sendMessage函数
 const sendMessage = async function(message?: string, selectedTools?: string[]) {
   if (!isProviderConfigured()) {
+    tips.warning('请先在设置页面配置API Key');
     sessionMessages.value.push({
       role: 'system',
       content: '请先在设置页面配置API Key。',
@@ -245,6 +254,7 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
   }
 
   if (!activeSessionId.value) {
+    tips.info('请先选择或创建一个会话');
     sessionMessages.value.push({
       role: 'system',
       content: '请先选择或创建一个会话。',
@@ -324,6 +334,7 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
     });
   } catch (error) {
     console.error('Failed to send message:', error)
+    tips.error('消息发送失败，请稍后再试或检查API配置');
     // 更新最后一条AI消息为错误信息
     const lastMessage = sessionMessages.value[sessionMessages.value.length - 1]
     lastMessage.content = '消息发送失败，请稍后再试或检查API配置。'
@@ -399,6 +410,7 @@ const ensureSessionMatchesProvider = async () => {
     }
   } catch (error) {
     console.error(`确保会话匹配时出错:`, error)
+    tips.error('会话加载出错，请刷新页面重试');
   }
 }
 

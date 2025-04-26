@@ -144,3 +144,20 @@ export interface ChatMessage {
   toolCalls?: Array<ToolCall>
   reasoningContent?: string // 添加推理内容字段
 }
+
+/**
+ * Tips组件暴露的方法接口
+ */
+export interface TipsExpose {
+  show: (message: string, type: 'info' | 'success' | 'warning' | 'error', duration: number) => { close: () => void };
+  hide: () => void;
+}
+
+/**
+ * 全局窗口接口扩展
+ */
+declare global {
+  interface Window {
+    __GLOBAL_TIPS_INSTANCE__: TipsExpose | null;
+  }
+}

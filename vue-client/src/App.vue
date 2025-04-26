@@ -9,6 +9,9 @@
         <component v-else :is="Component" />
       </router-view>
     </main>
+    
+    <!-- 全局Tips组件 -->
+    <GlobalTips />
   </div>
 </template>
 
@@ -16,6 +19,7 @@
 import Sidebar from './components/Sidebar.vue'
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from './store/settings'
+import GlobalTips from './components/GlobalTips.vue'
 
 const isMacOS = ref(false)
 const settingsStore = useSettingsStore()
