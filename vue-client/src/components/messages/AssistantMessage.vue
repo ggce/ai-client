@@ -2,7 +2,7 @@
   <div class="message assistant">
     <div class="message-row">
       <MessageAvatar type="assistant" />
-      <div class="message-container">
+      <div class="message-container ai-message-container">
         <!-- 显示推理内容区域 (仅当有推理内容时) -->
         <ReasoningContainer 
           v-if="reasoningContent"

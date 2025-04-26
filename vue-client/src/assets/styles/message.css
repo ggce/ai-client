@@ -120,6 +120,28 @@
 .message.assistant .message-container {
   background-color: #e6e6fa; /* 偏紫色 Lavender */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 85%;
+  width: 100%;
+}
+
+/* AI消息特有的宽度控制 */
+.ai-message-container {
+  max-width: 85% !important;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .message.assistant .message-container,
+  .ai-message-container {
+    max-width: 700px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .message.assistant .message-container,
+  .ai-message-container {
+    max-width: 90% !important;
+  }
 }
 
 .message.streaming .message-container {
