@@ -893,6 +893,12 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
             content: "\n\n[已停止生成]"
           });
         } else {
+          // 如果会话存在，删除最后一条用户消息及其后的所有消息
+          const session = client.getSession(sessionId);
+          if (session) {
+            const removed = session.removeLastMessageIfUser();
+            logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
+          }
           logger.error('Main', `流式请求失败: ${error}`);
           sendData(res, { 
             error: `流式请求失败: ${error instanceof Error ? error.message : String(error)}` 
