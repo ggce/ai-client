@@ -2,14 +2,35 @@
   <!-- 工具调用中 -->
   <ToolPromptMessage
     v-if="isToolPromptMessage(message)"
+    :is-loading="true"
     :content="message"
     :show-streaming-indicator="true"
     @tool-click="(toolName) => emit('tool-click', toolName)"
   />
+  <template v-else-if="isReasoningOnlyMode">
+    <!-- 纯推理模式 -->
+    <div class="message assistant">
+      <div class="message-row">
+        <MessageAvatar type="assistant" :is-loading="true" status="thinking" />
+        <div class="message-container typing-container">
+          <div
+            class="streaming-reasoning-container"
+            v-if="reasoningContent && reasoningContent.trim().length > 0"
+          >
+            <div class="reasoning-header">
+              推理中
+            </div>
+            <pre class="reasoning-content">{{ reasoningContent }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
   <template v-else>
+    <!-- 标准流式回答模式 -->
     <div class="message assistant streaming">
       <div class="message-row">
-        <MessageAvatar type="assistant" />
+        <MessageAvatar type="assistant" :is-loading="true" status="answering" />
         <div class="message-container">
           <!-- 先显示推理，再显示回答，保持顺序一致 -->
           <ReasoningContainer
@@ -41,6 +62,8 @@ import MarkdownIt from "markdown-it";
 const props = defineProps<{
   message: string;
   reasoningContent?: string;
+  isReasoningOnlyMode?: boolean;
+  isToolCallingMode?: boolean;
 }>();
 
 const emit = defineEmits(["tool-click"]);
@@ -95,4 +118,48 @@ const formattedMessage = computed(() => {
 <style scoped>
 @import "../../assets/styles/message.css";
 @import "../../assets/styles/reasoning.css";
+
+.typing-container {
+  min-height: 40px;
+}
+
+/* 纯推理模式特定样式 */
+.streaming-reasoning-container {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #f0f8ff;
+  min-height: 20px;
+  border: 1px solid #6495ed;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.reasoning-header {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #4169e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reasoning-content {
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: #333;
+  background-color: transparent;
+  border: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px;
+  min-height: 20px;
+  scroll-behavior: smooth;
+  transition: max-height 0.3s ease;
+}
 </style> 

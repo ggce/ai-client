@@ -30,6 +30,7 @@
 
 .tool-preview {
   white-space: nowrap;
+  max-width: 400px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -216,7 +217,6 @@
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  border-radius: 4px;
 }
 
 .tool-content-container.has-error .toggle-text,

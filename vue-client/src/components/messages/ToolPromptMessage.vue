@@ -1,7 +1,7 @@
 <template>
   <div class="message assistant">
     <div class="message-row">
-      <MessageAvatar type="assistant" />
+      <MessageAvatar type="assistant" :is-loading="isLoading" status="calling" />
       <div class="message-container">
         <div 
           class="tool-prompt-container" 
@@ -46,7 +46,7 @@
             <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
           </div>
         </div>
-        <div v-if="showStreamingIndicator" class="streaming-indicator">
+        <div v-if="isLoading" class="streaming-indicator">
           <span class="dot"></span>
           <span class="dot"></span>
           <span class="dot"></span>
@@ -62,7 +62,7 @@ import MessageAvatar from './MessageAvatar.vue';
 
 const props = defineProps<{
   content: string;
-  showStreamingIndicator: boolean;
+  isLoading?: boolean;
 }>();
 
 // Add the emit declaration

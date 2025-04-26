@@ -1063,11 +1063,6 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-  
-  // 关闭Express服务器
-  if (server) {
-    server.close();
-  }
 });
 
 app.on('activate', () => {
@@ -1078,8 +1073,19 @@ app.on('activate', () => {
 });
 
 // 退出前清理
-app.on('will-quit', () => {
+app.on('will-quit', async () => {
+  // 关闭MCP服务
+  try {
+    logger.log('Main', '应用程序退出，关闭MCP服务');
+    await mcpClient.stopAllServers();
+    logger.log('Main', 'MCP服务已成功关闭');
+  } catch (error) {
+    logger.error('Main', `关闭MCP服务失败: ${error}`);
+  }
+  
+  // 在应用程序真正退出时关闭Express服务器
   if (server) {
+    logger.log('Main', '应用程序退出，关闭Express服务器');
     server.close();
   }
 });

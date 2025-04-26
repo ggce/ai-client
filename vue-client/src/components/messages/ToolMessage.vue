@@ -60,7 +60,7 @@ const toolPreview = computed(() => {
       const firstLine = errorMessage.split('\n')[0] || "错误信息";
       // 添加更明显的错误样式和图标
       return `<div class="tool-preview tool-error-preview">
-        <span class="error-icon">⚠️</span> ${firstLine}${errorMessage.includes('\n') ? '...' : ''}
+        ${firstLine}${errorMessage.includes('\n') ? '...' : ''}
       </div>`;
     }
     
@@ -101,7 +101,7 @@ const toolExpandedContent = computed(() => {
       return `<div class="tool-error">
         <div class="tool-error-header">
           <div class="tool-error-title">
-            <span class="error-icon">⚠️</span> 工具调用失败
+            工具调用失败
           </div>
         </div>
         <div class="tool-error-content">

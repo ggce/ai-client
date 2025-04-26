@@ -51,16 +51,20 @@
     <LoadingMessage v-if="isLoading && !streamingReasoningContent && !streamingMessage" />
 
     <!-- Streaming reasoning state -->
-    <StreamingReasoningMessage 
+    <StreamingMessage 
       v-if="isLoading && streamingReasoningContent && !streamingMessage"
-      :content="streamingReasoningContent"
+      :message="''"
+      :reasoning-content="streamingReasoningContent"
+      :is-reasoning-only-mode="true"
+      @tool-click="handleToolClick"
     />
 
-    <!-- Streaming message state -->
+    <!-- Streaming message state - 判断是否为工具调用 -->
     <StreamingMessage 
       v-if="isLoading && streamingMessage"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
+      :is-tool-calling-mode="isToolCallMessage(streamingMessage)"
       @tool-click="handleToolClick"
     />
 
@@ -84,7 +88,6 @@ import ToolMessage from "./messages/ToolMessage.vue";
 import ToolPromptMessage from "./messages/ToolPromptMessage.vue";
 import LoadingMessage from "./messages/LoadingMessage.vue";
 import StreamingMessage from "./messages/StreamingMessage.vue";
-import StreamingReasoningMessage from "./messages/StreamingReasoningMessage.vue";
 import ToolInfoPopup from './messages/ToolInfoPopup.vue';
 
 // Define the window interface for Electron APIs
@@ -122,6 +125,11 @@ const showToolInfo = ref(false);
 // 检查消息是否为工具调用提示
 const isToolPromptMessage = (content: string): boolean => {
   return content.startsWith('#useTool<toolName>');
+};
+
+// 检查是否为工具调用消息
+const isToolCallMessage = (content: string): boolean => {
+  return content.includes('#useTool<toolName>') || content.includes('<toolArgs>');
 };
 
 // 自动滚动到底部
