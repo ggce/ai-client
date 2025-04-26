@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, inject } from 'vue'
 import { useSettingsStore } from '../store/settings'
-import { createSession, listSessionIds, deleteSession as apiDeleteSession, getSessionMessages } from '../api/chat'
+import { listSessionIds, deleteSession as apiDeleteSession, getSessionMessages } from '../api/chat'
 
 const props = defineProps<{
   activeSessionId: string

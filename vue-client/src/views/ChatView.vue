@@ -75,6 +75,9 @@ const activeSessionId = ref<string>('')
 // 聊天输入框
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
+// 添加应用初始化标志位
+const hasInitialized = ref(false);
+
 // 将activeSessionId提供给可能需要的子组件
 provide('activeSessionId', activeSessionId)
 
@@ -430,6 +433,9 @@ onMounted(async () => {
   
   // 确保会话与当前提供商匹配
   await ensureSessionMatchesProvider()
+  
+  // 标记已完成初始化
+  hasInitialized.value = true
 })
 
 // 监听路由变化
@@ -441,10 +447,12 @@ watch(() => route.query.sessionId, async (newSessionId) => {
   }
 }, { immediate: true })
 
-// 监听提供商变化
+// 监听提供商变化 - 仅在初始化完成后才响应提供商变化
 watch(() => settingsStore.currentProvider, async (newProvider) => {
-  console.log(`提供商变更为 ${newProvider}，确保会话匹配`)
-  await ensureSessionMatchesProvider()
+  if (hasInitialized.value) {
+    console.log(`提供商变更为 ${newProvider}，确保会话匹配`)
+    await ensureSessionMatchesProvider()
+  }
 }, { immediate: false })
 </script>
 

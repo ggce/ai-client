@@ -223,6 +223,7 @@
 import { ref, computed, onMounted, onActivated, onDeactivated, watch } from 'vue'
 import { useSettingsStore } from '../store/settings'
 import { getDeepSeekBalance, DeepSeekBalanceResponse } from '../api/config'
+import { tips } from '../utils/tips'
 
 // 定义组件名称
 defineOptions({
@@ -461,7 +462,7 @@ const saveSettings = async () => {
   await settingsStore.saveSettings()
   
   // 显示保存成功提示
-  alert('设置已保存')
+  tips.success('设置已保存')
 }
 
 // 切换调试配置显示

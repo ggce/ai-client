@@ -50,7 +50,7 @@
               <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
           </button>
-          <button class="toolbar-btn" title="上传图片" @click.prevent="openFileUpload">
+          <button class="toolbar-btn" title="上传图片" @click.prevent="handleImgUpload">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
           </button>
           <button class="toolbar-btn" title="全屏模式" @click.prevent="toggleFullscreen">
@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted, inject } from 'vue'
+import { tips } from '../utils/tips'
 
 const props = defineProps<{
   disabled?: boolean,
@@ -262,16 +263,16 @@ const handleEnterKey = (event: KeyboardEvent) => {
   }
 }
 
-// 打开文件上传（暂时为占位函数）
-const openFileUpload = () => {
-  // 后续可以实现文件上传功能
-  alert('文件上传功能即将推出！')
+// 图片上传
+const handleImgUpload = () => {
+  // 后续可以实现图片上传功能
+  tips.info('图片上传功能即将推出！');
 }
 
 // 文件按钮操作（暂时为占位函数）
 const handleFileAction = () => {
   // 后续可以实现文件操作功能
-  alert('文件操作功能即将推出！')
+  tips.info('文件操作功能即将推出！');
 }
 
 // 切换全屏模式
