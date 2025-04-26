@@ -21,6 +21,14 @@
               <input type="radio" v-model="selectedProvider" value="gemini">
               Gemini
             </label>
+            <label>
+              <input type="radio" v-model="selectedProvider" value="anthropic">
+              Anthropic
+            </label>
+            <label>
+              <input type="radio" v-model="selectedProvider" value="qwen">
+              Qwen
+            </label>
           </div>
         </div>
 
@@ -140,6 +148,60 @@
               <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash</option>
             </select>
           </div>
+
+          <div class="api-key-section" v-show="selectedProvider === 'anthropic'">
+            <label for="anthropic-api-key">Anthropic API密钥</label>
+            <input 
+              type="text" 
+              id="anthropic-api-key"
+              v-model="anthropicApiKey" 
+              placeholder="输入Anthropic API密钥" 
+              class="api-key-input"
+            >
+            <label for="anthropic-base-url">Anthropic 基础URL（可选）</label>
+            <input 
+              type="text" 
+              id="anthropic-base-url"
+              v-model="anthropicBaseUrl"
+              placeholder="默认: https://api.anthropic.com/v1"
+            >
+            <label for="anthropic-model">Anthropic 模型</label>
+            <select 
+              id="anthropic-model"
+              v-model="anthropicModel" 
+              class="model-select"
+            >
+              <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+              <option value="claude-3-7-sonnet-20250219-thinking">Claude 3.7 Sonnet (Thinking)</option>
+            </select>
+          </div>
+
+          <div class="api-key-section" v-show="selectedProvider === 'qwen'">
+            <label for="qwen-api-key">Qwen API密钥</label>
+            <input 
+              type="text" 
+              id="qwen-api-key"
+              v-model="qwenApiKey" 
+              placeholder="输入Qwen API密钥" 
+              class="api-key-input"
+            >
+            <label for="qwen-base-url">Qwen 基础URL（可选）</label>
+            <input 
+              type="text" 
+              id="qwen-base-url"
+              v-model="qwenBaseUrl"
+              placeholder="默认: https://dashscope.aliyuncs.com/compatible-mode/v1"
+            >
+            <label for="qwen-model">Qwen 模型</label>
+            <select 
+              id="qwen-model"
+              v-model="qwenModel" 
+              class="model-select"
+            >
+              <option value="qwen-max">Qwen Max</option>
+              <option value="qwen-turbo">Qwen Turbo</option>
+            </select>
+          </div>
         </div>
 
         <button 
@@ -170,7 +232,7 @@ defineOptions({
 const settingsStore = useSettingsStore()
 
 // 状态
-const selectedProvider = ref<'deepseek' | 'openai' | 'gemini'>('deepseek')
+const selectedProvider = ref<'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen'>('deepseek')
 const deepseekApiKey = ref('')
 const deepseekBaseUrl = ref('')
 const deepseekModel = ref('deepseek-chat')
@@ -180,6 +242,12 @@ const openaiModel = ref('gpt-4.1')
 const geminiApiKey = ref('')
 const geminiBaseUrl = ref('')
 const geminiModel = ref('gemini-2.0-flash')
+const anthropicApiKey = ref('')
+const anthropicBaseUrl = ref('')
+const anthropicModel = ref('claude-3-7-sonnet-20250219')
+const qwenApiKey = ref('')
+const qwenBaseUrl = ref('')
+const qwenModel = ref('qwen-max')
 const showDebugConfig = ref(false)
 
 // DeepSeek余额查询相关状态
@@ -209,8 +277,8 @@ const checkDeepseekBalance = async () => {
 }
 
 // 监听当前选择的模型提供商变化，并立即保存
-watch(selectedProvider, (newValue) => {
-  settingsStore.setProvider(newValue)
+watch(selectedProvider, async (newValue) => {
+  await settingsStore.setProvider(newValue)
 })
 
 // 监听模型选择变化，并立即保存
@@ -232,6 +300,20 @@ watch(geminiModel, (newValue) => {
   }
 })
 
+// 监听Anthropic模型选择变化，并立即保存
+watch(anthropicModel, (newValue) => {
+  if (newValue) {
+    settingsStore.setModel('anthropic', newValue)
+  }
+})
+
+// 监听Qwen模型选择变化，并立即保存
+watch(qwenModel, (newValue) => {
+  if (newValue) {
+    settingsStore.setModel('qwen', newValue)
+  }
+})
+
 // 配置调试信息
 const configDebug = computed(() => JSON.stringify({
   selectedProvider: selectedProvider.value,
@@ -250,6 +332,16 @@ const configDebug = computed(() => JSON.stringify({
       apiKey: geminiApiKey.value,
       baseURL: geminiBaseUrl.value,
       model: geminiModel.value
+    },
+    anthropic: {
+      apiKey: anthropicApiKey.value,
+      baseURL: anthropicBaseUrl.value,
+      model: anthropicModel.value
+    },
+    qwen: {
+      apiKey: qwenApiKey.value,
+      baseURL: qwenBaseUrl.value,
+      model: qwenModel.value
     }
   }
 }, null, 2))
@@ -258,7 +350,7 @@ const configDebug = computed(() => JSON.stringify({
 const loadSettings = async () => {
   await settingsStore.loadSettings()
   
-  selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai' | 'gemini'
+  selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen'
   
   const deepseekConfig = settingsStore.providers.deepseek
   if (deepseekConfig) {
@@ -281,6 +373,20 @@ const loadSettings = async () => {
     geminiModel.value = geminiConfig.model || 'gemini-2.0-flash'
   }
 
+  const anthropicConfig = settingsStore.providers.anthropic
+  if (anthropicConfig) {
+    anthropicApiKey.value = anthropicConfig.apiKey || ''
+    anthropicBaseUrl.value = anthropicConfig.baseURL || ''
+    anthropicModel.value = anthropicConfig.model || 'claude-3-7-sonnet-20250219'
+  }
+
+  const qwenConfig = settingsStore.providers.qwen
+  if (qwenConfig) {
+    qwenApiKey.value = qwenConfig.apiKey || ''
+    qwenBaseUrl.value = qwenConfig.baseURL || ''
+    qwenModel.value = qwenConfig.model || 'qwen-max'
+  }
+
   console.log('设置已加载：', {
     provider: selectedProvider.value,
     deepseek: {
@@ -294,6 +400,14 @@ const loadSettings = async () => {
     gemini: {
       apiKey: geminiApiKey.value ? '******' : '',
       model: geminiModel.value
+    },
+    anthropic: {
+      apiKey: anthropicApiKey.value ? '******' : '',
+      model: anthropicModel.value
+    },
+    qwen: {
+      apiKey: qwenApiKey.value ? '******' : '',
+      model: qwenModel.value
     }
   })
   
@@ -327,6 +441,20 @@ const saveSettings = async () => {
     await settingsStore.setApiKey('gemini', geminiApiKey.value)
     settingsStore.setBaseURL('gemini', geminiBaseUrl.value)
     await settingsStore.setModel('gemini', geminiModel.value)
+  }
+  
+  // 设置Anthropic配置
+  if (selectedProvider.value === 'anthropic') {
+    await settingsStore.setApiKey('anthropic', anthropicApiKey.value)
+    settingsStore.setBaseURL('anthropic', anthropicBaseUrl.value)
+    await settingsStore.setModel('anthropic', anthropicModel.value)
+  }
+  
+  // 设置Qwen配置
+  if (selectedProvider.value === 'qwen') {
+    await settingsStore.setApiKey('qwen', qwenApiKey.value)
+    settingsStore.setBaseURL('qwen', qwenBaseUrl.value)
+    await settingsStore.setModel('qwen', qwenModel.value)
   }
   
   // 保存所有设置

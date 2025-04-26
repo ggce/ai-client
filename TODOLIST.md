@@ -20,14 +20,15 @@
 - 工具调用提示优化 2025-04-26
 - 缩小到后台服务器关闭问题 2025-04-26
 - v3切r1 function call问题 2025-04-26
+- gemini、claude、qwen集成
 
 ## 待开发
+- 上下文缓存 https://bailian.console.aliyun.com/?tab=doc#/doc/?type=model&url=https%3A%2F%2Fhelp.aliyun.com%2Fdocument_detail%2F2862577.html&renderType=iframe
 - 支持保存历史对话
 - token重复冗余排查
-- gemini集成
+- gemini 工具
 - token显示？
 - 打包问题
 - 本地大模型集成
-- claude集成
-- qwen集成
+- claude 工具
 - 规则：今天的日期、禁止捏造数据

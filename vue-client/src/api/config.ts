@@ -23,6 +23,21 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
             apiKey: '',
             baseURL: '',
             model: 'gpt-4.1'
+          },
+          gemini: {
+            apiKey: '',
+            baseURL: '',
+            model: 'gemini-2.0-flash'
+          },
+          anthropic: {
+            apiKey: '',
+            baseURL: '',
+            model: 'claude-3-7-sonnet-20250219'
+          },
+          qwen: {
+            apiKey: '',
+            baseURL: '',
+            model: 'qwen-max'
           }
         },
         currentProvider: 'deepseek',
@@ -38,7 +53,11 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
       }
       
       if (config.currentProvider && 
-         (config.currentProvider === 'deepseek' || config.currentProvider === 'openai' || config.currentProvider === 'gemini')) {
+         (config.currentProvider === 'deepseek' || 
+          config.currentProvider === 'openai' || 
+          config.currentProvider === 'gemini' ||
+          config.currentProvider === 'anthropic' ||
+          config.currentProvider === 'qwen')) {
         completeConfig.currentProvider = config.currentProvider as Provider
       }
       
@@ -131,9 +150,19 @@ export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanc
 }
 
 // 获取默认模型
-export function getDefaultModel(provider: string): string {
-  const config = getConfig();
-  return provider === 'deepseek' 
-    ? (config?.deepseek?.model || 'deepseek-chat') 
-    : (config?.openai?.model || 'gpt-4.1');
+export function getDefaultModel(provider: Provider): string {
+  switch (provider) {
+    case 'deepseek':
+      return 'deepseek-chat';
+    case 'openai':
+      return 'gpt-4.1';
+    case 'gemini':
+      return 'gemini-2.0-flash';
+    case 'anthropic':
+      return 'claude-3-7-sonnet-20250219';
+    case 'qwen':
+      return 'qwen-max';
+    default:
+      return 'deepseek-chat';
+  }
 }

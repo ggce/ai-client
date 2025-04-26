@@ -21,6 +21,16 @@ export const useSettingsStore = defineStore('settings', {
           apiKey: '',
           baseURL: 'https://generativelanguage.googleapis.com',
           model: 'gemini-2.0-flash'
+        },
+        anthropic: {
+          apiKey: '',
+          baseURL: 'https://api.anthropic.com/v1',
+          model: 'claude-3-7-sonnet-20250219'
+        },
+        qwen: {
+          apiKey: '',
+          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          model: 'qwen-max'
         }
       },
       currentProvider: 'deepseek',
@@ -46,8 +56,8 @@ export const useSettingsStore = defineStore('settings', {
       // 设置新的提供商
       this.currentProvider = provider
       
-      // 保存设置
-      this.saveSettings()
+      // 保存设置 - 使用await确保完成
+      await this.saveSettings()
       
       // 返回提供商是否改变
       return previousProvider !== provider
@@ -124,7 +134,9 @@ export const useSettingsStore = defineStore('settings', {
           if (config.currentProvider && 
              (config.currentProvider === 'deepseek' || 
               config.currentProvider === 'openai' || 
-              config.currentProvider === 'gemini')) {
+              config.currentProvider === 'gemini' || 
+              config.currentProvider === 'anthropic' ||
+              config.currentProvider === 'qwen')) {
             this.currentProvider = config.currentProvider as Provider
           }
         }

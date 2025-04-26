@@ -7,7 +7,18 @@ import dotenv from 'dotenv';
 import * as fs from 'fs';
 import MCPClient from '../mcpClient';
 import { MCPTool } from '../types';
-import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS, GEMINI_MODELS } from '../constants';
+import { 
+  DEEPSEEK_DEFAULT_URL, 
+  OPENAI_DEFAULT_URL, 
+  OPENAI_MODELS, 
+  DEEPSEEK_MODELS, 
+  GEMINI_MODELS,
+  GEMINI_DEFAULT_URL,
+  ANTHROPIC_DEFAULT_URL,
+  ANTHROPIC_MODELS,
+  QWEN_DEFAULT_URL,
+  QWEN_MODELS
+} from '../constants';
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import logger from '../logger';
 import { AIProviderFactory, ProviderType } from '../providers/aiProviderFactory';
@@ -47,7 +58,22 @@ function initDefaultProviders() {
   // 初始化Gemini客户端
   AIProviderFactory.getProvider('gemini', {
     apiKey: '',
+    baseURL: GEMINI_DEFAULT_URL,
     defaultModel: GEMINI_MODELS.DEFAULT
+  });
+  
+  // 初始化Anthropic客户端
+  AIProviderFactory.getProvider('anthropic', {
+    apiKey: '',
+    baseURL: ANTHROPIC_DEFAULT_URL,
+    defaultModel: ANTHROPIC_MODELS.DEFAULT
+  });
+  
+  // 初始化Qwen客户端
+  AIProviderFactory.getProvider('qwen', {
+    apiKey: '',
+    baseURL: QWEN_DEFAULT_URL,
+    defaultModel: QWEN_MODELS.DEFAULT
   });
   
   logger.log('Main', '已初始化默认AI提供商');
@@ -162,14 +188,34 @@ function initClientsFromConfig() {
           logger.log('Main', '已更新OpenAI API配置');
         }
         
-        // 更新Gemini客户端（通过OpenAI客户端实现）
+        // 更新Gemini客户端
         if (config.providers.gemini?.apiKey) {
           AIProviderFactory.getProvider('gemini', {
             apiKey: config.providers.gemini.apiKey,
-            baseURL: config.providers.gemini.baseURL || OPENAI_DEFAULT_URL, // 使用提供的代理URL或默认OpenAI URL
+            baseURL: config.providers.gemini.baseURL || GEMINI_DEFAULT_URL,
             defaultModel: config.providers.gemini.model || GEMINI_MODELS.DEFAULT
           });
-          logger.log('Main', '已更新Gemini API配置（通过OpenAI格式）');
+          logger.log('Main', '已更新Gemini API配置');
+        }
+        
+        // 更新Anthropic客户端
+        if (config.providers.anthropic?.apiKey) {
+          AIProviderFactory.getProvider('anthropic', {
+            apiKey: config.providers.anthropic.apiKey,
+            baseURL: config.providers.anthropic.baseURL || ANTHROPIC_DEFAULT_URL,
+            defaultModel: config.providers.anthropic.model || ANTHROPIC_MODELS.DEFAULT
+          });
+          logger.log('Main', '已更新Anthropic API配置');
+        }
+        
+        // 更新Qwen客户端
+        if (config.providers.qwen?.apiKey) {
+          AIProviderFactory.getProvider('qwen', {
+            apiKey: config.providers.qwen.apiKey,
+            baseURL: config.providers.qwen.baseURL || QWEN_DEFAULT_URL,
+            defaultModel: config.providers.qwen.model || QWEN_MODELS.DEFAULT
+          });
+          logger.log('Main', '已更新Qwen API配置');
         }
       }
     }
@@ -699,8 +745,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
               chunk.choices[0].delta?.tool_calls &&
               chunk.choices[0].delta?.tool_calls[0]
             ) {
-              // 从chunk中获取工具调用
-              if (chunk.choices[0].delta?.tool_calls[0].type === 'function') {
+              // 工具名称
+              if (
+                chunk.choices[0].delta?.tool_calls[0].type === 'function'
+                && chunk.choices[0].delta?.tool_calls[0].function.name
+              ) {
                 // 上一个function名字和参数收集完毕，发送给前端
                 if (nowToolCallIndex !== -1 && toolCalls) {
                   sendData(res, { toolCall: toolCalls[nowToolCallIndex] });
@@ -717,11 +766,13 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 }
               }
 
-              // 从chunk中获取第一个工具调用的参数
-              if (chunk.choices[0].delta.tool_calls[0].function) {
+              // 工具调用参数
+              if (chunk.choices[0].delta.tool_calls[0].function
+                && !chunk.choices[0].delta?.tool_calls[0].function.name // 排除在工具名称中的参数（qwen）
+              ) {
                 const addStr = chunk.choices[0].delta.tool_calls[0].function.arguments;
                 
-                if (toolCalls && toolCalls[nowToolCallIndex]) {
+                if (addStr && toolCalls && toolCalls[nowToolCallIndex]) {
                   toolCalls[nowToolCallIndex].function.arguments += addStr;
                 }
               }
@@ -772,6 +823,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         // 有需要调用的工具
         if (toolCalls && toolCalls.length > 0) {
+          logger.log('工具调用参数', toolCalls[0].function.arguments);
           // 添加工具调用会话历史
           session?.addAssistantMessage('', '', toolCalls);
           // 信息更新
