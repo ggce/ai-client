@@ -222,7 +222,12 @@ const handleSend = () => {
   // Reset textarea height after sending
   setTimeout(() => {
     if (textareaRef.value) {
-      textareaRef.value.style.height = '40px';
+      // 如果当前是全屏模式，退出
+      if (isFullscreen.value) {
+        toggleFullscreen();
+      } else {
+        textareaRef.value.style.height = '40px'
+      }
     }
   }, 0);
 }
@@ -277,9 +282,17 @@ const toggleFullscreen = () => {
     if (isFullscreen.value) {
       inputArea.classList.add('fullscreen')
       document.body.style.overflow = 'hidden'
+      // 确保textarea能在全屏模式下填充可用空间
+      if (textareaRef.value) {
+        textareaRef.value.style.height = 'calc(100vh - 120px)'
+      }
     } else {
       inputArea.classList.remove('fullscreen')
       document.body.style.overflow = ''
+      // 恢复正常高度
+      if (textareaRef.value) {
+        autoResize()
+      }
     }
   }
 }
@@ -519,22 +532,52 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
-  padding: 16px;
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(5px);
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999;
+  padding: 0;
+  margin: 0;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-area.fullscreen .input-wrapper {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
 }
 
 .input-area.fullscreen .textarea-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  width: 100%;
+  padding: 20px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.input-area.fullscreen textarea {
-  height: 100%;
-  min-height: 100%;
-  font-size: 14px;
-  border: 1px solid #ddd;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.input-area.fullscreen .input-textarea {
+  flex: 1;
+  height: auto !important;
+  min-height: calc(100% - 60px) !important;
+  max-height: none;
+  font-size: 16px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .tool-badge {
