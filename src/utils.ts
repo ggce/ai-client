@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { ClientOptions } from './types';
-import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from './constants';
+import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS, GEMINI_MODELS } from './constants';
 
 // 加载环境变量
 dotenv.config();
@@ -22,6 +22,9 @@ export function loadConfigFromEnv(provider: string = 'deepseek'): ClientOptions 
     config.apiKey = '';
     config.baseURL = OPENAI_DEFAULT_URL;
     config.defaultModel = OPENAI_MODELS.DEFAULT;
+  } else if (provider === 'gemini') {
+    config.apiKey = '';
+    config.defaultModel = GEMINI_MODELS.DEFAULT;
   }
 
   return config;

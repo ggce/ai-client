@@ -1,9 +1,9 @@
 import { BaseClient } from './baseClient';
-import { DeepseekClient } from './deepseek';
+import { DeepseekClient } from './openai';
 import { OpenAIClient } from './openai';
 import { ClientOptions } from '../types';
 
-export type ProviderType = 'deepseek' | 'openai';
+export type ProviderType = 'deepseek' | 'openai' | 'gemini';
 
 export class AIProviderFactory {
   private static providers: Record<ProviderType, BaseClient> = {} as any;
@@ -27,6 +27,10 @@ export class AIProviderFactory {
         this.providers[type] = new DeepseekClient(options);
         break;
       case 'openai':
+        this.providers[type] = new OpenAIClient(options);
+        break;
+      case 'gemini':
+        // 使用OpenAI客户端代替Gemini客户端，通过第三方代理使用OpenAI风格调用Gemini
         this.providers[type] = new OpenAIClient(options);
         break;
       default:

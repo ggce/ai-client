@@ -76,25 +76,6 @@ const formattedJson = computed(() => {
   // 深拷贝消息数组，避免修改原始数据
   const messages = JSON.parse(JSON.stringify(props.messages));
   
-  // 为JSON添加更多可读性
-  messages.forEach((msg: any, index: number) => {
-    // 添加序号
-    msg.index = index + 1;
-    
-    // 添加可读的角色名称
-    msg.role_name = formatRole(msg.role);
-    
-    // 格式化时间（这只是示例，实际中可以使用真实的时间戳）
-    const now = new Date();
-    const time = new Date(now.getTime() - (messages.length - index) * 60000);
-    msg.timestamp = time.toISOString();
-    msg.formatted_time = time.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false
-    });
-  });
-  
   return JSON.stringify(messages, null, 2);
 });
 

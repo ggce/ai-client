@@ -6,12 +6,12 @@ export * from './utils';
 
 // 导出提供商客户端类
 export { OpenAIClient } from './providers/openai';
-export { DeepseekClient } from './providers/deepseek';
+export { DeepseekClient } from './providers/openai';
 export { AIProviderSwitcher } from './ai-provider-switcher';
 
 // 创建默认客户端实例
 import { OpenAIClient } from './providers/openai';
-import { DeepseekClient } from './providers/deepseek';
+import { DeepseekClient } from './providers/openai';
 import { ProviderConfig } from './types';
 import { loadConfigFromEnv } from './utils';
 import { AIProviderSwitcher } from './ai-provider-switcher';
@@ -29,7 +29,7 @@ const defaultOpenAIClient = new OpenAIClient(
 // 创建默认的AI提供商切换器
 const defaultProviderSwitcher = new AIProviderSwitcher({
   defaultProvider: process.env.DEFAULT_PROVIDER || 'deepseek',
-  providers: ['deepseek', 'openai']
+  providers: ['deepseek', 'openai', 'gemini']
 });
 
 // 导出默认实例

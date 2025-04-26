@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { loadConfig, saveConfig, saveApiKey, saveModel } from '../api/config'
 import router from '../router'
 
-type Provider = 'deepseek' | 'openai'
+// Define the Provider type exported from this module
+export type Provider = 'deepseek' | 'openai' | 'gemini'
 
 interface ProviderConfig {
   apiKey: string
@@ -32,6 +33,11 @@ export const useSettingsStore = defineStore('settings', {
           apiKey: '',
           baseURL: 'https://api.openai.com/v1',
           model: 'gpt-4.1'
+        },
+        gemini: {
+          apiKey: '',
+          baseURL: 'https://generativelanguage.googleapis.com',
+          model: 'gemini-2.0-flash'
         }
       },
       currentProvider: 'deepseek',
@@ -133,8 +139,10 @@ export const useSettingsStore = defineStore('settings', {
           }
           
           if (config.currentProvider && 
-             (config.currentProvider === 'deepseek' || config.currentProvider === 'openai')) {
-            this.currentProvider = config.currentProvider
+             (config.currentProvider === 'deepseek' || 
+              config.currentProvider === 'openai' || 
+              config.currentProvider === 'gemini')) {
+            this.currentProvider = config.currentProvider as Provider
           }
         }
         

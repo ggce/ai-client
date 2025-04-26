@@ -1,7 +1,6 @@
 <template>
   <div v-if="type === 'assistant'" class="avatar ai-avatar" :class="{ 'loading': isLoading }">
     <img src="/assets/logo.png" alt="AI" class="ai-logo" />
-    <div v-show="isLoading" class="glow-effect"></div>
     <div v-show="isLoading" class="loading-indicator" :class="statusClass">{{ statusText }}</div>
   </div>
   <div v-if="type === 'system'" class="avatar system-avatar">
@@ -48,20 +47,6 @@ const statusClass = computed(() => {
   overflow: visible;
 }
 
-.glow-effect {
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
-  border-radius: 50%;
-  z-index: -1;
-  background: radial-gradient(circle, rgba(65, 137, 230, 0.3) 0%, rgba(65, 137, 230, 0) 70%);
-  animation: pulse 2s ease-in-out infinite;
-  pointer-events: none; /* 确保不会干扰鼠标事件 */
-  will-change: opacity, transform; /* 性能优化 */
-}
-
 .loading-indicator {
   position: absolute;
   bottom: -16px;
@@ -76,7 +61,6 @@ const statusClass = computed(() => {
   font-weight: 500;
   letter-spacing: 0.3px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  opacity: 0;
   pointer-events: none;
   z-index: 1;
 }
@@ -94,20 +78,8 @@ const statusClass = computed(() => {
   background-color: rgba(156, 39, 176, 0.75); /* 紫色 - 回答 */
 }
 
-.loading .loading-indicator {
-  opacity: 0.9;
-  animation: pulseFade 2s ease-in-out infinite;
-}
-
 .loading .ai-logo {
   animation: subtle-bounce 2s ease-in-out infinite;
-}
-
-/* 当不加载时，保持透明但不移除元素 */
-.ai-avatar:not(.loading) .glow-effect {
-  opacity: 0;
-  transform: scale(1);
-  transition: opacity 0.3s ease-out;
 }
 
 @keyframes pulse {
@@ -122,18 +94,6 @@ const statusClass = computed(() => {
   100% {
     transform: scale(1);
     opacity: 0.2;
-  }
-}
-
-@keyframes pulseFade {
-  0% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0.7;
   }
 }
 

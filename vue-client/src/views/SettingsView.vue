@@ -17,6 +17,10 @@
               <input type="radio" v-model="selectedProvider" value="openai">
               OpenAI
             </label>
+            <label>
+              <input type="radio" v-model="selectedProvider" value="gemini">
+              Gemini
+            </label>
           </div>
         </div>
 
@@ -104,6 +108,38 @@
               <option value="o3-mini">O3 Mini</option>
             </select>
           </div>
+          
+          <div class="api-key-section" v-show="selectedProvider === 'gemini'">
+            <label for="gemini-api-key">Gemini API密钥</label>
+            <input 
+              type="text" 
+              id="gemini-api-key"
+              v-model="geminiApiKey" 
+              placeholder="输入Gemini API密钥" 
+              class="api-key-input"
+            >
+            <label for="gemini-base-url">Gemini 基础URL（第三方代理地址）</label>
+            <input 
+              type="text" 
+              id="gemini-base-url"
+              v-model="geminiBaseUrl"
+              placeholder="输入第三方代理的URL（需支持OpenAI格式调用）"
+            >
+            <div class="info-note">
+              <i class="info-icon">ℹ️</i>
+              <span>请使用支持OpenAI方式调用的第三方代理，以使用Gemini</span>
+            </div>
+            <label for="gemini-model">Gemini 模型</label>
+            <select 
+              id="gemini-model"
+              v-model="geminiModel" 
+              class="model-select"
+            >
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              <option value="gemini-2.5-pro-exp-03-25">Gemini 2.5 Pro</option>
+              <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash</option>
+            </select>
+          </div>
         </div>
 
         <button 
@@ -134,13 +170,16 @@ defineOptions({
 const settingsStore = useSettingsStore()
 
 // 状态
-const selectedProvider = ref<'deepseek' | 'openai'>('deepseek')
+const selectedProvider = ref<'deepseek' | 'openai' | 'gemini'>('deepseek')
 const deepseekApiKey = ref('')
 const deepseekBaseUrl = ref('')
 const deepseekModel = ref('deepseek-chat')
 const openaiApiKey = ref('')
 const openaiBaseUrl = ref('')
 const openaiModel = ref('gpt-4.1')
+const geminiApiKey = ref('')
+const geminiBaseUrl = ref('')
+const geminiModel = ref('gemini-2.0-flash')
 const showDebugConfig = ref(false)
 
 // DeepSeek余额查询相关状态
@@ -187,6 +226,12 @@ watch(openaiModel, (newValue) => {
   }
 })
 
+watch(geminiModel, (newValue) => {
+  if (newValue) {
+    settingsStore.setModel('gemini', newValue)
+  }
+})
+
 // 配置调试信息
 const configDebug = computed(() => JSON.stringify({
   selectedProvider: selectedProvider.value,
@@ -200,6 +245,11 @@ const configDebug = computed(() => JSON.stringify({
       apiKey: openaiApiKey.value,
       baseURL: openaiBaseUrl.value,
       model: openaiModel.value
+    },
+    gemini: {
+      apiKey: geminiApiKey.value,
+      baseURL: geminiBaseUrl.value,
+      model: geminiModel.value
     }
   }
 }, null, 2))
@@ -208,7 +258,7 @@ const configDebug = computed(() => JSON.stringify({
 const loadSettings = async () => {
   await settingsStore.loadSettings()
   
-  selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai'
+  selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai' | 'gemini'
   
   const deepseekConfig = settingsStore.providers.deepseek
   if (deepseekConfig) {
@@ -223,6 +273,13 @@ const loadSettings = async () => {
     openaiBaseUrl.value = openaiConfig.baseURL || ''
     openaiModel.value = openaiConfig.model || 'gpt-4.1'
   }
+  
+  const geminiConfig = settingsStore.providers.gemini
+  if (geminiConfig) {
+    geminiApiKey.value = geminiConfig.apiKey || ''
+    geminiBaseUrl.value = geminiConfig.baseURL || ''
+    geminiModel.value = geminiConfig.model || 'gemini-2.0-flash'
+  }
 
   console.log('设置已加载：', {
     provider: selectedProvider.value,
@@ -233,6 +290,10 @@ const loadSettings = async () => {
     openai: {
       apiKey: openaiApiKey.value ? '******' : '',
       model: openaiModel.value
+    },
+    gemini: {
+      apiKey: geminiApiKey.value ? '******' : '',
+      model: geminiModel.value
     }
   })
   
@@ -248,56 +309,48 @@ const saveSettings = async () => {
   await settingsStore.setProvider(selectedProvider.value)
   
   // 设置Deepseek配置
-  await settingsStore.setApiKey('deepseek', deepseekApiKey.value)
-  settingsStore.setBaseURL('deepseek', deepseekBaseUrl.value)
-  await settingsStore.setModel('deepseek', deepseekModel.value)
+  if (selectedProvider.value === 'deepseek') {
+    await settingsStore.setApiKey('deepseek', deepseekApiKey.value)
+    settingsStore.setBaseURL('deepseek', deepseekBaseUrl.value)
+    await settingsStore.setModel('deepseek', deepseekModel.value)
+  }
   
   // 设置OpenAI配置
-  await settingsStore.setApiKey('openai', openaiApiKey.value)
-  settingsStore.setBaseURL('openai', openaiBaseUrl.value)
-  await settingsStore.setModel('openai', openaiModel.value)
+  if (selectedProvider.value === 'openai') {
+    await settingsStore.setApiKey('openai', openaiApiKey.value)
+    settingsStore.setBaseURL('openai', openaiBaseUrl.value)
+    await settingsStore.setModel('openai', openaiModel.value)
+  }
   
-  // 保存全部设置确保同步
+  // 设置Gemini配置
+  if (selectedProvider.value === 'gemini') {
+    await settingsStore.setApiKey('gemini', geminiApiKey.value)
+    settingsStore.setBaseURL('gemini', geminiBaseUrl.value)
+    await settingsStore.setModel('gemini', geminiModel.value)
+  }
+  
+  // 保存所有设置
   await settingsStore.saveSettings()
   
   // 显示保存成功提示
-  showToast('设置已保存')
+  alert('设置已保存')
 }
 
-// 页面生命周期钩子
-onMounted(() => {
-  loadSettings()
-  console.log('SettingsView mounted')
-})
-
-// 激活时触发（keep-alive组件被显示时）
-onActivated(() => {
-  console.log('SettingsView activated')
-  // 每次组件被激活时重新加载设置以确保同步
-  loadSettings()
-})
-
-// 停用时触发（keep-alive组件被隐藏时）
-onDeactivated(() => {
-  console.log('SettingsView deactivated')
-})
-
-// 切换显示调试配置
+// 切换调试配置显示
 const toggleDebugConfig = () => {
   showDebugConfig.value = !showDebugConfig.value
 }
 
-// 显示消息提示
-const showToast = (message: string) => {
-  alert(message) // 简单实现，可以替换为更好的toast组件
-}
+// 组件挂载时加载设置
+onMounted(loadSettings)
 
-// 遮蔽API密钥
-const maskApiKey = (apiKey: string): string => {
-  if (!apiKey) return ''
-  if (apiKey.length <= 8) return '*'.repeat(apiKey.length)
-  return apiKey.substring(0, 4) + '*'.repeat(apiKey.length - 8) + apiKey.substring(apiKey.length - 4)
-}
+// 组件激活时刷新设置
+onActivated(loadSettings)
+
+// 组件销毁时保存设置
+onDeactivated(() => {
+  settingsStore.saveSettings()
+})
 </script>
 
 <style scoped>
@@ -472,6 +525,24 @@ const maskApiKey = (apiKey: string): string => {
   border-left: 3px solid #d32f2f;
   color: #d32f2f;
   font-size: 13px;
+}
+
+.info-note {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: #e8f4fd;
+  border-radius: 4px;
+  border-left: 3px solid #1a73e8;
+  color: #0d47a1;
+  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.info-icon {
+  font-style: normal;
+  color: #1a73e8;
 }
 
 .primary-button {

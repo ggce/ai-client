@@ -49,12 +49,12 @@ export class Session {
   }
   
   // 添加助手消息
-  public addAssistantMessage(content: string, reasoningContent?: string, toolCalls?: Array<ChatCompletionMessageToolCall>): void {
+  public addAssistantMessage(content: string, reasoningContent?: string, tool_calls?: Array<ChatCompletionMessageToolCall>): void {
     const message: Message = {
       role: 'assistant',
       content,
-      tool_calls: toolCalls,
-      reasoning_content: reasoningContent
+      tool_calls,
+      reasoningContent
     }
 
     this.messages.push(message);
@@ -308,7 +308,7 @@ export abstract class BaseClient {
       create?: (request: CompletionRequest) => Promise<CompletionResponse>;
       createStream: (params: {
         model: string;
-        messages: Array<{ role: string; content: string, tool_call_id?: string, tool_calls?: Array<ChatCompletionMessageToolCall> }>;
+        messages: Array<Message>;
         mcpTools?: Array<MCPTool>;
         signal?: AbortSignal;
       }) => Promise<any>;

@@ -6,7 +6,7 @@ export interface Message {
   role: Role;
   content: string;
   name?: string;
-  reasoning_content?: string;
+  reasoningContent?: string;
   tool_calls?: Array<ChatCompletionMessageToolCall>,
   tool_call_id?: string; // 为工具消息添加的可选字段
   timestamp?: number; // 添加时间戳字段
@@ -43,8 +43,8 @@ export interface CompletionChoice {
   message: {
     role: Role;
     content: string | null;
-    function_call?: FunctionCall;
-    reasoning_content?: string;
+    tool_calls?: Array<ChatCompletionMessageToolCall>;  
+    reasoningContent?: string;
   };
   finish_reason: 'stop' | 'length' | 'function_call';
 }
@@ -95,7 +95,7 @@ export interface DeltaChoice {
     role?: Role;
     content?: string;
     function_call?: Partial<FunctionCall>;
-    reasoning_content?: string;
+    reasoningContent?: string;
   };
   finish_reason?: string | null;
 } 

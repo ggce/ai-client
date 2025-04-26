@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import * as fs from 'fs';
 import MCPClient from '../mcpClient';
 import { MCPTool } from '../types';
-import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS } from '../constants';
+import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS, GEMINI_MODELS } from '../constants';
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import logger from '../logger';
 import { AIProviderFactory, ProviderType } from '../providers/aiProviderFactory';
@@ -42,6 +42,12 @@ function initDefaultProviders() {
   apiKey: '',
     baseURL: OPENAI_DEFAULT_URL,
     defaultModel: OPENAI_MODELS.DEFAULT
+  });
+  
+  // 初始化Gemini客户端
+  AIProviderFactory.getProvider('gemini', {
+    apiKey: '',
+    defaultModel: GEMINI_MODELS.DEFAULT
   });
   
   logger.log('Main', '已初始化默认AI提供商');
@@ -154,6 +160,16 @@ function initClientsFromConfig() {
             defaultModel: config.providers.openai.model || OPENAI_MODELS.DEFAULT
           });
           logger.log('Main', '已更新OpenAI API配置');
+        }
+        
+        // 更新Gemini客户端（通过OpenAI客户端实现）
+        if (config.providers.gemini?.apiKey) {
+          AIProviderFactory.getProvider('gemini', {
+            apiKey: config.providers.gemini.apiKey,
+            baseURL: config.providers.gemini.baseURL || OPENAI_DEFAULT_URL, // 使用提供的代理URL或默认OpenAI URL
+            defaultModel: config.providers.gemini.model || GEMINI_MODELS.DEFAULT
+          });
+          logger.log('Main', '已更新Gemini API配置（通过OpenAI格式）');
         }
       }
     }
@@ -448,7 +464,7 @@ router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response)
         ...msg,
         role: msg.role,
         content: msg.content,
-        reasoningContent: msg.reasoning_content,
+        reasoningContent: msg.reasoningContent,
         // 添加其他前端需要的字段
       }));
 
@@ -673,8 +689,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
             // 处理推理内容（如果有）
             if (chunk.choices && 
                 chunk.choices[0]?.delta && 
-                'reasoning_content' in chunk.choices[0].delta) {
-              const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
+                'reasoningContent' in chunk.choices[0].delta) {
+              const reasoningContent = chunk.choices[0].delta.reasoningContent as string;
               if (reasoningContent) {
                 fullReasoningContent += reasoningContent;
                 sendData(res, { reasoningContent });

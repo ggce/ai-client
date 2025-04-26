@@ -1,29 +1,48 @@
+// openai调用风格
 import { ChatCompletionMessageToolCall, ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { 
   ClientOptions, 
   Message,
   MCPTool,
 } from '../types';
-import { withRetry, generateUUID } from '../utils';
-import { OPENAI_DEFAULT_URL, OPENAI_MODELS } from '../constants';
+import {
+  OPENAI_DEFAULT_URL,
+  OPENAI_MODELS,
+  DEEPSEEK_DEFAULT_URL,
+  DEEPSEEK_MODELS
+} from '../constants';
 import logger from '../logger';
 import { BaseClient } from './baseClient';
 
 /**
- * 使用OpenAI SDK连接OpenAI API的客户端实现
+ * 支持OpenAI兼容API的通用客户端实现
  * 支持会话管理和流式API
  */
-export class OpenAIClient extends BaseClient {
-  constructor(options: ClientOptions = {}) {
+export class UnifiedClient extends BaseClient {
+  private provider: 'openai' | 'deepseek';
+
+  constructor(options: ClientOptions & { provider?: 'openai' | 'deepseek' } = {}) {
+    const provider = options.provider || 'openai';
+    const baseURL = options.baseURL || 
+      (provider === 'openai' ? OPENAI_DEFAULT_URL : DEEPSEEK_DEFAULT_URL);
+    const defaultModel = options.defaultModel || 
+      (provider === 'openai' ? OPENAI_MODELS.DEFAULT : DEEPSEEK_MODELS.DEFAULT);
+    
     super({
       apiKey: options.apiKey || '',
-      baseURL: options.baseURL || OPENAI_DEFAULT_URL,
-      defaultModel: options.defaultModel || OPENAI_MODELS.DEFAULT,
+      baseURL,
+      defaultModel,
       timeout: options.timeout || 60000,
       maxRetries: options.maxRetries || 3,
-    }, 'OpenAIClient');
+    }, provider === 'openai' ? 'OpenAIClient' : 'DeepseekClient');
     
+    this.provider = provider;
     logger.log(this.loggerPrefix, '初始化客户端完成');
+  }
+
+  // 检查模型是否为DeepSeek推理模型
+  private isReasonerModel(model: string): boolean {
+    return this.provider === 'deepseek' && model === 'deepseek-reasoner';
   }
 
   public chat = {
@@ -31,7 +50,7 @@ export class OpenAIClient extends BaseClient {
       // 流式API
       createStream: async (params: {
         model: string;
-        messages: Array<{ role: string; content: string, tool_call_id?: string, tool_calls?: Array<ChatCompletionMessageToolCall> }>;
+        messages: Array<Message>;
         mcpTools?: Array<MCPTool>,
         signal?: AbortSignal
       }) => {
@@ -39,8 +58,8 @@ export class OpenAIClient extends BaseClient {
         const messages = params.messages.map(msg => ({
           role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
           content: msg.content,
-          tool_call_id: msg.tool_call_id,
           tool_calls: msg.tool_calls,
+          tool_call_id: msg.tool_call_id,
         })) as ChatCompletionMessageParam[];
 
         try {
@@ -50,8 +69,13 @@ export class OpenAIClient extends BaseClient {
             throw new DOMException('请求已被用户中止', 'AbortError');
           }
 
-          // 确保model不会为undefined
-          const modelName = params.model || this.options.defaultModel || OPENAI_MODELS.DEFAULT;
+          // 确保model不会为undefined，使用默认模型
+          const modelName = params.model || this.options.defaultModel;
+          
+          // 防止模型为undefined
+          if (!modelName) {
+            throw new Error('未指定模型，且无默认模型可用');
+          }
           
           // 添加abort信号监听器
           if (params.signal) {
@@ -61,23 +85,30 @@ export class OpenAIClient extends BaseClient {
             });
           }
           
+          // 处理 Reasoner 模型不支持工具调用的情况
+          const isReasoner = this.isReasonerModel(modelName);
+          
+          // 如果是 Reasoner 模型，过滤掉相关消息
+          const filteredMessages = messages;
+          // 如果是 Reasoner 模型，过滤掉工具
+          const filteredTools = isReasoner ? undefined : params.mcpTools?.map(tool => ({
+            type: 'function' as const,
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters
+            }
+          }));
+          
           // 准备正确类型的API请求参数
           const requestParams = {
             model: modelName,
-            messages,
+            messages: filteredMessages,
             // 确保stream为true (流式)
             stream: true as const,
             max_tokens: 2048,
             temperature: 0.7,
-            // 工具类型正确 - 流式响应也支持工具
-            tools: params.mcpTools?.map(tool => ({
-              type: 'function' as const,
-              function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.parameters
-              }
-            })),
+            tools: filteredTools,
             // 传递中止信号
             signal: params.signal
           };
@@ -111,6 +142,10 @@ export class OpenAIClient extends BaseClient {
 
   // 嵌入API
   public async createEmbedding(input: string | string[]) {
+    if (this.provider !== 'openai') {
+      throw new Error('嵌入API仅在OpenAI提供商中可用');
+    }
+    
     const textInput = Array.isArray(input) ? input : [input];
     
     try {
@@ -125,5 +160,18 @@ export class OpenAIClient extends BaseClient {
       logger.error(this.loggerPrefix, `嵌入API请求失败: ${error}`);
       throw error;
     }
+  }
+}
+
+// 为了保持向后兼容性，保留原始的类名
+export class OpenAIClient extends UnifiedClient {
+  constructor(options: ClientOptions = {}) {
+    super({ ...options, provider: 'openai' });
+  }
+}
+
+export class DeepseekClient extends UnifiedClient {
+  constructor(options: ClientOptions = {}) {
+    super({ ...options, provider: 'deepseek' });
   }
 } 
