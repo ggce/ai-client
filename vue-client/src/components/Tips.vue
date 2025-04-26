@@ -167,7 +167,7 @@ defineExpose({
 .tips-content {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px;
 }
 
 .tips-icon-wrapper {
@@ -205,7 +205,7 @@ defineExpose({
 
 .tips-message {
   flex: 1;
-  font-size: 14.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: #444;
   word-break: break-word;

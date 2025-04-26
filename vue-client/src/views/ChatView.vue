@@ -328,6 +328,7 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
         resolve()
       });
       stream.onError(() => {
+        tips.error('消息发送失败，请稍后再试或检查API配置');
         activeStreamController.value = null
         resolve()
       });
