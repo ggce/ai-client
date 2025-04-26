@@ -32,8 +32,8 @@ export class UnifiedClient extends BaseClient {
       apiKey: options.apiKey || '',
       baseURL,
       defaultModel,
-      timeout: options.timeout || 60000,
-      maxRetries: options.maxRetries || 3,
+      timeout: options.timeout || 180000,
+      maxRetries: options.maxRetries || 5,
     }, provider === 'openai' ? 'OpenAIClient' : 'DeepseekClient');
     
     this.provider = provider;
@@ -106,7 +106,7 @@ export class UnifiedClient extends BaseClient {
             messages: filteredMessages as ChatCompletionMessageParam[],
             // 确保stream为true (流式)
             stream: true as const,
-            max_tokens: 2048,
+            max_tokens: 4096,
             temperature: 0.7,
             tools: filteredTools,
             // 传递中止信号
@@ -114,7 +114,7 @@ export class UnifiedClient extends BaseClient {
           };
 
           // 验证流对象 - 更详细的日志
-          logger.log(this.loggerPrefix, `流式响应开始: ${JSON.stringify(requestParams)}`);
+          logger.log(this.loggerPrefix, `流式请求开始: ${JSON.stringify(requestParams)}`);
 
           // 发送请求
           const stream = await this.client.chat.completions.create(requestParams);

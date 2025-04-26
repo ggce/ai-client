@@ -8,10 +8,12 @@
           class="tool-content-container"
           :class="{ 'collapsed': !isExpanded, 'has-error': isToolError(content) }"
         >
-          <div class="message-content" v-html="toolPreview"></div>
-          <div class="toggle-indicator" @click="toggleExpand">
-            <span class="toggle-text">{{ isExpanded ? '收起' : '展开详情' }}</span>
-            <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
+          <div class="tool-header-row">
+            <div class="message-content" v-html="toolPreview"></div>
+            <div class="toggle-indicator" @click="toggleExpand">
+              <span class="toggle-text">{{ isExpanded ? '收起' : '展开详情' }}</span>
+              <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
+            </div>
           </div>
         </div>
 
@@ -155,4 +157,22 @@ const isToolError = (content: string): boolean => {
 <style scoped>
 @import '../../assets/styles/message.css';
 @import '../../assets/styles/tool-message.css';
+
+/* 自定义样式，使工具消息预览和展开按钮在同一行 */
+.tool-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.tool-header-row .message-content {
+  flex: 1;
+}
+
+.tool-header-row .toggle-indicator {
+  margin-top: 0;
+  margin-left: 12px;
+  white-space: nowrap;
+}
 </style> 

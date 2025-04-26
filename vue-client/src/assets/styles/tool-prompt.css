@@ -219,7 +219,7 @@
 }
 
 .tool-prompt-toggle .toggle-text {
-  font-size: 12px;
+  font-size: 0.8em;
   color: #5D4DB3;
   font-weight: 500;
 }

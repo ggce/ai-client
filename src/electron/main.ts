@@ -589,9 +589,6 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // 防止Nginx缓冲
   
-  // 设置超时时间为较长时间，避免连接过早关闭
-  req.socket.setTimeout(120000);
-  
   // 监听客户端断开连接
   req.on('close', () => {
     logger.log('Main', `客户端断开SSE连接: ${requestId}`);
@@ -776,7 +773,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         // 有需要调用的工具
         if (toolCalls && toolCalls.length > 0) {
           // 添加工具调用会话历史
-          session?.addAssistantMessage('调用工具', '', toolCalls);
+          session?.addAssistantMessage('', '', toolCalls);
           // 信息更新
           isMessageUpdate = true;
         }
