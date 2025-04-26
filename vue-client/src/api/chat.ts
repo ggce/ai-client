@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { objToQueryStr } from '@/utils';
+import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 
 export interface ChatRequestConfig {
   apiKey: string
@@ -31,6 +32,7 @@ export interface SessionConfig {
 export interface SessionMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  tool_calls?: Array<ChatCompletionMessageToolCall>
   tool_call_id?: string
   reasoningContent?: string
 }

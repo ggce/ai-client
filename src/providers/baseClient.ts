@@ -64,11 +64,11 @@ export class Session {
   }
   
   // 添加工具消息
-  public addToolMessage(toolCallId: string, content: string): void {
+  public addToolMessage(tool_call_id: string, content: string): void {
     const message: Message = {
       role: 'tool',
       content,
-      tool_call_id: toolCallId,
+      tool_call_id,
       timestamp: Date.now()
     };
     this.messages.push(message);

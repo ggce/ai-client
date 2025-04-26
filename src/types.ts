@@ -7,8 +7,8 @@ export interface Message {
   content: string;
   name?: string;
   reasoningContent?: string;
-  tool_calls?: Array<ChatCompletionMessageToolCall>,
-  tool_call_id?: string; // 为工具消息添加的可选字段
+  tool_calls?: Array<ChatCompletionMessageToolCall>, // 发起工具调用的ai消息所携带 
+  tool_call_id?: string; // 为工具消息添加的可选字段，用于标识哪个工具
   timestamp?: number; // 添加时间戳字段
 }
 
