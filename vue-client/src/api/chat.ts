@@ -1,64 +1,16 @@
 import axios from 'axios'
 import { objToQueryStr } from '@/utils';
-import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
-
-export interface ChatRequestConfig {
-  apiKey: string
-  baseURL?: string
-}
-
-// 旧版API接口（已过时）
-export interface ChatRequest {
-  message: string
-  provider: string
-  model: string
-  config: ChatRequestConfig
-  stream?: boolean
-  sessionHistory?: Array<{ type: 'user' | 'assistant' | 'system' | 'tool', content: string }>
-}
-
-export interface ChatResponse {
-  reply: string
-  reasoningContent?: string
-}
-
-// 新会话API接口
-export interface SessionConfig {
-  provider?: string
-  model?: string
-  config?: ChatRequestConfig
-}
-
-export interface SessionMessage {
-  role: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
-  tool_calls?: Array<ChatCompletionMessageToolCall>
-  tool_call_id?: string
-  reasoningContent?: string
-}
-
-export interface Session {
-  id: string
-}
-
-export interface MessageOptions {
-  temperature?: number
-  max_tokens?: number
-  model?: string
-}
-
-export interface MessageResponse {
-  content: string
-  role: 'assistant'
-  reasoningContent?: string
-}
-
-export interface MessageCallbackParams {
-  content: string;
-  reasoningContent: string;
-  toolCall: any; // 替代 any 的推荐方案
-  isMessageUpdate: boolean;
-};
+import { 
+  ChatRequestConfig, 
+  ChatRequest, 
+  ChatResponse, 
+  SessionConfig, 
+  SessionMessage, 
+  Session, 
+  MessageOptions, 
+  MessageResponse, 
+  MessageCallbackParams 
+} from '../types';
 
 /**
  * 创建新会话

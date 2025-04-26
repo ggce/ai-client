@@ -17,6 +17,7 @@
             :isLoading="isLoading" 
             :streamingMessage="streamingMessage" 
             :streamingReasoningContent="streamingReasoningContent" 
+            :streamingToolCalls="streamingToolCalls"
           />
           <ChatToolbar :messages="sessionMessages" />
           <div class="input-wrapper">
@@ -58,21 +59,14 @@ import {
   listSessionIds,
   getSessionMessages,
   sendStreamingSessionMessage,
-  deleteSession,
-  SessionMessage
 } from '../api/chat'
+import { SessionMessage, ChatMessage, ToolCall } from '../types';
 import axios from 'axios'
 
 // 定义组件名称
 defineOptions({
   name: 'ChatView'
 })
-
-interface ChatMessage {
-  type: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
-  reasoningContent?: string // 添加推理内容字段
-}
 
 // 本地管理会话ID
 const activeSessionId = ref<string>('')
@@ -89,6 +83,7 @@ const sessionMessages = ref<SessionMessage[]>([])
 // 聊天状态
 const isLoading = ref(false)
 const streamingMessage = ref<string>('')
+const streamingToolCalls = ref<ToolCall[]>([])
 const streamingReasoningContent = ref<string>('') // 添加流式推理内容
 // 存储当前活动的流控制器
 const activeStreamController = ref<AbortController | null>(null)
@@ -126,22 +121,19 @@ const handleSessionDeleted = (deletedId: string) => {
 // 转换服务器消息到显示消息
 const displayMessages = computed<ChatMessage[]>(() => {
   if (!activeSessionId.value) {
-    return [{ type: 'system', content: '请在右侧边栏选择或创建一个会话开始聊天' }]
+    return [{ role: 'system', content: '请在右侧边栏选择或创建一个会话开始聊天' }]
   }
   
   return sessionMessages.value.map(msg => {
-    let type = msg.role
-    
     // 确保reasoningContent是字符串或undefined
     const reasoningContent = typeof msg.reasoningContent === 'string' 
       ? msg.reasoningContent 
       : undefined
     
     return {
-      type,
-      content: msg.content,
-      reasoningContent
-    }
+      ...msg,
+      reasoningContent,
+    } as ChatMessage
   })
 })
 
@@ -307,6 +299,8 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
       if (toolCall) {
         console.log("需要调用工具");
         console.log(toolCall);
+        // 添加进流工具数组
+        streamingToolCalls.value.push(toolCall);
         isUseToolCall = true;
       }
 
@@ -345,6 +339,7 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
       isLoading.value = false
       streamingMessage.value = ''
       streamingReasoningContent.value = ''
+      streamingToolCalls.value = []
       activeStreamController.value = null
     }
   }

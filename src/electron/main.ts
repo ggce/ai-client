@@ -658,8 +658,6 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         let fullReasoningContent = '';
         // 需要调用的工具
         let toolCalls: Array<ChatCompletionMessageToolCall> | null = null;
-        // 需要调用的工具的提示
-        let toolTips: Array<string> | null = null;
         // 当前调用工具index
         let nowToolCallIndex = -1;
         
@@ -689,8 +687,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
             // 处理推理内容（如果有）
             if (chunk.choices && 
                 chunk.choices[0]?.delta && 
-                'reasoningContent' in chunk.choices[0].delta) {
-              const reasoningContent = chunk.choices[0].delta.reasoningContent as string;
+                'reasoning_content' in chunk.choices[0].delta) {
+              const reasoningContent = chunk.choices[0].delta.reasoning_content as string;
               if (reasoningContent) {
                 fullReasoningContent += reasoningContent;
                 sendData(res, { reasoningContent });
@@ -706,6 +704,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
             ) {
               // 从chunk中获取工具调用
               if (chunk.choices[0].delta?.tool_calls[0].type === 'function') {
+                // 上一个function名字和参数收集完毕，发送给前端
+                if (nowToolCallIndex !== -1 && toolCalls) {
+                  sendData(res, { toolCall: toolCalls[nowToolCallIndex] });
+                }
+
                 // 工具index+1
                 nowToolCallIndex += 1;
                 // 赋值
@@ -714,17 +717,6 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 }
                 if (!toolCalls[nowToolCallIndex]) {
                   toolCalls[nowToolCallIndex] = chunk.choices[0].delta?.tool_calls[0] as ChatCompletionMessageToolCall;
-                }
-                if (!toolTips) {
-                  toolTips = [];
-                }
-                if (!toolTips[nowToolCallIndex]) {
-                  toolTips[nowToolCallIndex] = '#useTool';
-                  toolTips[nowToolCallIndex] += `<toolName>${toolCalls[nowToolCallIndex].function.name}</toolName>`;
-
-                  toolTips[nowToolCallIndex] += `<toolArgs>${toolCalls[nowToolCallIndex].function.arguments}`;
-                  
-                  sendData(res, { content: toolTips[nowToolCallIndex] });
                 }
               }
 
@@ -735,13 +727,13 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
                 if (toolCalls && toolCalls[nowToolCallIndex]) {
                   toolCalls[nowToolCallIndex].function.arguments += addStr;
                 }
-                if(toolTips && toolTips[nowToolCallIndex]) {
-                  toolTips[nowToolCallIndex] += addStr;
-                }
-
-                sendData(res, { content: addStr });
               }
             }
+          }
+
+          // 处理最后一个无法发送的情况
+          if (toolCalls && toolCalls.length > 0) {
+            sendData(res, { toolCall: toolCalls[toolCalls.length - 1] });
           }
         } catch (streamError) {
           // 检查是否是中止错误
@@ -783,17 +775,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         // 有需要调用的工具
         if (toolCalls && toolCalls.length > 0) {
-          // 添加末尾的</toolArgs>
-          if (toolTips) {
-            toolTips = toolTips?.map(tip => {
-              const addStr = '</toolArgs>';
-              sendData(res, { content: addStr });
-              return tip += addStr;
-            });
-          }
-          
           // 添加工具调用会话历史
-          session?.addAssistantMessage(toolTips ? toolTips.join('\n') : '', '', toolCalls);
+          session?.addAssistantMessage('调用工具', '', toolCalls);
           // 信息更新
           isMessageUpdate = true;
         }
@@ -841,7 +824,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
             }
 
             // 提醒前端更新信息
-            sendData(res, { isMessageUpdate: true, toolCall });
+            sendData(res, { isMessageUpdate: true });
           }
           
           // 清理会话的工具调用状态

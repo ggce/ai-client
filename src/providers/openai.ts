@@ -58,9 +58,9 @@ export class UnifiedClient extends BaseClient {
         const messages = params.messages.map(msg => ({
           role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
           content: msg.content,
-          tool_calls: msg.tool_calls,
-          tool_call_id: msg.tool_call_id,
-        })) as ChatCompletionMessageParam[];
+          tool_calls: msg.toolCalls,
+          tool_call_id: msg.toolCallId,
+        }));
 
         try {
           // 检查abort信号是否已被触发
@@ -88,8 +88,8 @@ export class UnifiedClient extends BaseClient {
           // 处理 Reasoner 模型不支持工具调用的情况
           const isReasoner = this.isReasonerModel(modelName);
           
-          // 如果是 Reasoner 模型，过滤掉相关消息
-          const filteredMessages = messages;
+          // 如果是 Reasoner 模型，过滤掉工具调用、响应消息
+          const filteredMessages = isReasoner ? messages.filter(msg => !msg.tool_calls && msg.role !== 'tool') : messages;
           // 如果是 Reasoner 模型，过滤掉工具
           const filteredTools = isReasoner ? undefined : params.mcpTools?.map(tool => ({
             type: 'function' as const,
@@ -103,7 +103,7 @@ export class UnifiedClient extends BaseClient {
           // 准备正确类型的API请求参数
           const requestParams = {
             model: modelName,
-            messages: filteredMessages,
+            messages: filteredMessages as ChatCompletionMessageParam[],
             // 确保stream为true (流式)
             stream: true as const,
             max_tokens: 2048,
@@ -114,12 +114,7 @@ export class UnifiedClient extends BaseClient {
           };
 
           // 验证流对象 - 更详细的日志
-          logger.log(this.loggerPrefix, `流式响应开始: ${JSON.stringify({
-            model: modelName,
-            messagesCount: messages.length,
-            hasSignal: !!params.signal,
-            isAborted: params.signal?.aborted
-          })}`);
+          logger.log(this.loggerPrefix, `流式响应开始: ${JSON.stringify(requestParams)}`);
 
           // 发送请求
           const stream = await this.client.chat.completions.create(requestParams);

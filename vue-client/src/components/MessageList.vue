@@ -8,34 +8,35 @@
         !(
           isLoading &&
           streamingMessage &&
-          message.type === 'assistant' &&
+          message.role === 'assistant' &&
           index === messages.length - 1
         )
       "
     >
       <!-- User messages -->
       <UserMessage
-        v-if="message.type === 'user'"
+        v-if="message.role === 'user'"
         :content="message.content"
       />
 
       <!-- System messages -->
       <SystemMessage
-        v-if="message.type === 'system'"
+        v-if="message.role === 'system'"
         :content="message.content"
       />
 
       <!-- Tool messages -->
       <ToolMessage
-        v-if="message.type === 'tool'"
+        v-if="message.role === 'tool'"
         :content="message.content" 
       />
 
       <!-- Assistant messages - regular or tool prompt -->
-      <template v-if="message.type === 'assistant'">
+      <template v-if="message.role === 'assistant'">
         <ToolPromptMessage 
-          v-if="isToolPromptMessage(message.content)"
+          v-if="message.toolCalls"
           :content="message.content"
+          :toolCalls="message.toolCalls"
           @tool-click="handleToolClick"
         />
         <AssistantMessage
@@ -64,7 +65,8 @@
       v-if="isLoading && streamingMessage"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
-      :is-tool-calling-mode="isToolCallMessage(streamingMessage)"
+      :streamingToolCalls="streamingToolCalls"
+      :is-tool-calling-mode="streamingToolCalls && streamingToolCalls.length > 0"
       @tool-click="handleToolClick"
     />
 
@@ -78,7 +80,6 @@
 
 <script setup lang="ts">
 import { defineProps, ref, watch, onMounted, nextTick, onUnmounted } from "vue";
-import MarkdownIt from "markdown-it";
 
 // Import message components
 import UserMessage from "./messages/UserMessage.vue";
@@ -89,6 +90,8 @@ import ToolPromptMessage from "./messages/ToolPromptMessage.vue";
 import LoadingMessage from "./messages/LoadingMessage.vue";
 import StreamingMessage from "./messages/StreamingMessage.vue";
 import ToolInfoPopup from './messages/ToolInfoPopup.vue';
+
+import { ChatMessage, ToolCall } from '../types';
 
 // Define the window interface for Electron APIs
 declare global {
@@ -105,27 +108,17 @@ declare global {
   }
 }
 
-interface ChatMessage {
-  type: 'user' | 'assistant' | 'system' | 'tool'
-  content: string;
-  reasoningContent?: string; // 添加推理内容字段
-}
-
 const props = defineProps<{
   messages: ChatMessage[];
   isLoading?: boolean;
   streamingMessage?: string;
   streamingReasoningContent?: string; // 添加流式推理内容
+  streamingToolCalls?: ToolCall[],  // 工具数组
 }>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
 const toolInfoPopup = ref<any>(null);
 const showToolInfo = ref(false);
-
-// 检查消息是否为工具调用提示
-const isToolPromptMessage = (content: string): boolean => {
-  return content.startsWith('#useTool<toolName>');
-};
 
 // 检查是否为工具调用消息
 const isToolCallMessage = (content: string): boolean => {

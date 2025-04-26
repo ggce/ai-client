@@ -4,6 +4,7 @@
     v-if="isToolPromptMessage(message)"
     :is-loading="true"
     :content="message"
+    :toolCalls="streamingToolCalls"
     :show-streaming-indicator="true"
     @tool-click="(toolName) => emit('tool-click', toolName)"
   />
@@ -58,11 +59,13 @@ import MessageAvatar from "./MessageAvatar.vue";
 import ReasoningContainer from "./ReasoningContainer.vue";
 import ToolPromptMessage from "./ToolPromptMessage.vue";
 import MarkdownIt from "markdown-it";
+import { ToolCall } from '../../types';
 
 const props = defineProps<{
   message: string;
   reasoningContent?: string;
   isReasoningOnlyMode?: boolean;
+  streamingToolCalls?: ToolCall[];
   isToolCallingMode?: boolean;
 }>();
 

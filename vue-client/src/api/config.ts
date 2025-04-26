@@ -1,22 +1,5 @@
 import axios from 'axios'
-
-// 使用与settings.ts相同的类型定义
-type Provider = 'deepseek' | 'openai'
-
-interface ProviderConfig {
-  apiKey: string
-  baseURL: string
-  model: string
-}
-
-interface SettingsState {
-  providers: {
-    [key: string]: ProviderConfig
-  }
-  currentProvider: Provider
-  isSidebarCollapsed: boolean
-  selectedTools?: string[] // 存储选中的工具名称数组
-}
+import { Provider, ProviderConfig, SettingsState, DeepSeekBalanceInfo, DeepSeekBalanceResponse } from '../types'
 
 // 加载配置
 export const loadConfig = async (): Promise<SettingsState | null> => {
@@ -55,8 +38,8 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
       }
       
       if (config.currentProvider && 
-         (config.currentProvider === 'deepseek' || config.currentProvider === 'openai')) {
-        completeConfig.currentProvider = config.currentProvider
+         (config.currentProvider === 'deepseek' || config.currentProvider === 'openai' || config.currentProvider === 'gemini')) {
+        completeConfig.currentProvider = config.currentProvider as Provider
       }
       
       if (typeof config.isSidebarCollapsed === 'boolean') {
@@ -137,18 +120,6 @@ export const saveModel = async (provider: Provider, model: string): Promise<bool
 }
 
 // 查询DeepSeek账户余额
-export interface DeepSeekBalanceInfo {
-  currency: 'CNY' | 'USD';
-  total_balance: string;
-  granted_balance: string;
-  topped_up_balance: string;
-}
-
-export interface DeepSeekBalanceResponse {
-  is_available: boolean;
-  balance_infos: DeepSeekBalanceInfo[];
-}
-
 export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanceResponse> => {
   try {
     const response = await axios.get(`/api/deepseek/balance?apiKey=${encodeURIComponent(apiKey)}`);
@@ -159,11 +130,10 @@ export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanc
   }
 }
 
-
 // 获取默认模型
 export function getDefaultModel(provider: string): string {
   const config = getConfig();
   return provider === 'deepseek' 
     ? (config?.deepseek?.model || 'deepseek-chat') 
     : (config?.openai?.model || 'gpt-4.1');
-} 
+}

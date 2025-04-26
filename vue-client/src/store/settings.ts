@@ -1,24 +1,7 @@
 import { defineStore } from 'pinia'
 import { loadConfig, saveConfig, saveApiKey, saveModel } from '../api/config'
 import router from '../router'
-
-// Define the Provider type exported from this module
-export type Provider = 'deepseek' | 'openai' | 'gemini'
-
-interface ProviderConfig {
-  apiKey: string
-  baseURL: string
-  model: string
-}
-
-interface SettingsState {
-  providers: {
-    [key: string]: ProviderConfig
-  }
-  currentProvider: Provider
-  isSidebarCollapsed: boolean
-  isSessionSidebarCollapsed?: boolean
-}
+import { Provider, ProviderConfig, SettingsState } from '../types'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => {
@@ -165,4 +148,4 @@ export const useSettingsStore = defineStore('settings', {
       }
     }
   }
-}) 
+})

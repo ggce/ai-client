@@ -7,8 +7,8 @@ export interface Message {
   content: string;
   name?: string;
   reasoningContent?: string;
-  tool_calls?: Array<ChatCompletionMessageToolCall>, // 发起工具调用的ai消息所携带 
-  tool_call_id?: string; // 为工具消息添加的可选字段，用于标识哪个工具
+  toolCalls?: Array<ChatCompletionMessageToolCall>, // 发起工具调用的ai消息所携带 
+  toolCallId?: string; // 为工具消息添加的可选字段，用于标识哪个工具
   timestamp?: number; // 添加时间戳字段
 }
 
@@ -43,7 +43,7 @@ export interface CompletionChoice {
   message: {
     role: Role;
     content: string | null;
-    tool_calls?: Array<ChatCompletionMessageToolCall>;  
+    toolCalls?: Array<ChatCompletionMessageToolCall>;  
     reasoningContent?: string;
   };
   finish_reason: 'stop' | 'length' | 'function_call';
