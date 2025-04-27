@@ -591,4 +591,31 @@ h1 small {
 .model-subtitle {
   font-size: 13px;
 }
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px; /* 减小滚动条宽度 */
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02); /* 滚动条轨道的颜色 */
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15); /* 滚动条滑块的颜色 */
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3); /* 鼠标悬停时的颜色 */
+}
+
+/* 确保消息列表的滚动条也使用自定义样式 */
+:deep(.message-list) {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(0, 0, 0, 0.15) rgba(0, 0, 0, 0.02); /* Firefox */
+}
 </style>

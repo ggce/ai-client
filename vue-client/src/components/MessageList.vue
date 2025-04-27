@@ -44,6 +44,7 @@
           :content="message.content"
           :reasoning-content="message.reasoningContent"
           :index="index"
+          :total-length="messages.length"
         />
       </template>
     </div>
@@ -101,6 +102,7 @@ declare global {
       getAppVersion: () => Promise<string>;
       openFile: () => Promise<string | null>;
       saveFile: (content: string) => Promise<boolean>;
+      sendNotification?: (options: any) => Promise<void>;
     };
     electron?: {
       openExternal: (url: string) => void;
@@ -120,16 +122,38 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const toolInfoPopup = ref<any>(null);
 const showToolInfo = ref(false);
 
+// 滚动控制变量
+const userHasScrolled = ref(false);
+const isNearBottom = ref(true);
+const scrollThreshold = 100; // 距离底部多少像素内视为"接近底部"
+
 // 检查是否为工具调用消息
 const isToolCallMessage = (content: string): boolean => {
   return content.includes('#useTool<toolName>') || content.includes('<toolArgs>');
 };
 
-// 自动滚动到底部
+// 检查是否在底部附近
+const checkIfNearBottom = (): boolean => {
+  if (!messagesContainer.value) return true;
+  
+  const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
+  const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+  
+  return distanceFromBottom <= scrollThreshold;
+};
+
+// 自动滚动到底部 - 增加智能判断
 const scrollToBottom = async () => {
   await nextTick();
   if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    // 只有当用户没有手动滚动，或者用户已经滚动到接近底部时才自动滚动
+    if (!userHasScrolled.value || isNearBottom.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      // 重置用户滚动标志
+      if (isNearBottom.value) {
+        userHasScrolled.value = false;
+      }
+    }
   }
 };
 
@@ -144,7 +168,23 @@ const scrollReasoningToBottom = async () => {
   });
 };
 
-// 监听消息变化，自动滚动
+// 处理滚动事件
+const handleScroll = () => {
+  if (!messagesContainer.value) return;
+  
+  // 用户手动滚动时设置标志
+  userHasScrolled.value = true;
+  
+  // 检查是否接近底部
+  isNearBottom.value = checkIfNearBottom();
+  
+  // 如果滚动到底部，重置用户滚动标志
+  if (isNearBottom.value) {
+    userHasScrolled.value = false;
+  }
+};
+
+// 监听消息变化，自动滚动 - 现在考虑用户行为
 watch(
   () => props.messages.length,
   () => {
@@ -155,12 +195,17 @@ watch(
 // 监听加载状态变化，自动滚动
 watch(
   () => props.isLoading,
-  () => {
-    scrollToBottom();
+  (newVal, oldVal) => {
+    // 当加载开始或结束时，应该滚动到底部
+    if (newVal !== oldVal) {
+      // 当AI开始回复或结束回复时，重置用户滚动状态
+      userHasScrolled.value = false;
+      scrollToBottom();
+    }
   }
 );
 
-// 监听推理消息变化，自动滚动
+// 监听推理消息变化，智能自动滚动
 watch(
   () => props.streamingReasoningContent,
   () => {
@@ -170,7 +215,7 @@ watch(
   { immediate: true }
 );
 
-// 监听流式消息变化，自动滚动
+// 监听流式消息变化，智能自动滚动
 watch(
   () => props.streamingMessage,
   () => {
@@ -179,12 +224,26 @@ watch(
   { immediate: true }
 );
 
-// 初始化时滚动到底部
+// 初始化时设置滚动监听
 onMounted(() => {
+  // 初始滚动到底部
   scrollToBottom();
   
-  // Add event listener for all link clicks in the messages container
+  // 添加滚动事件监听器
+  if (messagesContainer.value) {
+    messagesContainer.value.addEventListener('scroll', handleScroll);
+  }
+  
+  // 添加链接点击事件监听器
   document.addEventListener('click', handleLinkClick);
+});
+
+// 组件卸载时清理事件监听器
+onUnmounted(() => {
+  if (messagesContainer.value) {
+    messagesContainer.value.removeEventListener('scroll', handleScroll);
+  }
+  document.removeEventListener('click', handleLinkClick);
 });
 
 // Handle link clicks to open in default browser
@@ -223,11 +282,6 @@ const handleLinkClick = (event: MouseEvent) => {
     }
   }
 };
-
-// Clean up event listeners when component is unmounted
-onUnmounted(() => {
-  document.removeEventListener('click', handleLinkClick);
-});
 
 // Handle tool clicks by delegating to the ToolInfoPopup component
 const handleToolClick = (toolName: string) => {

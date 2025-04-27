@@ -41,6 +41,7 @@ const props = defineProps<{
   content: string;
   reasoningContent?: string;
   index: number;
+  totalLength?: number;
 }>();
 
 // 添加一个消息中正在被查看的推理内容的索引
@@ -94,7 +95,11 @@ function isQuestion(text: string = '') {
 
 onMounted(() => {
   // AI提出问题
-  if (!isNotifyed.value && isQuestion(props.content)) {
+  if (
+    props.totalLength === props.index + 1 &&  // 最后一个消息
+    !isNotifyed.value &&  // 未通知过
+    isQuestion(props.content)  // 是问题
+  ) {
     // 提示
     NotificationUtil.info('等待您的进一步指示', props.content);
     // 设置通知过
