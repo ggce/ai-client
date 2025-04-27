@@ -6,14 +6,33 @@
 }
 
 .message {
-  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
 }
 
 .message-row {
+  position: relative;
   display: flex;
   align-items: flex-start;
+  padding-bottom: 20px;
+
+    &:hover {
+      .message-actions {
+        display: block;
+      }
+    }
+
+    &.message-row-assistant {
+      .message-actions {
+        left: 50px;
+      }
+    }
+
+    &.message-row-user {
+      .message-actions {
+        right: 50px;
+      }
+    }
 }
 
 .message.user .message-row {
@@ -166,9 +185,9 @@
 
 /* Button Styles */
 .message-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
+  display: none;
+  position: absolute;
+  bottom: 0;
 }
 
 .copy-button {

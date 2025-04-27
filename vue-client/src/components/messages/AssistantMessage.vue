@@ -1,6 +1,6 @@
 <template>
   <div class="message assistant">
-    <div class="message-row">
+    <div class="message-row message-row-assistant">
       <MessageAvatar type="assistant" />
       <div class="message-container ai-message-container">
         <!-- 显示推理内容区域 (仅当有推理内容时) -->
@@ -17,14 +17,14 @@
           class="message-content"
           v-html="formattedContent"
         ></div>
-
-        <!-- 只在AI消息下添加复制按钮 -->
-        <MessageActions 
-          v-if="!isToolPromptMessage(content)"
-          :content="content"
-          :index="index"
-        />
       </div>
+
+      <!-- 消息操作栏 -->
+      <MessageActions 
+        v-if="!isToolPromptMessage(content)"
+        :content="content"
+        :index="index"
+      />
     </div>
   </div>
 </template>
@@ -34,7 +34,7 @@ import { defineProps, computed, ref } from 'vue';
 import MessageAvatar from './MessageAvatar.vue';
 import MessageActions from './MessageActions.vue';
 import ReasoningContainer from './ReasoningContainer.vue';
-import MarkdownIt from 'markdown-it';
+import { createMarkdownRenderer } from '../../utils/markdown';
 
 const props = defineProps<{
   content: string;
@@ -63,33 +63,7 @@ const isToolPromptMessage = (content: string): boolean => {
 };
 
 // 初始化markdown解析器
-const md = new MarkdownIt({
-  breaks: true,
-  linkify: true,
-  typographer: true,
-});
-
-// Configure md to add target="_blank" to all links
-md.renderer.rules.link_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
-  // Add target="_blank" and rel="noopener noreferrer" to all links
-  const token = tokens[idx];
-  const aIndex = token.attrIndex('target');
-  
-  if (aIndex < 0) {
-    token.attrPush(['target', '_blank']);
-    token.attrPush(['rel', 'noopener noreferrer']);
-  } else if (token.attrs) {
-    token.attrs[aIndex][1] = '_blank';
-    
-    const relIndex = token.attrIndex('rel');
-    if (relIndex < 0) {
-      token.attrPush(['rel', 'noopener noreferrer']);
-    }
-  }
-  
-  // Return default renderer result
-  return self.renderToken(tokens, idx, options);
-};
+const md = createMarkdownRenderer();
 
 // 格式化消息
 const formattedContent = computed(() => {
