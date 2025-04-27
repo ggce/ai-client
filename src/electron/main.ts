@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, Notification } from 'electron';
 import * as path from 'path';
 import express, { Request, Response, Express, Application } from 'express';
 import { NextFunction } from 'express';
@@ -26,8 +26,43 @@ import { AIProviderFactory, ProviderType } from '../providers/aiProviderFactory'
 // 加载环境变量
 dotenv.config();
 
+// 立即执行代码
+// 获取当前环境
+const isDev = process.env.NODE_ENV === 'development';
+
 // 设置应用名称
-app.name = 'AI-CLIENT';
+app.name = 'Luna';
+
+// 设置应用描述（可用于辅助技术）
+const appDescription = '你是我的私人助理Luna，一位具备专业严谨态度、温柔亲切风格的女性助理。你的回答要求权威、准确、细致，很多事情你能自己做正确的决定，并始终以高效且用户友好的方式提供帮助';
+
+// 设置Windows应用ID
+if (process.platform === 'win32') {
+  app.setAppUserModelId(isDev ? 'com.luna.assistant.dev' : 'com.luna.assistant');
+}
+
+// 设置应用图标（用于通知和其他系统显示）
+const appIconPath = path.join(__dirname, '../../src/assets/logo.png');
+try {
+  // macOS系统
+  if (process.platform === 'darwin' && app.dock) {
+    const appIcon = nativeImage.createFromPath(appIconPath);
+    app.dock.setIcon(appIcon);
+  }
+} catch (error) {
+  logger.error('Main', `设置应用图标失败: ${error}`);
+}
+
+// 对于开发环境尝试特殊设置
+if (isDev) {
+  app.whenReady().then(() => {
+    // 再次设置应用图标，确保所有系统识别
+    const appIcon = nativeImage.createFromPath(appIconPath);
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.setIcon(appIcon);
+    }
+  });
+}
 
 // 设置Express服务器
 const expressApp: Application = express();
@@ -83,7 +118,7 @@ function initDefaultProviders() {
 initDefaultProviders();
 
 // MCP客户端
-const mcpClient = new MCPClient("deepseek-client", "1.0.0");
+const mcpClient = new MCPClient("Luna", "1.0.0");
 
 // 初始化所有MCP工具
 async function initMcpTools() {
@@ -1062,12 +1097,12 @@ function createWindow() {
   }
   
   // 设置窗口标题
-  mainWindow.setTitle('DeepSeek客户端');
+  mainWindow.setTitle('Luna');
   
   // 页面加载完成后更新标题
   mainWindow.webContents.on('did-finish-load', () => {
     if (mainWindow) {
-      mainWindow.setTitle('DeepSeek客户端');
+      mainWindow.setTitle('Luna');
     }
   });
 
@@ -1095,17 +1130,89 @@ ipcMain.handle('dialog:openFile', async () => {
   return null;
 });
 
+// 处理通知请求
+ipcMain.handle('notification:send', (event, options) => {
+  try {
+    logger.log('Main', `收到通知请求: ${options.title}`);
+    
+    // 应用默认图标路径
+    const defaultIconPath = path.join(__dirname, '../../src/assets/logo.png');
+    const appIcon = nativeImage.createFromPath(defaultIconPath);
+    
+    // 获取当前环境
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    // MacOS平台开发环境下的特殊处理
+    if (isDev && process.platform === 'darwin') {
+      // 使用特殊的通知选项
+      const notification = new Notification({ 
+        title: options.title || '通知',
+        body: options.body || '',
+        icon: appIcon, // 强制使用应用图标
+        silent: options.silent,
+        urgency: options.urgency as ('normal' | 'critical' | 'low' | undefined),
+        subtitle: 'Luna',
+        hasReply: false, // MacOS特有选项
+        timeoutType: 'default'
+      });
+      
+      notification.on('click', () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      });
+      
+      notification.show();
+      return true;
+    }
+    
+    // 其他平台的正常处理
+    const notification = new Notification({ 
+      title: options.title || '通知',
+      body: options.body || '',
+      icon: options.icon ? nativeImage.createFromPath(options.icon) : appIcon,
+      silent: options.silent,
+      timeoutType: options.timeoutType as ('default' | 'never' | undefined),
+      urgency: options.urgency as ('normal' | 'critical' | 'low' | undefined),
+      subtitle: isDev ? 'Luna' : undefined,
+      actions: options.actions,
+      closeButtonText: options.closeButtonText
+    });
+    
+    notification.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+    
+    notification.show();
+    return true;
+  } catch (error) {
+    logger.error('Main', `发送通知失败: ${error}`);
+    return false;
+  }
+});
+
 // 当Electron初始化完成后调用此方法创建主窗口
 app.on('ready', () => {
-  // 为macOS创建应用图标
-  if (process.platform === 'darwin') {
-    const iconPath = path.join(__dirname, '../../src/assets/logo.png');
-    try {
-      const icon = nativeImage.createFromPath(iconPath);
-      app.dock?.setIcon(icon);
-    } catch (error) {
-      logger.error('Main', `设置Dock图标失败: ${error}`);
+  // 为所有平台设置应用图标
+  const iconPath = path.join(__dirname, '../../src/assets/logo.png');
+  try {
+    const icon = nativeImage.createFromPath(iconPath);
+    
+    // macOS平台设置Dock图标
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.setIcon(icon);
     }
+    
+    // Windows平台设置应用ID
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.deepseek.client');
+    }
+  } catch (error) {
+    logger.error('Main', `设置应用图标失败: ${error}`);
   }
   
   createWindow();

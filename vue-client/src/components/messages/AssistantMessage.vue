@@ -30,11 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, computed, ref } from 'vue';
+import { defineProps, computed, ref, onMounted } from 'vue';
 import MessageAvatar from './MessageAvatar.vue';
 import MessageActions from './MessageActions.vue';
 import ReasoningContainer from './ReasoningContainer.vue';
 import { createMarkdownRenderer } from '../../utils/markdown';
+import NotificationUtil from '@/utils/notification';
 
 const props = defineProps<{
   content: string;
@@ -44,6 +45,9 @@ const props = defineProps<{
 
 // 添加一个消息中正在被查看的推理内容的索引
 const expandedReasoningIndex = ref<number | null>(null);
+
+// 是否通知过
+const isNotifyed = ref(false);
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
@@ -70,6 +74,33 @@ const formattedContent = computed(() => {
   if (!props.content) return "";
   return md.render(props.content);
 });
+
+// 是否是问题
+function isQuestion(text: string = '') {
+  const questionKeywords: string[] = [
+    "请问",
+    "请提供",
+    "请指示",
+    "请告诉",
+    "请告知",
+    "您能否",
+    "您有什么",
+    "您有没有",
+    "我可以怎样",
+    "我希望了解",
+  ];
+  return text.endsWith("？") || text.endsWith("?") || questionKeywords.some(keyword => text.includes(keyword));;
+}
+
+onMounted(() => {
+  // AI提出问题
+  if (!isNotifyed.value && isQuestion(props.content)) {
+    // 提示
+    NotificationUtil.info('等待您的进一步指示', props.content);
+    // 设置通知过
+    isNotifyed.value = true;
+  }
+})
 </script>
 
 <style scoped>

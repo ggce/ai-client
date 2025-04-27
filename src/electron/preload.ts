@@ -15,7 +15,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (content: string) => ipcRenderer.invoke('dialog:saveFile', content),
   
   // 打开外部链接
-  openExternalLink: (url: string) => shell.openExternal(url)
+  openExternalLink: (url: string) => shell.openExternal(url),
+  
+  // 发送系统通知
+  sendNotification: (options: any) => ipcRenderer.invoke('notification:send', options)
 });
 
 // 暴露用于打开外部链接的API

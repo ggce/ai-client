@@ -1,7 +1,7 @@
 {
-  "name": "deepseek-client",
+  "name": "luna-assistant",
   "version": "1.0.0",
-  "description": "DeepSeek V3模型客户端，支持MCP多云协议",
+  "description": "Luna - 你的私人助理，一位具备专业严谨态度、温柔亲切风格的AI助理",
   "main": "dist/electron/main.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -57,8 +57,8 @@
     "typescript": "^5.8.3"
   },
   "build": {
-    "appId": "com.deepseek.client",
-    "productName": "Deepseek客户端",
+    "appId": "com.luna.assistant",
+    "productName": "Luna",
     "directories": {
       "output": "build"
     },
