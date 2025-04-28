@@ -33,6 +33,10 @@
         right: 50px;
       }
     }
+  
+  pre {
+    max-width: 100% !important;
+  }
 }
 
 .message.user .message-row {

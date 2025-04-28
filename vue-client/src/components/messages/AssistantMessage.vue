@@ -47,9 +47,6 @@ const props = defineProps<{
 // 添加一个消息中正在被查看的推理内容的索引
 const expandedReasoningIndex = ref<number | null>(null);
 
-// 是否通知过
-const isNotifyed = ref(false);
-
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
   // 防止事件冒泡
@@ -81,6 +78,7 @@ function isQuestion(text: string = '') {
   const questionKeywords: string[] = [
     "请问",
     "请提供",
+    "请确认",
     "请指示",
     "请告诉",
     "请告知",
@@ -93,17 +91,47 @@ function isQuestion(text: string = '') {
   return text.endsWith("？") || text.endsWith("?") || questionKeywords.some(keyword => text.includes(keyword));;
 }
 
+// 通知
+function notify(text: string = '') {
+  if (!text || isNotifyed(text)) {
+    return;
+  }
+
+  const setText = text.slice(0, 20);
+
+  const notifyedMap = sessionStorage.getItem('notifyedMap');
+  if (!notifyedMap) {
+    sessionStorage.setItem('notifyedMap', JSON.stringify([setText]));
+  } else {
+    const notifyedMapList = JSON.parse(notifyedMap);
+    notifyedMapList.push(setText);
+    sessionStorage.setItem('notifyedMap', JSON.stringify(notifyedMapList));
+  }
+
+  // 提示
+  NotificationUtil.info('等待您的进一步指示', text);
+}
+
+// 是否通知过
+function isNotifyed(text: string = '') {
+  const notifyedMap = sessionStorage.getItem('notifyedMap');
+
+  if (!notifyedMap) {
+    return false;
+  }
+
+  const notifyedMapList = JSON.parse(notifyedMap);
+  
+  return notifyedMapList.includes(text.slice(0, 20));
+}
+
 onMounted(() => {
   // AI提出问题
   if (
     props.totalLength === props.index + 1 &&  // 最后一个消息
-    !isNotifyed.value &&  // 未通知过
     isQuestion(props.content)  // 是问题
   ) {
-    // 提示
-    NotificationUtil.info('等待您的进一步指示', props.content);
-    // 设置通知过
-    isNotifyed.value = true;
+    notify(props.content);
   }
 })
 </script>
