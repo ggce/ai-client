@@ -32,7 +32,7 @@
             is-streaming
           />
           <!-- 回答中 -->
-          <div v-else class="message-content" v-html="formattedMessage"></div>
+          <div class="message-content" v-html="formattedMessage"></div>
           <div class="streaming-indicator">
             <span class="dot"></span>
             <span class="dot"></span>
