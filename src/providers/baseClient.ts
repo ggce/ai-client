@@ -168,7 +168,7 @@ export abstract class BaseClient {
       logger.log(this.loggerPrefix, '成功加载Luna系统提示');
     } catch (error) {
       logger.error(this.loggerPrefix, `加载Luna系统提示失败: ${error}`);
-      this.lunaSystemPrompt = '你是Luna，一位专业的AI助手。';
+      this.lunaSystemPrompt = '';
     }
     
     logger.log(this.loggerPrefix, '初始化客户端完成');
@@ -205,6 +205,9 @@ export abstract class BaseClient {
       throw new Error('历史摘要器未初始化');
     }
     const { exceeded, estimatedTokens } = this.historySummarizer.checkTokenLimit(messages, this.tokenLimit);
+
+    logger.log(this.loggerPrefix, `当前token数: ${estimatedTokens}`);
+
     // 检查是否超过token限制
     if (exceeded) {
       logger.warn(this.loggerPrefix, `会话token数超限: ${Math.round(estimatedTokens)} > ${this.tokenLimit}`);
@@ -300,8 +303,10 @@ export abstract class BaseClient {
     const sessionId = session.getId();
     logger.log(this.loggerPrefix, `创建新会话: ${sessionId}`);
 
-    // 添加luna的系统消息
-    session.addSystemMessage(this.lunaSystemPrompt, false);
+    if (this.lunaSystemPrompt) {
+      // 添加luna的系统消息
+      session.addSystemMessage(this.lunaSystemPrompt, false);
+    }
 
     // 继续前一对话
     if (summary) {

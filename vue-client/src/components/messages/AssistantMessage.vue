@@ -13,7 +13,6 @@
 
         <!-- 普通消息内容显示 -->
         <div
-          v-if="!isToolPromptMessage(content)"
           class="message-content"
           v-html="formattedContent"
         ></div>
@@ -21,7 +20,6 @@
 
       <!-- 消息操作栏 -->
       <MessageActions 
-        v-if="!isToolPromptMessage(content)"
         :content="content"
         :index="index"
       />
@@ -57,11 +55,6 @@ const toggleReasoning = () => {
   } else {
     expandedReasoningIndex.value = props.index; // 展开
   }
-};
-
-// 检查消息是否为工具调用提示
-const isToolPromptMessage = (content: string): boolean => {
-  return content.startsWith('#useTool<toolName>');
 };
 
 // 初始化markdown解析器

@@ -34,7 +34,7 @@
       <!-- Assistant messages - regular or tool prompt -->
       <template v-if="message.role === 'assistant'">
         <ToolPromptMessage 
-          v-if="message.toolCalls"
+          v-if="message.toolCalls && message.toolCalls.length > 0"
           :content="message.content"
           :next-messages="messages.slice(index + 1)"
           :toolCalls="message.toolCalls"
@@ -60,17 +60,13 @@
       :message="''"
       :reasoning-content="streamingReasoningContent"
       :is-reasoning-only-mode="true"
-      @tool-click="handleToolClick"
     />
 
-    <!-- Streaming message state - 判断是否为工具调用 -->
+    <!-- Streaming message state -->
     <StreamingMessage 
       v-if="isLoading && streamingMessage"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
-      :streamingToolCalls="streamingToolCalls"
-      :is-tool-calling-mode="streamingToolCalls && streamingToolCalls.length > 0"
-      @tool-click="handleToolClick"
     />
 
     <!-- Tool info popup -->
@@ -137,11 +133,6 @@ const currentToolResult = ref('');
 const userHasScrolled = ref(false);
 const isNearBottom = ref(true);
 const scrollThreshold = 100; // 距离底部多少像素内视为"接近底部"
-
-// 检查是否为工具调用消息
-const isToolCallMessage = (content: string): boolean => {
-  return content.includes('#useTool<toolName>') || content.includes('<toolArgs>');
-};
 
 // 检查是否在底部附近
 const checkIfNearBottom = (): boolean => {

@@ -848,10 +848,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         }
 
         // 文字流
-        if (
-          (fullContent || fullReasoningContent)
-          && (!fullContent.startsWith('#useTool'))
-        ) {
+        if (fullContent || fullReasoningContent) {
           // 将完整响应添加到会话历史
           session?.addAssistantMessage(fullContent, fullReasoningContent);
           // 信息更新

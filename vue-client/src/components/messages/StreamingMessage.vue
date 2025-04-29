@@ -1,14 +1,5 @@
 <template>
-  <!-- 工具调用中 -->
-  <ToolPromptMessage
-    v-if="isToolPromptMessage(message)"
-    :is-loading="true"
-    :content="message"
-    :toolCalls="streamingToolCalls"
-    :show-streaming-indicator="true"
-    @tool-click="(toolName) => emit('tool-click', toolName)"
-  />
-  <template v-else-if="isReasoningOnlyMode">
+  <template v-if="isReasoningOnlyMode">
     <!-- 纯推理模式 -->
     <div class="message assistant">
       <div class="message-row">
@@ -57,19 +48,13 @@
 import { defineProps, computed } from "vue";
 import MessageAvatar from "./MessageAvatar.vue";
 import ReasoningContainer from "./ReasoningContainer.vue";
-import ToolPromptMessage from "./ToolPromptMessage.vue";
 import MarkdownIt from "markdown-it";
-import { ToolCall } from '../../types';
 
 const props = defineProps<{
   message: string;
   reasoningContent?: string;
   isReasoningOnlyMode?: boolean;
-  streamingToolCalls?: ToolCall[];
-  isToolCallingMode?: boolean;
 }>();
-
-const emit = defineEmits(["tool-click"]);
 
 // 初始化markdown解析器
 const md = new MarkdownIt({
@@ -77,11 +62,6 @@ const md = new MarkdownIt({
   linkify: true,
   typographer: true,
 });
-
-// 检查消息是否为工具调用提示
-const isToolPromptMessage = (content: string): boolean => {
-  return content.startsWith("#useTool<toolName>");
-};
 
 // Configure md to add target="_blank" to all links
 md.renderer.rules.link_open = (

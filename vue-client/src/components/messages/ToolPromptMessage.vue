@@ -3,7 +3,6 @@
     <div class="message-row">
       <div class="avatar ai-avatar" :class="{ 'loading': isLoading }">
         <img src="/assets/logo.png" alt="AI" class="ai-logo" />
-        <div v-show="isLoading" class="loading-indicator status-calling">调用中</div>
       </div>
       
       <div class="message-container">
@@ -12,41 +11,35 @@
           :class="{ 'collapsed': shouldCollapseToolPrompt && !isExpanded }"
         >
           <div class="tool-prompt-content">
-            <!-- 没有工具调用时显示原始内容 -->
-            <div v-if="!props.toolCalls || props.toolCalls.length === 0" v-html="props.content"></div>
-            
-            <!-- 有工具调用时显示工具卡片 -->
-            <div v-else>
-              <div 
-                v-for="(toolCall, index) in processedToolCalls" 
-                :key="index"
-                :class="{ 'tool-card-container-not-first': index !== 0 }"
-                class="tool-card-container"
-              >
-                <div class="tool-card-header">
-                  <div class="tool-card-header-left">
-                    <span 
-                      class="tool-name"
-                      title="点击查看工具详情"
-                      @click="emit('tool-click', toolCall.name)"
-                    >{{ toolCall.displayName }}</span>
-                    <div
-                      class="tool-badge tool-processing"
-                      :class="{
-                        'tool-failed': failSet && failSet.has(toolCall.toolCallId),
-                        'tool-finished': finishedSet && finishedSet.has(toolCall.toolCallId)
-                      }"
-                      @click="openToolCallResult(toolCall.toolCallId)"
-                    >
-                      <template v-if="failSet && failSet.has(toolCall.toolCallId)">已失败</template>
-                      <template v-else-if="finishedSet && finishedSet.has(toolCall.toolCallId)">已完成</template>
-                      <template v-else-if="finishedSet && !finishedSet.has(toolCall.toolCallId)">调用中</template>
-                    </div>
+            <div 
+              v-for="(toolCall, index) in processedToolCalls" 
+              :key="index"
+              :class="{ 'tool-card-container-not-first': index !== 0 }"
+              class="tool-card-container"
+            >
+              <div class="tool-card-header">
+                <div class="tool-card-header-left">
+                  <span 
+                    class="tool-name"
+                    title="点击查看工具详情"
+                    @click="emit('tool-click', toolCall.name)"
+                  >{{ toolCall.displayName }}</span>
+                  <div
+                    class="tool-badge tool-processing"
+                    :class="{
+                      'tool-failed': failSet && failSet.has(toolCall.toolCallId),
+                      'tool-finished': finishedSet && finishedSet.has(toolCall.toolCallId)
+                    }"
+                    @click="openToolCallResult(toolCall.toolCallId)"
+                  >
+                    <template v-if="failSet && failSet.has(toolCall.toolCallId)">已失败</template>
+                    <template v-else-if="finishedSet && finishedSet.has(toolCall.toolCallId)">已完成</template>
+                    <template v-else-if="finishedSet && !finishedSet.has(toolCall.toolCallId)">调用中</template>
                   </div>
                 </div>
-                <div class="tool-card-body">
-                  <div v-html="toolCall.formattedArgs"></div>
-                </div>
+              </div>
+              <div class="tool-card-body">
+                <div v-html="toolCall.formattedArgs"></div>
               </div>
             </div>
           </div>

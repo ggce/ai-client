@@ -163,8 +163,8 @@ export class UnifiedClient extends BaseClient {
           };
 
           // 验证流对象 - 更详细的日志
-          logger.log(this.loggerPrefix, `流式请求开始: ${JSON.stringify(requestParams)}`);
-          logger.log(this.loggerPrefix, `请求options: ${JSON.stringify(this.options)}`);
+          logger.log(this.loggerPrefix, `流式请求开始: ${JSON.stringify(requestParams).substring(0, 100)}`);
+          logger.log(this.loggerPrefix, `请求options: ${JSON.stringify(this.options).substring(0, 100)}`);
 
           // 发送请求
           const stream = await this.client.chat.completions.create(requestParams);
