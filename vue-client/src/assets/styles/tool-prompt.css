@@ -3,6 +3,14 @@
   padding: 8px;
 }
 
+.message-container.with-content {
+  padding: 8px 12px;
+}
+
+.message-content {
+  margin-bottom: 8px;
+}
+
 .tool-prompt-header {
   display: flex;
   justify-content: space-between;

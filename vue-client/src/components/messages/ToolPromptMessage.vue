@@ -5,11 +5,17 @@
         <img src="/assets/logo.png" alt="AI" class="ai-logo" />
       </div>
       
-      <div class="message-container">
+      <div
+        class="message-container"
+        :class="{
+          'with-content': content,
+        }"
+      >
         <div 
           class="tool-prompt-container" 
           :class="{ 'collapsed': shouldCollapseToolPrompt && !isExpanded }"
         >
+          <div v-if="content" class="message-content" v-html="formattedContent"></div>
           <div class="tool-prompt-content">
             <div 
               v-for="(toolCall, index) in processedToolCalls" 
@@ -65,6 +71,7 @@
 <script setup lang="ts">
 import { defineProps, ref, computed } from 'vue';
 import { ToolCall, ChatMessage } from '../../types';
+import { createMarkdownRenderer } from '../../utils/markdown';
 
 const props = defineProps<{
   content: string;
@@ -78,6 +85,15 @@ const emit = defineEmits(['tool-click', 'tool-result-click']);
 
 // 是否展开
 const isExpanded = ref(false);
+
+// 初始化markdown解析器
+const md = createMarkdownRenderer();
+
+// 格式化消息
+const formattedContent = computed(() => {
+  if (!props.content) return "";
+  return md.render(props.content);
+});
 
 // 切换展开/折叠状态
 const toggleExpand = () => {

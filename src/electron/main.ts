@@ -848,7 +848,10 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         }
 
         // 文字流
-        if (fullContent || fullReasoningContent) {
+        if (
+          (fullContent || fullReasoningContent) &&
+          !toolCalls
+        ) {
           // 将完整响应添加到会话历史
           session?.addAssistantMessage(fullContent, fullReasoningContent);
           // 信息更新
@@ -859,7 +862,11 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         if (toolCalls && toolCalls.length > 0) {
           logger.log('工具调用参数', toolCalls[0].function.arguments);
           // 添加工具调用会话历史
-          session?.addAssistantMessage('', '', toolCalls);
+          session?.addAssistantMessage(
+            fullContent || '',
+            fullReasoningContent || '',
+            toolCalls
+          );
           // 信息更新
           isMessageUpdate = true;
         }
