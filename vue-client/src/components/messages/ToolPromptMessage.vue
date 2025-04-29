@@ -252,7 +252,7 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   font-weight: 600;
   font-family: monospace;
   color: #5D4DB3;
-  font-size: 0.95em;
+  font-size: 0.85em;
   padding: 3px 8px;
   background-color: rgba(124, 98, 194, 0.12);
   border-radius: 4px;
@@ -272,11 +272,11 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   align-items: center;
   justify-content: center;
   margin-left: 10px;
-  margin-right: 20px;
+  margin-right: 10px;
   background: linear-gradient(to bottom, #3ac264, #34a853);
   color: white;
   font-size: 0.7em;
-  padding: 3px 8px;
+  padding: 2px 4px;
   border-radius: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -287,7 +287,7 @@ const shouldCollapseToolPrompt = computed((): boolean => {
 .tool-card-body {
   padding: 10px 12px;
   font-family: monospace;
-  font-size: 0.85em;
+  font-size: 0.8em;
   background-color: #FCFCFF;
   border-radius: 0 0 8px 8px;
   overflow: hidden;
@@ -312,7 +312,7 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   font-weight: 600;
   padding-right: 10px;
   flex-shrink: 0;
-  font-size: 0.85em;
+  font-size: 0.8em;
 }
 
 .tool-param-value {
@@ -322,7 +322,7 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   flex: 1;
   padding-left: 5px;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  font-size: 0.85em;
+  font-size: 0.8em;
   max-width: 100%;
   overflow-wrap: break-word;
 }

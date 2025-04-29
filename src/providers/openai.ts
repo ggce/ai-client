@@ -159,7 +159,7 @@ export class UnifiedClient extends BaseClient {
             temperature: 0.7,
             tools: filteredTools,
             // 传递中止信号
-            signal: params.signal
+            signal: params.signal,
           };
 
           // 验证流对象 - 更详细的日志
