@@ -144,7 +144,8 @@ export interface ChatMessage {
   content: string,
   isShow?: boolean,
   toolCalls?: Array<ToolCall>
-  reasoningContent?: string // 添加推理内容字段
+  reasoningContent?: string, // 添加推理内容字段
+  toolCallId?: string,
 }
 
 /**

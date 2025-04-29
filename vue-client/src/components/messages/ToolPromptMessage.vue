@@ -30,8 +30,17 @@
                       title="点击查看工具详情"
                       @click="emit('tool-click', toolCall.name)"
                     >{{ toolCall.displayName }}</span>
-                    <div class="tool-badge">
-                      工具{{ props.toolCalls.length > 1 ? index + 1 : '' }}
+                    <div
+                      class="tool-badge tool-processing"
+                      :class="{
+                        'tool-failed': failSet && failSet.has(toolCall.toolCallId),
+                        'tool-finished': finishedSet && finishedSet.has(toolCall.toolCallId)
+                      }"
+                      @click="openToolCallResut(toolCall.toolCallId)"
+                    >
+                      <template v-if="failSet && failSet.has(toolCall.toolCallId)">已失败</template>
+                      <template v-else-if="finishedSet && finishedSet.has(toolCall.toolCallId)">已完成</template>
+                      <template v-else-if="finishedSet && !finishedSet.has(toolCall.toolCallId)">调用中</template>
                     </div>
                   </div>
                 </div>
@@ -57,17 +66,23 @@
         </div>
       </div>
     </div>
+    <ToolCallResultDialog
+      v-model:visible="showToolResult"
+      :tool-result="currentToolResult"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineProps, ref, computed } from 'vue';
-import { ToolCall } from '../../types';
+import { ToolCall, ChatMessage } from '../../types';
+import ToolCallResultDialog from './ToolCallResultDialog.vue';
 
 const props = defineProps<{
   content: string;
   isLoading?: boolean;
-  toolCalls?: Array<ToolCall>
+  toolCalls?: Array<ToolCall>;
+  nextMessages?: Array<ChatMessage>;
 }>();
 
 // 添加事件
@@ -86,6 +101,7 @@ const toggleExpand = () => {
 // 处理工具调用数据
 interface ProcessedToolCall {
   name: string;
+  toolCallId: string;
   displayName: string;
   formattedArgs: string;
 }
@@ -113,10 +129,47 @@ const processedToolCalls = computed<ProcessedToolCall[]>(() => {
     
     return {
       name: toolName,
+      toolCallId: toolCall.id,
       displayName,
       formattedArgs
     };
   });
+});
+
+// 后面的工具完成情况map
+const finishedSet = computed(() => {
+  const finishedSet = new Set<string>();
+
+  props.nextMessages?.forEach((message) => {
+    if (message.role === 'tool' && message.toolCallId) {
+      if (processedToolCalls.value.find(toolCall => toolCall.toolCallId === message.toolCallId)) {
+        finishedSet.add(message.toolCallId);
+      };
+    }
+  });
+
+  return finishedSet;
+});
+
+// 后面的工具失败情况map
+const failSet = computed(() => {
+  const failSet = new Set<string>();
+
+  props.nextMessages?.forEach((message) => {
+    if (message.role === 'tool' && message.toolCallId) {
+      try {
+        const parsed = JSON.parse(message.content);
+
+        if (parsed.errorMessage || parsed.error) {
+          failSet.add(message.toolCallId);
+        }
+      } catch (e) {
+        return false;
+      }
+    }
+  });
+
+  return failSet;
 });
 
 // 格式化工具参数的函数
@@ -213,6 +266,27 @@ const shouldCollapseToolPrompt = computed((): boolean => {
     return false;
   }
 });
+
+// 工具结果弹窗控制
+const showToolResult = ref(false);
+const currentToolResult = ref('');
+
+// 打开工具调用结果
+function openToolCallResut(toolCallId: string) {
+  if (!finishedSet.value.has(toolCallId)) {
+    return;
+  }
+  
+  // 查找对应的工具调用结果
+  const toolResult = props.nextMessages?.find(
+    message => message.role === 'tool' && message.toolCallId === toolCallId
+  );
+  
+  if (toolResult) {
+    currentToolResult.value = toolResult.content;
+    showToolResult.value = true;
+  }
+}
 </script>
 
 <style scoped>
@@ -273,15 +347,71 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   justify-content: center;
   margin-left: 10px;
   margin-right: 10px;
-  background: linear-gradient(to bottom, #3ac264, #34a853);
   color: white;
   font-size: 0.7em;
-  padding: 2px 4px;
+  padding: 2px 8px;
   border-radius: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
-  box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3);
-  border: 1px solid rgba(52, 168, 83, 0.2);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.tool-badge.tool-processing {
+  background: linear-gradient(135deg, #FF9933 0%, #FF8533 100%);
+  border: 1px solid rgba(255, 153, 51, 0.3);
+  box-shadow: 0 2px 4px rgba(255, 153, 51, 0.2);
+  animation: pulse 2s infinite, badge-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-badge.tool-finished {
+  cursor: pointer;
+  background: linear-gradient(135deg, #34c759 0%, #32b350 100%);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  box-shadow: 0 2px 4px rgba(52, 199, 89, 0.15);
+  animation: badge-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-badge.tool-failed {
+  cursor: pointer;
+  background: linear-gradient(135deg, #ff3b30 0%, #dc352b 100%);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  box-shadow: 0 2px 4px rgba(255, 59, 48, 0.15);
+  animation: badge-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-badge.tool-failed:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(255, 59, 48, 0.25);
+}
+
+.tool-badge.tool-finished:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(52, 199, 89, 0.25);
+}
+
+@keyframes badge-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 2px 4px rgba(255, 153, 51, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(255, 153, 51, 0.4);
+  }
+  100% {
+    box-shadow: 0 2px 4px rgba(255, 153, 51, 0.2);
+  }
 }
 
 .tool-card-body {

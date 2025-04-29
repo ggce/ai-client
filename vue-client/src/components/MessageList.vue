@@ -26,16 +26,17 @@
       />
 
       <!-- Tool messages -->
-      <ToolMessage
+      <!-- <ToolMessage
         v-if="message.role === 'tool'"
         :content="message.content" 
-      />
+      /> -->
 
       <!-- Assistant messages - regular or tool prompt -->
       <template v-if="message.role === 'assistant'">
         <ToolPromptMessage 
           v-if="message.toolCalls"
           :content="message.content"
+          :next-messages="messages.slice(index + 1)"
           :toolCalls="message.toolCalls"
           @tool-click="handleToolClick"
         />
