@@ -15,9 +15,9 @@ import {
 /**
  * 创建新会话
  */
-export const createSession = async (provider?: string): Promise<string> => {
+export const createSession = async (provider?: string, summary?: string): Promise<string> => {
   try {
-    const response = await axios.post<string>('/api/sessions', { provider })
+    const response = await axios.post<string>('/api/sessions', { provider, summary })
     return response.data
   } catch (error) {
     console.error('创建会话失败:', error)

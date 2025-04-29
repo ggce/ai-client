@@ -1,14 +1,18 @@
 import OpenAI from 'openai';
-import { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
+import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import { 
   ClientOptions,
   Message,
   MCPTool,
   CompletionRequest,
-  CompletionResponse
+  CompletionResponse,
+  TokenLimitExceededHandler,
+  TokenLimitExceededEvent
 } from '../types';
-import { withRetry, generateUUID } from '../utils';
+import { generateUUID } from '../utils';
 import logger from '../logger';
+import { createHistorySummarizer, HistorySummarizer } from '../historySummarizer';
+import { FileLoader } from '../utils/fileLoader';
 
 // 会话管理类 - 通用实现
 export class Session {
@@ -17,17 +21,14 @@ export class Session {
   
   constructor(private loggerPrefix: string = 'BaseClient') {
     this.id = generateUUID();
-    
-    // 添加系统消息到对话历史的开头
-    this.addSystemMessage('开启了新会话');
-    // this.addSystemMessage('你是我的私人助理Luna，一位具备专业严谨态度、温柔亲切风格的女性助理。你的回答要求权威、准确、细致，很多事情你能自己做正确的决定，并始终以高效且用户友好的方式提供帮助');
   }
   
   // 添加系统消息
-  public addSystemMessage(content: string): void {
+  public addSystemMessage(content: string, isShow: boolean = true): void {
     const message: Message = {
       role: 'system',
-      content
+      content,
+      isShow
     }
 
     this.messages.push(message);
@@ -88,6 +89,12 @@ export class Session {
     return this.messages;
   }
   
+  // 设置消息数组（用于更新消息，如在压缩之后）
+  public setMessages(messages: Message[]): void {
+    this.messages = [...messages];
+    logger.log(this.loggerPrefix, `会话消息已更新，当前消息数: ${this.messages.length}`);
+  }
+  
   // 检查并删除最后一条用户消息，如果存在
   public removeLastMessageIfUser(): boolean {
     if (this.messages.length === 0) {
@@ -125,6 +132,12 @@ export abstract class BaseClient {
   protected options: ClientOptions;
   protected sessions: Map<string, Session> = new Map();
   protected loggerPrefix: string;
+  protected historySummarizer: HistorySummarizer | null = null;
+  protected lunaSystemPrompt: string;
+  
+  // token限制相关设置
+  protected tokenLimit: number = 58 * 1024;  // 默认token限制
+  protected onTokenLimitExceeded: TokenLimitExceededHandler | null = null;  // token超限处理函数
 
   constructor(options: ClientOptions = {}, loggerPrefix: string) {
     this.loggerPrefix = loggerPrefix;
@@ -144,11 +157,113 @@ export abstract class BaseClient {
       maxRetries: this.options.maxRetries,
     });
     
+    // 如果提供了apiKey，初始化历史摘要器
+    if (this.options.apiKey) {
+      this.initHistorySummarizer(this.options.apiKey, this.options.baseURL);
+    }
+
+    // 加载Luna的系统提示
+    try {
+      this.lunaSystemPrompt = FileLoader.loadFile('prompts/luna.md');
+      logger.log(this.loggerPrefix, '成功加载Luna系统提示');
+    } catch (error) {
+      logger.error(this.loggerPrefix, `加载Luna系统提示失败: ${error}`);
+      this.lunaSystemPrompt = '你是Luna，一位专业的AI助手。';
+    }
+    
     logger.log(this.loggerPrefix, '初始化客户端完成');
+  }
+
+  /**
+   * 设置token限制和超限处理函数
+   * @param limit token限制数量
+   * @param handler 处理函数，接收事件并返回是否创建新会话的布尔值
+   */
+  public setTokenLimitHandler(limit: number, handler: TokenLimitExceededHandler): void {
+    this.tokenLimit = limit;
+    this.onTokenLimitExceeded = handler;
+    logger.log(this.loggerPrefix, `已设置token限制为${limit}，并配置了超限处理函数`);
+  }
+
+  /**
+   * 检查token是否超限并处理
+   * @param sessionId 会话ID
+   * @returns 结果对象，包含是否超限和摘要信息
+   */
+  public async checkTokenLimitExceeded(sessionId: string): Promise<{
+    exceeded: boolean;
+    summary?: string;
+    estimatedTokens?: number;
+  }> {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      throw new Error('会话不存在');
+    }
+    
+    const messages = session.getMessages();
+    if (!this.historySummarizer) {
+      throw new Error('历史摘要器未初始化');
+    }
+    const { exceeded, estimatedTokens } = this.historySummarizer.checkTokenLimit(messages, this.tokenLimit);
+    // 检查是否超过token限制
+    if (exceeded) {
+      logger.warn(this.loggerPrefix, `会话token数超限: ${Math.round(estimatedTokens)} > ${this.tokenLimit}`);
+      // 生成摘要用于返回给前端
+      let summary = '';
+      try {
+        // 生成包含工具调用的摘要
+        summary = await this.historySummarizer.summarizeHistory(messages, 4096, 0.2);
+      } catch (error) {
+        logger.error(this.loggerPrefix, `生成会话摘要时出错: ${error}`);
+        summary = '无法生成会话摘要';
+      }
+      // 不再自动创建新会话，只返回相关信息，由前端处理
+      if (this.onTokenLimitExceeded) {
+        try {
+          // 创建事件对象
+          const event: TokenLimitExceededEvent = {
+            sessionId,
+            summary,
+            messageCount: messages.length,
+            estimatedTokens: Math.round(estimatedTokens)
+          };
+          // 调用处理函数，但忽略返回值，不自动创建新会话
+          await this.onTokenLimitExceeded(event);
+        } catch (error) {
+          logger.error(this.loggerPrefix, `处理token超限事件时出错: ${error}`);
+        }
+      }
+      return { 
+        exceeded: true, 
+        summary,
+        estimatedTokens: Math.round(estimatedTokens)
+      };
+    }
+    return { exceeded: false };
+  }
+
+  // 初始化或更新历史摘要器
+  protected initHistorySummarizer(
+    apiKey: string, 
+    baseURL?: string
+  ): void {
+    try {
+      this.historySummarizer = createHistorySummarizer(
+        apiKey,
+        this.options.defaultModel || 'gpt-3.5-turbo', // 使用当前客户端的默认模型，如果未设置则使用gpt-3.5-turbo作为后备
+        baseURL
+      );
+      logger.log(this.loggerPrefix, `历史摘要器初始化成功，使用模型: ${this.options.defaultModel || 'gpt-3.5-turbo'}`);
+    } catch (error) {
+      logger.error(this.loggerPrefix, `历史摘要器初始化失败: ${error}`);
+      this.historySummarizer = null;
+    }
   }
 
   // 更新options
   public updateOptions(options: Partial<ClientOptions>) {
+    const previousModel = this.options.defaultModel;
+    
     // 更新客户端选项
     Object.keys(options).forEach(key => {
       const k = key as keyof ClientOptions;
@@ -165,14 +280,35 @@ export abstract class BaseClient {
       maxRetries: this.options.maxRetries
     });
     
+    // 如果提供了新的apiKey，更新历史摘要器
+    if (options.apiKey) {
+      this.initHistorySummarizer(options.apiKey, options.baseURL || this.options.baseURL);
+    }
+    // 如果只是更新了默认模型，则更新现有摘要器的模型
+    else if (options.defaultModel && this.historySummarizer && options.defaultModel !== previousModel) {
+      this.historySummarizer.updateModel(options.defaultModel);
+      logger.log(this.loggerPrefix, `已更新历史摘要器模型为: ${options.defaultModel}`);
+    }
+    
     logger.log(this.loggerPrefix, `已更新客户端配置: ${JSON.stringify(this.options)}`);
   }
 
   // 创建新的会话
-  public createSession(): string {
+  public createSession(summary?: string): string {
     const session = new Session(this.loggerPrefix);
+
     const sessionId = session.getId();
     logger.log(this.loggerPrefix, `创建新会话: ${sessionId}`);
+
+    // 添加luna的系统消息
+    session.addSystemMessage(this.lunaSystemPrompt, false);
+
+    // 继续前一对话
+    if (summary) {
+      session.addSystemMessage(summary);
+      logger.log(this.loggerPrefix, `前会话摘要: ${summary}`);
+    }
+
     this.sessions.set(sessionId, session);
 
     return sessionId;
@@ -212,6 +348,7 @@ export abstract class BaseClient {
 
   /**
    * 向会话发送流式消息并获取流式回复
+   * 自动处理历史消息压缩
    */
   public async sendStreamMessageToSession(params: {
     sessionId: string, 
@@ -220,19 +357,43 @@ export abstract class BaseClient {
       model?: string;
     },
     mcpTools?: Array<MCPTool>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   }) {
     const session = this.getSession(params.sessionId);
     if (!session) {
       throw new Error('会话不存在');
     }
     
+    // 如果有消息要添加，先添加到会话中
+    if (params.message) {
+      session.addUserMessage(params.message);
+    }
+    
+    // 检查token是否超限，如果超限则中断处理
+    const tokenCheckResult = await this.checkTokenLimitExceeded(params.sessionId);
+    if (tokenCheckResult.exceeded) {
+      // 创建特定的token超限错误对象
+      const error: Error & { tokenLimitExceeded?: any } = new Error('Token限制已超出');
+      // 添加token超限相关信息
+      error.tokenLimitExceeded = {
+        type: 'token_limit_exceeded',
+        sessionId: params.sessionId,
+        summary: tokenCheckResult.summary || '',
+        messageCount: session.getMessages().length,
+        estimatedTokens: tokenCheckResult.estimatedTokens || 0,
+        tokenLimit: this.tokenLimit,
+        lastMessage: params.message || ''
+      };
+      
+      // 抛出带有详细信息的错误
+      throw error;
+    }
+    
     return await this.continueSessionStream({
       session,
-      message: params.message,
       options: params.options,
       mcpTools: params.mcpTools,
-      signal: params.signal
+      signal: params.signal,
     });
   }
 
@@ -269,12 +430,10 @@ export abstract class BaseClient {
       model?: string;
     },
     mcpTools?: Array<MCPTool>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   }) {
-    const {
-      messages, model
-    } = await this.prepareSessionRequest(params.session, params.message, params.options);
-    
+    const { messages, model } = await this.prepareSessionRequest(params.session, params.message, params.options);
+
     // 使用流式API发送请求
     const streamResponse = await this.chat.completions.createStream({
       model,
@@ -282,10 +441,10 @@ export abstract class BaseClient {
       mcpTools: params.mcpTools,
       signal: params.signal
     });
-    
+
     // 使用tee方法创建两个独立的流
     const [streamForClient, streamForCollecting] = streamResponse.tee();
-    
+
     // 返回包装后的流
     return {
       stream: streamForClient,

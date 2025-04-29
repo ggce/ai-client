@@ -21,7 +21,7 @@
 
       <!-- System messages -->
       <SystemMessage
-        v-if="message.role === 'system'"
+        v-if="message.role === 'system' && message.isShow !== false"
         :content="message.content"
       />
 

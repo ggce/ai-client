@@ -70,6 +70,7 @@ export interface SessionConfig {
 export interface SessionMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  isShow?: boolean;
   toolCalls?: Array<ChatCompletionMessageToolCall>;
   toolCallId?: string;
   reasoningContent?: string;
@@ -140,7 +141,8 @@ export interface ToolCall {
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
+  content: string,
+  isShow?: boolean,
   toolCalls?: Array<ToolCall>
   reasoningContent?: string // 添加推理内容字段
 }

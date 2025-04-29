@@ -461,6 +461,7 @@ router.post('/api/sessions', routeHandler(async (req: Request, res: Response) =>
     // 确保req.body存在，提供默认值
     const reqBody = req.body || {};
     const providerType = reqBody.provider || defaultProviderType;
+    const summary = reqBody.summary || '';
     
     logger.log('Main', `使用提供商: ${providerType}`);
     
@@ -468,8 +469,8 @@ router.post('/api/sessions', routeHandler(async (req: Request, res: Response) =>
     const client = AIProviderFactory.getProvider(providerType as ProviderType);
     
     // 创建会话
-    const sessionId = client.createSession();
-    
+    const sessionId = client.createSession(summary);
+
     if (!sessionId) {
       logger.error('Main', '创建会话失败');
       // 直接发送响应而不是返回值
@@ -545,6 +546,7 @@ router.get('/api/sessions/:id', routeHandler(async (req: Request, res: Response)
         ...msg,
         role: msg.role,
         content: msg.content,
+        isShow: msg.isShow,
         reasoningContent: msg.reasoningContent,
         // 添加其他前端需要的字段
       }));
@@ -587,8 +589,8 @@ const activeStreamRequests = new Map<string, AbortController>();
 // 为SSE格式化并发送数据
 function sendData(res: Response, data: any) {
   try {
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-  // 使用兼容的方式尝试刷新流
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // 使用兼容的方式尝试刷新流
     const response = res as any;
     if (typeof response.flush === 'function') {
       response.flush();
@@ -927,6 +929,18 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           sendData(res, { 
             content: "\n\n[已停止生成]"
           });
+          return;
+        } else if (error instanceof Error && (error as Error & { tokenLimitExceeded?: any }).tokenLimitExceeded) {
+          // token超限
+          sendData(res, {
+            error: JSON.stringify(error) 
+          });
+          // 如果会话存在，删除最后一条用户消息及其后的所有消息
+          const session = client.getSession(sessionId);
+          if (session) {
+            const removed = session.removeLastMessageIfUser();
+            logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
+          }
         } else {
           // 如果会话存在，删除最后一条用户消息及其后的所有消息
           const session = client.getSession(sessionId);

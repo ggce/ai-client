@@ -5,6 +5,7 @@ export type Role = 'user' | 'assistant' | 'system' | 'tool';
 export interface Message {
   role: Role;
   content: string;
+  isShow?: boolean;
   name?: string;
   reasoningContent?: string;
   toolCalls?: Array<ChatCompletionMessageToolCall>, // 发起工具调用的ai消息所携带 
@@ -98,4 +99,24 @@ export interface DeltaChoice {
     reasoningContent?: string;
   };
   finish_reason?: string | null;
+} 
+
+// 添加TokenLimitExceededEvent接口和处理函数类型
+export interface TokenLimitExceededEvent {
+  sessionId: string;
+  summary: string;
+  messageCount: number;
+  estimatedTokens: number;
+}
+
+export type TokenLimitExceededHandler = (event: TokenLimitExceededEvent) => Promise<boolean>;
+
+// 添加TokenLimitExceededError接口，表示token超限错误的响应格式
+export interface TokenLimitExceededError {
+  type: 'token_limit_exceeded';
+  sessionId: string;
+  summary: string;
+  messageCount: number;
+  estimatedTokens: number;
+  tokenLimit: number;
 } 

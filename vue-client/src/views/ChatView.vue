@@ -39,6 +39,13 @@
       @create-session="handleCreateSession"
       @session-deleted="handleSessionDeleted"
     />
+
+    <TokenLimitDialog
+      :show="showTokenLimitDialog"
+      :data="tokenLimitData"
+      @create-session-by-summary="handleCreateSessionBySummary"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -52,6 +59,7 @@ import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'
 import SessionSidebar from '../components/SessionSidebar.vue'
 import ChatToolbar from '../components/ChatToolbar.vue'
+import TokenLimitDialog from '../components/TokenLimitDialog.vue'
 import { useSettingsStore } from '../store/settings'
 import { useRoute } from 'vue-router'
 import {
@@ -92,6 +100,18 @@ const streamingReasoningContent = ref<string>('') // 添加流式推理内容
 // 存储当前活动的流控制器
 const activeStreamController = ref<AbortController | null>(null)
 
+const showTokenLimitDialog = ref(false)
+const tokenLimitData = ref<any>(null)
+
+function handleCreateSessionBySummary() {
+  showTokenLimitDialog.value = false
+  handleCreateSession(tokenLimitData.value.summary)
+}
+
+function handleCancel() {
+  showTokenLimitDialog.value = false
+}
+
 // 将isLoading提供给其他组件
 provide('isLoading', isLoading)
 
@@ -103,13 +123,17 @@ const setActiveSessionId = (sessionId: string) => {
 }
 
 // 创建新会话
-const handleCreateSession = async () => {
+const handleCreateSession = async (summary?: string) => {
   try {
     // 使用当前选择的提供商创建会话
     const currentProvider = settingsStore.currentProvider
     console.log(`使用提供商 ${currentProvider} 创建新会话`)
-    const sessionId = await createSession(currentProvider)
+    const sessionId = await createSession(currentProvider, summary)
     activeSessionId.value = sessionId
+    // 继续对话的情况下，主动发送继续会话请求
+    if (summary) {
+      sendMessage('继续完成上一次未完成的任务', chatInputRef.value?.getSelectedTools());
+    }
   } catch (error) {
     console.error('创建会话失败:', error)
     tips.error('创建会话失败，请检查网络连接或刷新页面重试')
@@ -125,10 +149,6 @@ const handleSessionDeleted = (deletedId: string) => {
 
 // 转换服务器消息到显示消息
 const displayMessages = computed<ChatMessage[]>(() => {
-  if (!activeSessionId.value) {
-    return [{ role: 'system', content: '请在右侧边栏选择或创建一个会话开始聊天' }]
-  }
-  
   return sessionMessages.value.map(msg => {
     // 确保reasoningContent是字符串或undefined
     const reasoningContent = typeof msg.reasoningContent === 'string' 
@@ -249,19 +269,11 @@ const stopGeneration = async () => {
 const sendMessage = async function(message?: string, selectedTools?: string[]) {
   if (!isProviderConfigured()) {
     tips.warning('请先在设置页面配置API Key');
-    sessionMessages.value.push({
-      role: 'system',
-      content: '请先在设置页面配置API Key。',
-    });
     return;
   }
 
   if (!activeSessionId.value) {
     tips.info('请先选择或创建一个会话');
-    sessionMessages.value.push({
-      role: 'system',
-      content: '请先选择或创建一个会话。',
-    });
     return;
   }
 
@@ -330,8 +342,22 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
         activeStreamController.value = null
         resolve()
       });
-      stream.onError(() => {
-        tips.error('消息发送失败，请稍后再试或检查API配置');
+      stream.onError((error) => {
+
+        console.log(error);
+
+        try {
+          // token超限
+          const errorData = JSON.parse(error);
+          if (errorData.tokenLimitExceeded) {
+            // token超过限制
+            showTokenLimitDialog.value = true
+            tokenLimitData.value = errorData.tokenLimitExceeded
+          }
+        } catch(error) {
+          // 普通错误
+          tips.error('消息发送失败，请稍后再试或检查API配置');
+        }
         activeStreamController.value = null
         resolve()
       });
