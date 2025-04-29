@@ -36,7 +36,7 @@
                         'tool-failed': failSet && failSet.has(toolCall.toolCallId),
                         'tool-finished': finishedSet && finishedSet.has(toolCall.toolCallId)
                       }"
-                      @click="openToolCallResut(toolCall.toolCallId)"
+                      @click="openToolCallResult(toolCall.toolCallId)"
                     >
                       <template v-if="failSet && failSet.has(toolCall.toolCallId)">已失败</template>
                       <template v-else-if="finishedSet && finishedSet.has(toolCall.toolCallId)">已完成</template>
@@ -66,17 +66,12 @@
         </div>
       </div>
     </div>
-    <ToolCallResultDialog
-      v-model:visible="showToolResult"
-      :tool-result="currentToolResult"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineProps, ref, computed } from 'vue';
 import { ToolCall, ChatMessage } from '../../types';
-import ToolCallResultDialog from './ToolCallResultDialog.vue';
 
 const props = defineProps<{
   content: string;
@@ -86,7 +81,7 @@ const props = defineProps<{
 }>();
 
 // 添加事件
-const emit = defineEmits(['tool-click']);
+const emit = defineEmits(['tool-click', 'tool-result-click']);
 
 // 是否展开
 const isExpanded = ref(false);
@@ -267,12 +262,8 @@ const shouldCollapseToolPrompt = computed((): boolean => {
   }
 });
 
-// 工具结果弹窗控制
-const showToolResult = ref(false);
-const currentToolResult = ref('');
-
 // 打开工具调用结果
-function openToolCallResut(toolCallId: string) {
+function openToolCallResult(toolCallId: string) {
   if (!finishedSet.value.has(toolCallId)) {
     return;
   }
@@ -283,8 +274,7 @@ function openToolCallResut(toolCallId: string) {
   );
   
   if (toolResult) {
-    currentToolResult.value = toolResult.content;
-    showToolResult.value = true;
+    emit('tool-result-click', toolResult.content);
   }
 }
 </script>

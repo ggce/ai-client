@@ -39,6 +39,7 @@
           :next-messages="messages.slice(index + 1)"
           :toolCalls="message.toolCalls"
           @tool-click="handleToolClick"
+          @tool-result-click="handleToolResultClick"
         />
         <AssistantMessage
           v-else
@@ -77,6 +78,12 @@
       v-model:visible="showToolInfo"
       ref="toolInfoPopup"
     />
+
+    <!-- Tool call result dialog -->
+    <ToolCallResultDialog
+      v-model:visible="showToolResult"
+      :tool-result="currentToolResult"
+    />
   </div>
 </template>
 
@@ -92,6 +99,7 @@ import ToolPromptMessage from "./messages/ToolPromptMessage.vue";
 import LoadingMessage from "./messages/LoadingMessage.vue";
 import StreamingMessage from "./messages/StreamingMessage.vue";
 import ToolInfoPopup from './messages/ToolInfoPopup.vue';
+import ToolCallResultDialog from './messages/ToolCallResultDialog.vue';
 
 import { ChatMessage, ToolCall } from '../types';
 
@@ -122,6 +130,8 @@ const props = defineProps<{
 const messagesContainer = ref<HTMLElement | null>(null);
 const toolInfoPopup = ref<any>(null);
 const showToolInfo = ref(false);
+const showToolResult = ref(false);
+const currentToolResult = ref('');
 
 // 滚动控制变量
 const userHasScrolled = ref(false);
@@ -289,6 +299,11 @@ const handleToolClick = (toolName: string) => {
   if (toolInfoPopup.value) {
     toolInfoPopup.value.showTool(toolName);
   }
+};
+
+const handleToolResultClick = (result: string) => {
+  currentToolResult.value = result;
+  showToolResult.value = true;
 };
 </script>
 

@@ -1,21 +1,30 @@
 <template>
-  <Transition name="dialog-fade">
-    <div v-if="visible" class="tool-call-dialog-overlay" @click="close">
-      <div class="tool-call-dialog" @click.stop>
-        <div class="tool-call-dialog-header">
-          <h3>工具调用结果</h3>
-          <button class="close-button" @click="close">&times;</button>
-        </div>
-        <div class="tool-call-dialog-content">
-          <div class="tool-result" v-html="toolResult"></div>
-        </div>
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="visible" class="tool-call-dialog-overlay" @click="close">
+        <Transition name="zoom">
+          <div v-show="visible" class="tool-call-dialog" @click.stop>
+            <div class="tool-call-dialog-header">
+              <h3>工具调用结果</h3>
+              <div class="header-actions">
+                <button class="action-btn copy-btn" @click="copyResult" :class="{ 'copied': isCopied }">
+                  <span class="btn-text">{{ isCopied ? '已复制' : '复制' }}</span>
+                </button>
+                <button class="close-btn" @click="close">×</button>
+              </div>
+            </div>
+            <div class="tool-call-dialog-body">
+              <div class="tool-result" v-html="formattedResult"></div>
+            </div>
+          </div>
+        </Transition>
       </div>
-    </div>
-  </Transition>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue';
+import { defineProps, defineEmits, computed, ref } from 'vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -23,10 +32,58 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(['update:visible']);
+const isCopied = ref(false);
 
 const close = () => {
   emit('update:visible', false);
 };
+
+// 复制结果
+const copyResult = async () => {
+  try {
+    // 尝试解析并格式化 JSON，如果失败则使用原始内容
+    const textToCopy = (() => {
+      try {
+        const obj = JSON.parse(props.toolResult);
+        return JSON.stringify(obj, null, 2);
+      } catch {
+        return props.toolResult;
+      }
+    })();
+
+    await navigator.clipboard.writeText(textToCopy);
+    
+    // 显示复制成功状态
+    isCopied.value = true;
+    setTimeout(() => {
+      isCopied.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy:', err);
+  }
+};
+
+// 格式化工具调用结果
+const formattedResult = computed(() => {
+  try {
+    // 尝试解析JSON
+    const resultObj = JSON.parse(props.toolResult);
+    
+    // 使用语法高亮格式化JSON
+    const formattedJson = JSON.stringify(resultObj, null, 2)
+      .replace(/\n/g, '<br>')
+      .replace(/\s{2}/g, '&nbsp;&nbsp;')
+      .replace(/({|}|\[|\])/g, '<span class="tool-syntax-bracket">$1</span>')
+      .replace(/"([^"]+)":/g, '<span class="tool-syntax-key">"$1"</span>:')
+      .replace(/: (".*?")(?=,|\n|$)/g, ': <span class="tool-syntax-string">$1</span>')
+      .replace(/: (true|false|null|\d+(?:\.\d+)?)/g, ': <span class="tool-syntax-value">$1</span>');
+    
+    return formattedJson;
+  } catch (e) {
+    // 如果不是JSON或解析失败，直接返回原始内容
+    return props.toolResult;
+  }
+});
 </script>
 
 <style scoped>
@@ -34,105 +91,165 @@ const close = () => {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  backdrop-filter: blur(2px);
 }
 
 .tool-call-dialog {
-  background: white;
+  background-color: white;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12),
-              0 2px 8px rgba(0, 0, 0, 0.08);
   width: 90%;
-  max-width: 600px;
+  max-width: 800px;
   max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  transform-origin: center;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  position: relative;
+  border: 1px solid rgba(124, 98, 194, 0.2);
 }
 
 .tool-call-dialog-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(to right, #f8f8ff, #ffffff);
-  border-radius: 12px 12px 0 0;
+  padding: 18px 24px;
+  border-bottom: 1px solid #eee;
+  background-color: #F7F5FF;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tool-call-dialog-header h3 {
   margin: 0;
-  font-size: 1.1em;
-  color: #333;
+  font-size: 1.25em;
+  color: #5D4DB3;
   font-weight: 600;
 }
 
-.close-button {
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: none;
+  color: #666;
+}
+
+.copy-btn {
+  background-color: #F0EDFF;
+  border-color: #E6E4F0;
+  color: #5D4DB3;
+}
+
+.copy-btn:hover {
+  background-color: #E6E4F0;
+}
+
+.copy-btn.copied {
+  background-color: #E8F5E9;
+  border-color: #C8E6C9;
+  color: #2E7D32;
+}
+
+.btn-text {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.close-btn {
   background: none;
   border: none;
-  font-size: 1.5em;
+  font-size: 1.8em;
   cursor: pointer;
-  color: #666;
-  padding: 4px 8px;
-  border-radius: 6px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   transition: all 0.2s ease;
-  line-height: 1;
 }
 
-.close-button:hover {
-  color: #333;
+.close-btn:hover {
   background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
 }
 
-.tool-call-dialog-content {
-  padding: 20px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 100px;
-  max-height: calc(80vh - 100px);
+.tool-call-dialog-body {
+  padding: 24px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
 }
 
 .tool-result {
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  white-space: pre-wrap;
-  font-size: 0.9em;
   line-height: 1.6;
   color: #333;
-  background: #f8f9fa;
+  font-size: 0.95em;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  background-color: #FCFCFF;
   padding: 16px;
   border-radius: 8px;
-  border: 1px solid #eee;
+  border: 1px solid #E6E4F0;
 }
 
-/* 动画相关样式 */
-.dialog-fade-enter-active {
-  transition: all 0.3s ease-out;
+/* 语法高亮样式 */
+:deep(.tool-syntax-bracket) {
+  color: #0366d6;
+  font-weight: 600;
 }
 
-.dialog-fade-leave-active {
-  transition: all 0.2s ease-in;
+:deep(.tool-syntax-key) {
+  color: #7c62c2;
+  font-weight: 500;
 }
 
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
+:deep(.tool-syntax-string) {
+  color: #2e7d32;
+}
+
+:deep(.tool-syntax-value) {
+  color: #e65100;
+  font-weight: 500;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
-  transform: scale(0.98);
 }
 
-.dialog-fade-enter-to,
-.dialog-fade-leave-from {
-  opacity: 1;
-  transform: scale(1);
+.zoom-enter-active,
+.zoom-leave-active {
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              opacity 0.3s ease;
 }
 
-.dialog-fade-enter-from .tool-call-dialog,
-.dialog-fade-leave-to .tool-call-dialog {
+.zoom-enter-from,
+.zoom-leave-to {
+  transform: scale(0.95);
   opacity: 0;
-  transform: scale(0.98);
 }
 </style> 
