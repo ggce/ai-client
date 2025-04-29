@@ -1,5 +1,6 @@
 <template>
   <div class="app-container" :class="{'macos': isMacOS}">
+    <div v-if="isMacOS" class="titlebar" />
     <Sidebar />
     <main class="main-content">
       <router-view v-slot="{ Component, route }">
@@ -40,6 +41,17 @@ onMounted(async () => {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  position: relative;
+}
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  -webkit-app-region: drag;
+  z-index: 9999;
 }
 
 /* 为macOS标题栏预留空间 */
