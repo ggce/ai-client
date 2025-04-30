@@ -141,50 +141,6 @@ export class HistorySummarizer {
       return [...history];
     }
   }
-
-  /**
-   * 估算消息列表的token数量
-   * @param messages 消息列表
-   * @returns 估算的token数量
-   */
-  public estimateTokenCount(messages: Message[]): number {
-    return messages.reduce((sum, msg) => {
-      let content = msg.content || '';
-      // 计算工具调用内容的token（如果有）
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        content += msg.toolCalls.reduce((toolSum, tool) => {
-          const functionName = tool.function.name || '';
-          const args = tool.function.arguments || '{}';
-          return toolSum + functionName.length + args.length;
-        }, 0);
-      }
-      // 计算推理内容的token（如果有）
-      if (msg.reasoningContent) {
-        content += msg.reasoningContent;
-      }
-      // 新的 token 估算规则
-      // 英文字符
-      const englishChars = (content.match(/[a-zA-Z]/g) || []).length;
-      // 中文字符
-      const chineseChars = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
-      // 其它字符（数字、符号等）
-      const otherChars = content.length - englishChars - chineseChars;
-      // 添加消息角色和结构的基础token开销
-      const baseCost = 4; // 估计每条消息的基础结构token开销
-      return sum + baseCost + englishChars * 0.3 + chineseChars * 0.6 + otherChars * 0.3;
-    }, 0);
-  }
-
-  /**
-   * 检查消息token是否超限
-   * @param messages 消息列表
-   * @param limit token限制
-   * @returns { exceeded, estimatedTokens }
-   */
-  public checkTokenLimit(messages: Message[], limit: number): { exceeded: boolean, estimatedTokens: number } {
-    const estimatedTokens = this.estimateTokenCount(messages);
-    return { exceeded: estimatedTokens > limit, estimatedTokens };
-  }
 }
 
 /**

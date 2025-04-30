@@ -106,7 +106,6 @@ export interface TokenLimitExceededEvent {
   sessionId: string;
   summary: string;
   messageCount: number;
-  estimatedTokens: number;
 }
 
 export type TokenLimitExceededHandler = (event: TokenLimitExceededEvent) => Promise<boolean>;
@@ -114,9 +113,6 @@ export type TokenLimitExceededHandler = (event: TokenLimitExceededEvent) => Prom
 // 添加TokenLimitExceededError接口，表示token超限错误的响应格式
 export interface TokenLimitExceededError {
   type: 'token_limit_exceeded';
-  sessionId: string;
+  message: string;
   summary: string;
-  messageCount: number;
-  estimatedTokens: number;
-  tokenLimit: number;
 } 

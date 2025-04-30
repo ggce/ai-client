@@ -927,8 +927,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
         // 清理会话的控制器
         activeStreamRequests.delete(sessionId);
       } catch (error) {
-        // 检查是否是中止错误
         if (error instanceof Error && error.name === 'AbortError') {
+          // 用户主动终止
           logger.log('Main', `流式请求已被用户中止: ${sessionId}`);
           sendData(res, { 
             content: "\n\n[已停止生成]"
@@ -939,13 +939,8 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           sendData(res, {
             error: JSON.stringify(error) 
           });
-          // 如果会话存在，删除最后一条用户消息及其后的所有消息
-          const session = client.getSession(sessionId);
-          if (session) {
-            const removed = session.removeLastMessageIfUser();
-            logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
-          }
         } else {
+          // 其他错误
           // 如果会话存在，删除最后一条用户消息及其后的所有消息
           const session = client.getSession(sessionId);
           if (session) {

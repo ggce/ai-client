@@ -175,52 +175,61 @@ export abstract class BaseClient {
   }
 
   /**
-   * 设置token限制和超限处理函数
-   * @param limit token限制数量
+   * 设置token超限处理函数
    * @param handler 处理函数，接收事件并返回是否创建新会话的布尔值
    */
-  public setTokenLimitHandler(limit: number, handler: TokenLimitExceededHandler): void {
-    this.tokenLimit = limit;
+  public setTokenLimitHandler(handler: TokenLimitExceededHandler): void {
     this.onTokenLimitExceeded = handler;
-    logger.log(this.loggerPrefix, `已设置token限制为${limit}，并配置了超限处理函数`);
+    logger.log(this.loggerPrefix, `已配置token超限处理函数`);
   }
 
   /**
-   * 检查token是否超限并处理
+   * 处理API返回的token超限错误
    * @param sessionId 会话ID
-   * @returns 结果对象，包含是否超限和摘要信息
+   * @param error OpenAI API错误对象
    */
-  public async checkTokenLimitExceeded(sessionId: string): Promise<{
-    exceeded: boolean;
-    summary?: string;
-    estimatedTokens?: number;
-  }> {
-    const session = this.getSession(sessionId);
-    if (!session) {
-      throw new Error('会话不存在');
-    }
+  protected async handleTokenLimitError(sessionId: string, error: any): Promise<void> {
+    // 添加详细的错误日志
+    logger.log(this.loggerPrefix, '收到错误对象，结构如下：');
+    logger.log(this.loggerPrefix, `error instanceof Error: ${error instanceof Error}`);
+    logger.log(this.loggerPrefix, `error.message: ${error.message}`);
+    logger.log(this.loggerPrefix, 'error对象完整内容:');
+    logger.log(this.loggerPrefix, JSON.stringify(error, null, 2));
     
-    const messages = session.getMessages();
-    if (!this.historySummarizer) {
-      throw new Error('历史摘要器未初始化');
-    }
-    const { exceeded, estimatedTokens } = this.historySummarizer.checkTokenLimit(messages, this.tokenLimit);
+    // 检查是否是token超限错误
+    const isTokenLimitError = 
+      // 检查状态码是否为400
+      error.status === 400 &&
+      error.message && (
+        // 检查错误消息是否包含token超限相关的关键词
+        error.message.includes('maximum context length') ||
+        error.message.includes('requested') && error.message.includes('tokens') ||
+        error.message.includes('reduce the length')
+      );
 
-    logger.log(this.loggerPrefix, `当前token数: ${estimatedTokens}`);
+    if (isTokenLimitError) {
+      logger.warn(this.loggerPrefix, `会话token数超限: ${error.message}`);
+      
+      const session = this.getSession(sessionId);
+      if (!session) {
+        throw new Error('会话不存在');
+      }
 
-    // 检查是否超过token限制
-    if (exceeded) {
-      logger.warn(this.loggerPrefix, `会话token数超限: ${Math.round(estimatedTokens)} > ${this.tokenLimit}`);
+      const messages = session.getMessages();
+      
       // 生成摘要用于返回给前端
       let summary = '';
       try {
-        // 生成包含工具调用的摘要
-        summary = await this.historySummarizer.summarizeHistory(messages, 4096, 0.2);
-      } catch (error) {
-        logger.error(this.loggerPrefix, `生成会话摘要时出错: ${error}`);
+        if (this.historySummarizer) {
+          // 生成包含工具调用的摘要
+          summary = await this.historySummarizer.summarizeHistory(messages, 4096, 0.2);
+        }
+      } catch (err) {
+        logger.error(this.loggerPrefix, `生成会话摘要时出错: ${err}`);
         summary = '无法生成会话摘要';
       }
-      // 不再自动创建新会话，只返回相关信息，由前端处理
+
+      // 调用token超限处理函数
       if (this.onTokenLimitExceeded) {
         try {
           // 创建事件对象
@@ -228,21 +237,26 @@ export abstract class BaseClient {
             sessionId,
             summary,
             messageCount: messages.length,
-            estimatedTokens: Math.round(estimatedTokens)
           };
-          // 调用处理函数，但忽略返回值，不自动创建新会话
+          // 调用处理函数
           await this.onTokenLimitExceeded(event);
-        } catch (error) {
-          logger.error(this.loggerPrefix, `处理token超限事件时出错: ${error}`);
+        } catch (err) {
+          logger.error(this.loggerPrefix, `处理token超限事件时出错: ${err}`);
         }
       }
-      return { 
-        exceeded: true, 
-        summary,
-        estimatedTokens: Math.round(estimatedTokens)
+
+      // 抛出特定的token超限错误
+      const tokenLimitError: Error & { tokenLimitExceeded?: any } = new Error('Token限制已超出');
+      tokenLimitError.tokenLimitExceeded = {
+        type: 'token_limit_exceeded',
+        message: error.message,
+        summary: summary || '',
       };
+      throw tokenLimitError;
     }
-    return { exceeded: false };
+    
+    // 如果不是token超限错误，继续抛出原始错误
+    throw error;
   }
 
   // 初始化或更新历史摘要器
@@ -368,34 +382,11 @@ export abstract class BaseClient {
     if (!session) {
       throw new Error('会话不存在');
     }
-    
-    // 如果有消息要添加，先添加到会话中
-    if (params.message) {
-      session.addUserMessage(params.message);
-    }
-    
-    // 检查token是否超限，如果超限则中断处理
-    const tokenCheckResult = await this.checkTokenLimitExceeded(params.sessionId);
-    if (tokenCheckResult.exceeded) {
-      // 创建特定的token超限错误对象
-      const error: Error & { tokenLimitExceeded?: any } = new Error('Token限制已超出');
-      // 添加token超限相关信息
-      error.tokenLimitExceeded = {
-        type: 'token_limit_exceeded',
-        sessionId: params.sessionId,
-        summary: tokenCheckResult.summary || '',
-        messageCount: session.getMessages().length,
-        estimatedTokens: tokenCheckResult.estimatedTokens || 0,
-        tokenLimit: this.tokenLimit,
-        lastMessage: params.message || ''
-      };
-      
-      // 抛出带有详细信息的错误
-      throw error;
-    }
-    
+
+    // 发送请求并返回流
     return await this.continueSessionStream({
       session,
+      message: params.message,
       options: params.options,
       mcpTools: params.mcpTools,
       signal: params.signal,
@@ -439,32 +430,45 @@ export abstract class BaseClient {
   }) {
     const { messages, model } = await this.prepareSessionRequest(params.session, params.message, params.options);
 
-    // 使用流式API发送请求
-    const streamResponse = await this.chat.completions.createStream({
-      model,
-      messages,
-      mcpTools: params.mcpTools,
-      signal: params.signal
-    });
+    try {
+      // 使用流式API发送请求
+      const streamResponse = await this.chat.completions.createStream({
+        model,
+        messages,
+        mcpTools: params.mcpTools,
+        signal: params.signal
+      });
 
-    // 使用tee方法创建两个独立的流
-    const [streamForClient, streamForCollecting] = streamResponse.tee();
+      // 使用tee方法创建两个独立的流
+      const [streamForClient, streamForCollecting] = streamResponse.tee();
 
-    // 返回包装后的流
-    return {
-      stream: streamForClient,
-      onComplete: async(
-        fullContent: string,
-        fullReasoningContent: string,
-        toolCalls: Array<ChatCompletionMessageToolCall> | null
-      ) => {
-        logger.log(this.loggerPrefix, `流式响应完成: ${JSON.stringify({
-          fullContent,
-          fullReasoningContent,
-          toolCalls
-        })}`);
+      // 返回包装后的流
+      return {
+        stream: streamForClient,
+        onComplete: async(
+          fullContent: string,
+          fullReasoningContent: string,
+          toolCalls: Array<ChatCompletionMessageToolCall> | null
+        ) => {
+          logger.log(this.loggerPrefix, `流式响应完成: ${JSON.stringify({
+            fullContent,
+            fullReasoningContent,
+            toolCalls
+          })}`);
+        }
+      };
+    } catch (error) {
+      // 检查是否是中止错误
+      if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('abort'))) {
+        logger.log(this.loggerPrefix, `流式请求被用户中止: ${error.message}`);
+        // 重新抛出AbortError以确保正确处理
+        throw new DOMException('请求已被用户中止', 'AbortError');
       }
-    };
+      
+      // 处理token超限错误
+      await this.handleTokenLimitError(params.session.getId(), error);
+      throw error;
+    }
   }
 
   // 聊天接口 - 抽象方法，由子类实现
