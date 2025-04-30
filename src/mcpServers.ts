@@ -40,9 +40,16 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "/Users/guogangchuan/develop/git-project/ai-client/agent"
     ]
   },
+  "desktop-commander-server": {
+    url: "http://localhost:7003/fileServer",
+    "command": "npx",
+    "args": [
+      "@wonderwhy-er/desktop-commander"
+    ]
+  },
   // 网络请求操作
   "fetch-server": {
-    url: "http://localhost:7003/fetch-server",
+    url: "http://localhost:7004/fetch-server",
     command: "npx",
     args: [
       "@kazuph/mcp-fetch"
@@ -50,7 +57,7 @@ export const mcpServers: Record<string, MCPServerConfig> = {
   },
   // excel操作
   "excel-mcp-server": {
-    url: "http://localhost:7004/excel-mcp-server",
+    url: "http://localhost:7005/excel-mcp-server",
     command: "npx",
     args: [
       "@negokaz/excel-mcp-server"
@@ -58,13 +65,13 @@ export const mcpServers: Record<string, MCPServerConfig> = {
   },
   // 通过结构化思维过程提供了一种动态和反思性的问题解决工具
   "sequential-thinking-server": {
-    url: "http://localhost:7005/sequentialThinkingServer",
+    url: "http://localhost:7006/sequentialThinkingServer",
     command: "npx",
     args: ["@modelcontextprotocol/server-sequential-thinking"]
   },
   // 通过 tavily-search 工具实现实时网络搜索功能 通过 tavily-extract 工具从网页中智能提取数据
   "tavily-search-server": {
-    url: "http://localhost:7006/tavilySearchServer",
+    url: "http://localhost:7007/tavilySearchServer",
     command: "npx",
     args: [
       "tavily-mcp@0.1.4"
@@ -76,7 +83,7 @@ export const mcpServers: Record<string, MCPServerConfig> = {
   },
   // 百度地图
   "baidu-map-server": {
-    url: "http://localhost:7007/baiduMapServer",
+    url: "http://localhost:7008/baiduMapServer",
     "command": "npx",
     "args": [
       "@baidumap/mcp-server-baidu-map"
@@ -89,18 +96,23 @@ export const mcpServers: Record<string, MCPServerConfig> = {
   "baidu-search-server": {
     "url": "http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+bce-v3/ALTAK-XrGNJfcENgbHK6Mraj5Yt/3e55298a8b0ddf1a0e56253a1eb3ada499d5225b"
   },
+  "time-server": {
+    url: "http://localhost:7009/timeServer",
+    "command": "python",
+    "args": ["-m", "mcp_server_time", "--local-timezone=Asia/Shanghai"]
+  },
   // 本地demo
   // "browser-server": {
   //   url: "http://localhost:8001/browserServer",
   //   command: "node",
   //   args: ["./dist/mcpServers/BrowserServer.js"]
   // },
-  "weather-server": {
+  "(demo-for-test)_weather-server": {
     url: "http://localhost:8002/weatherServer",
     command: "node",
     args: ["./dist/mcpServers/WeatherServer.js"]
   },
-  "lianchuang-server": {
+  "(demo-for-test)_lianchuang-server": {
     url: "http://localhost:8003/lianchuangServer",
     command: "node",
     args: ["./dist/mcpServers/LianchuangServer.js"]
