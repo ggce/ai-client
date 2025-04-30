@@ -58,8 +58,15 @@ export class MCPClient {
             .then(() => logger.log('MCPClient', `✓ 服务器 "${key}" 启动成功`))
             .catch(err => logger.error('MCPClient', `✗ 服务器 "${key}" 启动失败: ${err}`))
         );
+      } else if (instance.config.url) {
+        // 对于远程服务，尝试直接连接
+        startupPromises.push(
+          this.connectToServer(key)
+            .then(() => logger.log('MCPClient', `✓ 远程服务器 "${key}" 连接成功`))
+            .catch(err => logger.error('MCPClient', `✗ 远程服务器 "${key}" 连接失败: ${err}`))
+        );
       } else {
-        logger.log('MCPClient', `跳过服务器 "${key}" (无启动命令)`);
+        logger.log('MCPClient', `跳过服务器 "${key}" (无启动命令和URL)`);
       }
     }
     
@@ -68,7 +75,8 @@ export class MCPClient {
     
     // 列出启动成功的服务器
     const runningServers = this.getRunningServers();
-    logger.log('MCPClient', `成功启动 ${runningServers.length}/${serverEntries.length} 个服务器: ${runningServers.join(', ')}`);
+    const connectedServers = this.getConnectedServers();
+    logger.log('MCPClient', `成功启动/连接 ${connectedServers.length}/${serverEntries.length} 个服务器: ${connectedServers.join(', ')}`);
   }
 
   /**
@@ -169,6 +177,41 @@ export class MCPClient {
 
     const config = instance.config;
 
+    // 如果是远程服务（只有 url，没有 command）
+    if (!config.command) {
+      try {
+        // 首先尝试使用 StreamableHTTP 传输
+        const baseUrl = new URL(config.url);
+        const transport = new StreamableHTTPClientTransport(baseUrl);
+        
+        await instance.client.connect(transport);
+        
+        instance.transport = transport;
+        instance.isConnected = true;
+        
+        logger.log('MCPClient', `已使用StreamableHTTP传输连接到远程服务"${serverKey}"`);
+        return;
+      } catch (error) {
+        // 如果失败，尝试使用 SSE 传输
+        logger.log('MCPClient', `远程服务"${serverKey}"的StreamableHTTP连接失败，正在回退到SSE传输`);
+        try {
+          const baseUrl = new URL(config.url);
+          const transport = new SSEClientTransport(baseUrl);
+          
+          await instance.client.connect(transport);
+          
+          instance.transport = transport;
+          instance.isConnected = true;
+          
+          logger.log('MCPClient', `已使用SSE传输连接到远程服务"${serverKey}"`);
+          return;
+        } catch (sseError) {
+          logger.error('MCPClient', `无法连接到远程服务"${serverKey}": ${sseError}`);
+          throw sseError;
+        }
+      }
+    }
+
     // 检查是否有现成的传输实例（已启动但尚未连接）
     if (instance.transport) {
       try {
@@ -219,7 +262,7 @@ export class MCPClient {
       }
     }
 
-    // 首先尝试使用StreamableHTTP传输
+    // 对于本地服务，尝试使用 HTTP/SSE 传输
     try {
       const baseUrl = new URL(config.url);
       const transport = new StreamableHTTPClientTransport(baseUrl);
@@ -230,8 +273,8 @@ export class MCPClient {
       instance.isConnected = true;
       
       logger.log('MCPClient', `已使用StreamableHTTP传输连接到"${serverKey}"`);
+      return;
     } catch (error) {
-      // 如果失败，尝试使用较旧的SSE传输
       logger.log('MCPClient', `"${serverKey}"的StreamableHTTP连接失败，正在回退到SSE传输`);
       try {
         const baseUrl = new URL(config.url);
@@ -243,55 +286,29 @@ export class MCPClient {
         instance.isConnected = true;
         
         logger.log('MCPClient', `已使用SSE传输连接到"${serverKey}"`);
-      } catch (error: any) {
+        return;
+      } catch (sseError) {
         // 如果两种传输都失败，如果提供了命令，则尝试Stdio传输
         if (config.command) {
           try {
-            // 如果还没有启动服务器，现在启动
-            if (!instance.transport) {
-              await this.startServer(serverKey);
-              
-              // startServer 应该已经设置了连接状态
-              if (instance.isConnected) {
-                return; // 启动并连接成功
-              } else {
-                throw new Error(`服务器已启动但连接失败: ${serverKey}`);
-              }
-            } else {
-              // 服务器已启动但连接失败，尝试使用现有传输再次连接
-              try {
-                await instance.client.connect(instance.transport);
-                instance.isConnected = true;
-              } catch (reconnectError) {
-                // 处理"already started"错误
-                if (reconnectError instanceof Error && reconnectError.message.includes('already started')) {
-                  logger.log('MCPClient', `检测到重连时"already started"错误，执行连接状态验证: ${serverKey}`);
-                  // 尝试执行一个操作来验证连接
-                  try {
-                    await instance.client.listTools();
-                    instance.isConnected = true;
-                    logger.log('MCPClient', `验证成功，服务器 "${serverKey}" 已连接并可用`);
-                  } catch (validationError) {
-                    logger.error('MCPClient', `连接验证失败`);
-                    throw new Error(`无法验证服务器 "${serverKey}" 的连接`);
-                  }
-                } else {
-                  throw reconnectError;
-                }
-              }
-            }
+            const transport = new StdioClientTransport({
+              command: config.command,
+              args: config.args || [],
+              env: config.env,
+            });
             
-            if (instance.isConnected) {
-              logger.log('MCPClient', `已使用Stdio传输连接到"${serverKey}"`);
-            } else {
-              throw new Error(`无法建立到服务器 "${serverKey}" 的连接`);
-            }
+            await instance.client.connect(transport);
+            
+            instance.transport = transport;
+            instance.isConnected = true;
+            
+            logger.log('MCPClient', `已使用Stdio传输连接到"${serverKey}"`);
           } catch (stdioError) {
             logger.error('MCPClient', `Stdio传输连接到"${serverKey}"失败: ${stdioError}`);
-            throw new Error(`使用所有可用传输连接到"${serverKey}"失败`);
+            throw stdioError;
           }
         } else {
-          throw new Error(`连接到"${serverKey}"失败: ${error.message}`);
+          throw sseError;
         }
       }
     }
@@ -408,7 +425,12 @@ export class MCPClient {
    */
   getRunningServers(): string[] {
     return Array.from(this.serverInstances.entries())
-      .filter(([_, instance]) => instance.transport !== null)
+      .filter(([_, instance]) => 
+        // 对于本地服务，检查transport是否存在
+        (instance.config.command && instance.transport !== null) ||
+        // 对于远程服务，检查是否有url且已连接
+        (!instance.config.command && instance.config.url && instance.isConnected)
+      )
       .map(([key, _]) => key);
   }
 

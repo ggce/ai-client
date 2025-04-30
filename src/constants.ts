@@ -38,7 +38,8 @@ export const GEMINI_MODELS = {
   GEMINI_1_5_FLASH: 'gemini-1.5-flash',
   GEMINI_2_5_PRO_EXP: 'gemini-2.5-pro-exp-03-25',
   GEMINI_2_5_FLASH_PREVIEW: 'gemini-2.5-flash-preview-04-17',
-  ALL: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-flash-preview-04-17']
+  GEMINI_2_0_FLASH_EXP: 'google/gemini-2.0-flash-exp:free',
+  ALL: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-flash-preview-04-17', 'google/gemini-2.0-flash-exp:free']
 };
 
 // Anthropic对应的服务
@@ -59,5 +60,6 @@ export const QWEN_MODELS = {
   DEFAULT: 'qwen-max-latest',
   QWEN_MAX: 'qwen-max-latest',
   QWEN_TURBO: 'qwen-turbo',
-  ALL: ['qwen-max-latest', 'qwen-turbo']
+  QWEN_3_235B: 'qwen/qwen3-235b-a22b:free',
+  ALL: ['qwen-max-latest', 'qwen-turbo', 'qwen/qwen3-235b-a22b:free']
 }; 

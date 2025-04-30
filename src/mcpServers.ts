@@ -74,6 +74,21 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "PATH": process.env.PATH
     }
   },
+  // 百度地图
+  "baidu-map-server": {
+    url: "http://localhost:7007/baiduMapServer",
+    "command": "npx",
+    "args": [
+      "@baidumap/mcp-server-baidu-map"
+    ],
+    "env": {
+      "BAIDU_MAP_API_KEY": "uyTr6pO6US94ws6yz0tZSXSJ7X4wkyLT",
+      "PATH": process.env.PATH
+    }
+  },
+  "baidu-search-server": {
+    "url": "http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+bce-v3/ALTAK-XrGNJfcENgbHK6Mraj5Yt/3e55298a8b0ddf1a0e56253a1eb3ada499d5225b"
+  },
   // 本地demo
   // "browser-server": {
   //   url: "http://localhost:8001/browserServer",

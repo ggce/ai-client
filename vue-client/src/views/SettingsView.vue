@@ -146,6 +146,7 @@
               <option value="gemini-2.0-flash">gemini-2.0-flash</option>
               <option value="gemini-2.5-pro-exp-03-25">gemini-2.5-pro-exp-03-25</option>
               <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview-04-17</option>
+              <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash Exp</option>
             </select>
           </div>
 
@@ -193,13 +194,14 @@
               placeholder="默认: https://dashscope.aliyuncs.com/compatible-mode/v1"
             >
             <label for="qwen-model">Qwen 模型</label>
-            <select 
+            <select
               id="qwen-model"
-              v-model="qwenModel" 
-              class="model-select"
+              v-model="qwenModel"
+              class="form-select"
             >
               <option value="qwen-max-latest">qwen-max-latest</option>
               <option value="qwen-turbo">Qwen Turbo</option>
+              <option value="qwen/qwen3-235b-a22b:free">Qwen 3 235B</option>
             </select>
           </div>
         </div>
