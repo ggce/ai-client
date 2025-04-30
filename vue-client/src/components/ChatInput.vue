@@ -24,9 +24,9 @@
           </div>
           <div v-else class="tools-list">
             <div class="tools-header">使用工具</div>
-            <div v-for="(tool, index) in availableTools" :key="index" class="tool-item" @click.stop="toggleToolSelection(tool)"
+            <div v-for="(tool, index) in availableTools" :key="index" class="tool-item"
                  :class="{ 'selected': selectedTools.includes(tool.name) }">
-              <div class="tool-checkbox">
+              <div class="tool-checkbox" @click.stop="toggleToolSelection(tool)">
                 <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
@@ -632,7 +632,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   z-index: 100;
   margin-bottom: 6px;
-  max-height: 260px;
+  min-height: 550px;
   overflow-y: auto;
   animation: fadeInDown 0.2s ease-out;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -690,7 +690,7 @@ onUnmounted(() => {
 }
 
 .tools-list {
-  max-height: 260px;
+  max-height: 550px;
   overflow-y: auto;
 }
 
