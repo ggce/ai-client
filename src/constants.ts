@@ -61,5 +61,6 @@ export const QWEN_MODELS = {
   QWEN_MAX: 'qwen-max-latest',
   QWEN_TURBO: 'qwen-turbo',
   QWEN_3_235B: 'qwen/qwen3-235b-a22b:free',
-  ALL: ['qwen-max-latest', 'qwen-turbo', 'qwen/qwen3-235b-a22b:free']
+  QWEN_3_32B: 'qwen3-32b',
+  ALL: ['qwen-max-latest', 'qwen-turbo', 'qwen/qwen3-235b-a22b:free', 'qwen3-32b']
 }; 

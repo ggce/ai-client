@@ -15,6 +15,14 @@
           class="tool-prompt-container" 
           :class="{ 'collapsed': shouldCollapseToolPrompt && !isExpanded }"
         >
+          <!-- 推理内容 -->
+          <ReasoningContainer
+            v-if="reasoningContent && reasoningContent.trim().length > 0"
+            :content="reasoningContent"
+            :is-collapsed="expandedReasoning"
+            @toggle="toggleReasoning"
+          />
+          <!-- 正文内容 -->
           <div v-if="content" class="message-content" v-html="formattedContent"></div>
           <div class="tool-prompt-content">
             <div 
@@ -69,12 +77,14 @@
 </template>
 
 <script setup lang="ts">
+import ReasoningContainer from './ReasoningContainer.vue';
 import { defineProps, ref, computed } from 'vue';
 import { ToolCall, ChatMessage } from '../../types';
 import { createMarkdownRenderer } from '../../utils/markdown';
 
 const props = defineProps<{
   content: string;
+  reasoningContent?: string;
   isLoading?: boolean;
   toolCalls?: Array<ToolCall>;
   nextMessages?: Array<ChatMessage>;
@@ -88,6 +98,17 @@ const isExpanded = ref(false);
 
 // 初始化markdown解析器
 const md = createMarkdownRenderer();
+
+// 添加一个消息中正在被查看的推理内容的索引
+const expandedReasoning = ref(true);
+
+// 修改toggleReasoning函数使其更可靠
+const toggleReasoning = () => {
+  // 防止事件冒泡
+  event?.stopPropagation();
+
+  expandedReasoning.value = !expandedReasoning.value;
+};
 
 // 格式化消息
 const formattedContent = computed(() => {

@@ -202,6 +202,7 @@
               <option value="qwen-max-latest">qwen-max-latest</option>
               <option value="qwen-turbo">Qwen Turbo</option>
               <option value="qwen/qwen3-235b-a22b:free">Qwen 3 235B</option>
+              <option value="qwen3-32b">Qwen 3 32B</option>
             </select>
           </div>
         </div>

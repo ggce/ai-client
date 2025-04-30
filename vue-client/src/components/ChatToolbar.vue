@@ -6,6 +6,12 @@
       </svg>
       <span class="button-text">查看消息记录</span>
     </button>
+    <button class="toolbar-button debug-button" @click="toggleDevTools" title="打开调试工具">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+      </svg>
+      <span class="button-text">打开调试工具</span>
+    </button>
     <div v-if="isDialogOpen" class="messages-dialog-overlay" @click="closeDialog">
       <div class="messages-dialog" @click.stop>
         <div class="dialog-header">
@@ -47,11 +53,19 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { SessionMessage } from '../api/chat';
+
+// 声明 window.electronAPI 类型
+declare global {
+  interface Window {
+    electronAPI?: {
+      [key: string]: any;
+    };
+  }
+}
 
 // 定义组件参数
 const props = defineProps<{
-  messages: SessionMessage[]
+  messages: any[] // 临时使用 any[] 类型，后续可以根据实际类型定义更新
 }>();
 
 const isDialogOpen = ref(false);
@@ -116,6 +130,14 @@ const showMessages = () => {
 // 关闭对话框
 const closeDialog = () => {
   isDialogOpen.value = false;
+};
+
+// 切换DevTools
+const toggleDevTools = () => {
+  const api = window.electronAPI as any;
+  if (api && typeof api.toggleDevTools === 'function') {
+    api.toggleDevTools();
+  }
 };
 </script>
 
@@ -496,5 +518,16 @@ const closeDialog = () => {
 
 .slider-label {
   font-size: 13px;
+}
+
+.debug-button {
+  bottom: 160px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3), 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.debug-button:hover {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 5px 12px rgba(245, 158, 11, 0.4), 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 </style>

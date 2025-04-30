@@ -18,7 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternalLink: (url: string) => shell.openExternal(url),
   
   // 发送系统通知
-  sendNotification: (options: any) => ipcRenderer.invoke('notification:send', options)
+  sendNotification: (options: any) => ipcRenderer.invoke('notification:send', options),
+  
+  // 切换开发者工具
+  toggleDevTools: () => ipcRenderer.invoke('window:toggleDevTools')
 });
 
 // 暴露用于打开外部链接的API

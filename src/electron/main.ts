@@ -1123,11 +1123,6 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-
-  // 在开发环境中打开DevTools
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
 }
 
 // 处理IPC通信
@@ -1141,6 +1136,17 @@ ipcMain.handle('dialog:openFile', async () => {
     return filePaths[0];
   }
   return null;
+});
+
+// 切换开发者工具
+ipcMain.handle('window:toggleDevTools', () => {
+  if (mainWindow) {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+    } else {
+      mainWindow.webContents.openDevTools();
+    }
+  }
 });
 
 // 处理通知请求

@@ -36,6 +36,7 @@
         <ToolPromptMessage 
           v-if="message.toolCalls && message.toolCalls.length > 0"
           :content="message.content"
+          :reasoning-content="message.reasoningContent"
           :next-messages="messages.slice(index + 1)"
           :toolCalls="message.toolCalls"
           @tool-click="handleToolClick"
