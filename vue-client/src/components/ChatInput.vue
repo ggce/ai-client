@@ -632,7 +632,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   z-index: 100;
   margin-bottom: 6px;
-  min-height: 550px;
+  min-height: 450px;
   overflow-y: auto;
   animation: fadeInDown 0.2s ease-out;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -690,14 +690,14 @@ onUnmounted(() => {
 }
 
 .tools-list {
-  max-height: 550px;
+  max-height: 450px;
   overflow-y: auto;
 }
 
 .tool-item {
   display: flex;
   align-items: center;
-  padding: 8px 14px;
+  padding: 4px 8px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background-color 0.2s;

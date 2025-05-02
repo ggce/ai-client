@@ -3,7 +3,7 @@ import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions
 /**
  * 提供商类型
  */
-export type Provider = 'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen';
+export type Provider = 'deepseek' | 'qwen' | 'qingyun';
 
 /**
  * 提供商配置

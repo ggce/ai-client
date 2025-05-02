@@ -1,14 +1,8 @@
 import axios from 'axios'
 import { objToQueryStr } from '@/utils';
 import { 
-  ChatRequestConfig, 
-  ChatRequest, 
-  ChatResponse, 
-  SessionConfig, 
   SessionMessage, 
-  Session, 
   MessageOptions, 
-  MessageResponse, 
   MessageCallbackParams 
 } from '../types';
 

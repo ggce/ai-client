@@ -100,7 +100,6 @@ import { useSettingsStore } from '../store/settings'
 import { getDeepSeekBalance, DeepSeekBalanceResponse } from '../api/config'
 import { tips } from '../utils/tips'
 import { Provider } from '../types'
-import type { ProvidersResponse } from '../api/provider'
 
 // 定义组件名称
 defineOptions({
@@ -113,7 +112,7 @@ const settingsStore = useSettingsStore()
 const selectedProvider = ref<Provider>(settingsStore.currentProvider)
 
 // 从 settingsStore 获取 provider 配置
-const providerConfigs = computed(() => settingsStore.providerConfigs as ProvidersResponse)
+const providerConfigs = computed(() => settingsStore.providerConfigs)
 
 // 使用 Record 类型来确保类型安全
 const apiKeys = ref<Record<Provider, string>>({} as Record<Provider, string>)

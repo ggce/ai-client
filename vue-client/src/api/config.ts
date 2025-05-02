@@ -1,5 +1,6 @@
 import axios from 'axios'
-import { Provider, ProviderConfig, SettingsState, DeepSeekBalanceInfo, DeepSeekBalanceResponse } from '../types'
+import { Provider, SettingsState, DeepSeekBalanceResponse } from '../types'
+import { getProviderConfigs } from './provider'
 
 export type { DeepSeekBalanceResponse }
 
@@ -14,8 +15,7 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
       const config = response.data
       
       // 获取provider配置
-      const providersResponse = await axios.get('/api/providers/configs')
-      const providersData = providersResponse.data
+      const providersData = await getProviderConfigs()
       
       // 创建一个完整的配置结构
       const completeConfig: SettingsState = {
@@ -29,7 +29,7 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
         completeConfig.providers[provider] = {
           apiKey: '',
           baseURL: '',
-          model: providersData.configs[provider].defaultModel
+          model: (providersData.configs as any)[provider]?.defaultModel || '',
         }
       })
       
@@ -49,6 +49,8 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
       if (typeof config.isSidebarCollapsed === 'boolean') {
         completeConfig.isSidebarCollapsed = config.isSidebarCollapsed
       }
+
+      console.log('加载配置:', completeConfig)
       
       return completeConfig
     }
@@ -81,13 +83,12 @@ export const saveApiKey = async (provider: Provider, apiKey: string): Promise<bo
     // 更新API key
     if (!currentConfig.providers[provider]) {
       // 获取provider默认配置
-      const providersResponse = await axios.get('/api/providers/configs')
-      const providersData = providersResponse.data
+      const providersData = await getProviderConfigs()
       
       currentConfig.providers[provider] = {
         apiKey: '',
         baseURL: '',
-        model: providersData.configs[provider].defaultModel
+        model: (providersData.configs as any)[provider]?.defaultModel || ''
       }
     }
     
@@ -111,13 +112,12 @@ export const saveModel = async (provider: Provider, model: string): Promise<bool
     // 更新模型
     if (!currentConfig.providers[provider]) {
       // 获取provider默认配置
-      const providersResponse = await axios.get('/api/providers/configs')
-      const providersData = providersResponse.data
+      const providersData = await getProviderConfigs()
       
       currentConfig.providers[provider] = {
         apiKey: '',
         baseURL: '',
-        model: model || providersData.configs[provider].defaultModel
+        model: model || (providersData.configs as any)[provider]?.defaultModel || ''
       }
     } else {
       currentConfig.providers[provider].model = model
@@ -145,9 +145,8 @@ export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanc
 // 获取默认模型
 export const getDefaultModel = async (provider: Provider): Promise<string> => {
   try {
-    const providersResponse = await axios.get('/api/providers/configs')
-    const providersData = providersResponse.data
-    return providersData.configs[provider].defaultModel
+    const providersData = await getProviderConfigs()
+    return (providersData.configs as any)[provider]?.defaultModel || 'deepseek-chat'
   } catch (error) {
     console.error('获取默认模型失败:', error)
     return 'deepseek-chat' // 作为最后的后备选项

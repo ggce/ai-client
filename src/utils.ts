@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import { ClientOptions } from './types';
 import { ProviderType, getProviderConfig as getConfig } from './constants';
-import * as constants from './constants';
 
 // 加载环境变量
 dotenv.config();
