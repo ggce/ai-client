@@ -39,6 +39,7 @@
     "ejs": "^3.1.10",
     "electron-store": "^10.0.1",
     "express": "^5.1.0",
+    "firecrawl-mcp": "^1.10.0",
     "openai": "^4.95.0",
     "pinia": "^2.1.7",
     "tavily-mcp": "^0.1.4",

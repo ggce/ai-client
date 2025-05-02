@@ -48,6 +48,18 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     ]
   },
   // 网络请求操作
+  "firecrawl-server": {
+    url: "http://localhost:7010/firecrawlServer",
+    command: "npx",
+    args: [
+      "firecrawl-mcp"
+    ],
+    env: {
+      "FIRECRAWL_API_KEY": "c31fedf4-a502-4b2f-b013-3ed102c5463d",
+      "PATH": process.env.PATH
+    }
+  },
+  // 网络请求操作
   "fetch-server": {
     url: "http://localhost:7004/fetch-server",
     command: "npx",
