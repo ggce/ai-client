@@ -69,27 +69,17 @@ let mcpTools: Array<MCPTool> = [];
 
 // 初始化AI提供商
 function initDefaultProviders() {
-  // 初始化DeepSeek客户端
-  AIProviderFactory.getProvider('deepseek', {
-    apiKey: '',
-    baseURL: PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_URL,
-    defaultModel: PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_MODEL
-  });
-  
-  // 初始化Qwen客户端
-  AIProviderFactory.getProvider('qwen', {
-    apiKey: '',
-    baseURL: PROVIDER_CONFIGS.QWEN.DEFAULT_URL,
-    defaultModel: PROVIDER_CONFIGS.QWEN.DEFAULT_MODEL
-  });
-
-  // 初始化Qingyun客户端
-  AIProviderFactory.getProvider('qingyun', {
-    apiKey: '',
-    baseURL: PROVIDER_CONFIGS.QINGYUN.DEFAULT_URL,
-    defaultModel: PROVIDER_CONFIGS.QINGYUN.DEFAULT_MODEL
-  });
-  
+  for (const provider of SUPPORTED_PROVIDERS) {
+    const providerKey = provider.toUpperCase();
+    const config = PROVIDER_CONFIGS[providerKey];
+    if (config) {
+      AIProviderFactory.getProvider(provider, {
+        apiKey: '',
+        baseURL: config.DEFAULT_URL,
+        defaultModel: config.DEFAULT_MODEL
+      });
+    }
+  }
   logger.log('Main', '已初始化默认AI提供商');
 }
 
@@ -182,34 +172,17 @@ function initClientsFromConfig() {
           logger.log('Main', `设置默认提供商: ${defaultProviderType}`);
         }
         
-        // 更新DeepSeek客户端
-        if (config.providers.deepseek?.apiKey) {
-          AIProviderFactory.getProvider('deepseek', {
-            apiKey: config.providers.deepseek.apiKey,
-            baseURL: config.providers.deepseek.baseURL || PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_URL,
-            defaultModel: config.providers.deepseek.model
-          });
-          logger.log('Main', '已从配置文件加载DeepSeek API配置');
-        }
-        
-        // 更新Qwen客户端
-        if (config.providers.qwen?.apiKey) {
-          AIProviderFactory.getProvider('qwen', {
-            apiKey: config.providers.qwen.apiKey,
-            baseURL: config.providers.qwen.baseURL || PROVIDER_CONFIGS.QWEN.DEFAULT_URL,
-            defaultModel: config.providers.qwen.model
-          });
-          logger.log('Main', '已更新Qwen API配置');
-        }
-
-        // 更新Qingyun客户端
-        if (config.providers.qingyun?.apiKey) {
-          AIProviderFactory.getProvider('qingyun', {
-            apiKey: config.providers.qingyun.apiKey,
-            baseURL: config.providers.qingyun.baseURL || PROVIDER_CONFIGS.QINGYUN.DEFAULT_URL,
-            defaultModel: config.providers.qingyun.model
-          });
-          logger.log('Main', '已更新Qingyun API配置');
+        // 动态遍历所有支持的 provider，自动初始化
+        for (const provider of SUPPORTED_PROVIDERS) {
+          const providerConfig = config.providers[provider];
+          if (providerConfig && providerConfig.apiKey) {
+            AIProviderFactory.getProvider(provider as ProviderType, {
+              apiKey: providerConfig.apiKey,
+              baseURL: providerConfig.baseURL || PROVIDER_CONFIGS[provider.toUpperCase()].DEFAULT_URL,
+              defaultModel: providerConfig.model
+            });
+            logger.log('Main', `已更新${provider} API配置`);
+          }
         }
       }
     }
@@ -1245,7 +1218,7 @@ app.on('ready', () => {
     
     // Windows平台设置应用ID
     if (process.platform === 'win32') {
-      app.setAppUserModelId('com.deepseek.client');
+      app.setAppUserModelId('com.luna.assistant');
     }
   } catch (error) {
     logger.error('Main', `设置应用图标失败: ${error}`);
@@ -1285,4 +1258,11 @@ app.on('will-quit', async () => {
     logger.log('Main', '应用程序退出，关闭Express服务器');
     server.close();
   }
+});
+
+// 注册 notification:send handler，支持前端系统通知
+ipcMain.handle('notification:send', (event, options) => {
+  // options: { title, body, icon, ... }
+  const notification = new Notification(options);
+  notification.show();
 });

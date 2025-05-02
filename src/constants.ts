@@ -48,6 +48,15 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
       'deepseek-chat',
       'doubao-1-5-pro-32k-250115'
     ]
+  },
+  OPENROUTER: {
+    NAME: 'openrouter',
+    DEFAULT_URL: 'https://openrouter.ai/api/v1',
+    DEFAULT_MODEL: 'google/gemini-2.0-flash-exp:free',
+    ALL_MODELS: [
+      'google/gemini-2.0-flash-exp:free',
+      'meta-llama/llama-4-maverick:free'
+    ]
   }
 } as const;
 

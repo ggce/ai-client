@@ -1,5 +1,4 @@
-// Provider 类型定义
-export type ProviderType = 'deepseek' | 'qwen'
+import { Provider } from '../../src/types'
 
 // Provider 配置接口
 export interface ProviderConfig {
@@ -10,8 +9,8 @@ export interface ProviderConfig {
 }
 
 export interface ProvidersResponse {
-  providers: ProviderType[]
-  configs: Record<ProviderType, ProviderConfig>
+  providers: Provider[]
+  configs: Record<Provider, ProviderConfig>
 }
 
 // 获取所有可用的 provider 配置

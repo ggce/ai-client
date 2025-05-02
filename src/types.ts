@@ -2,6 +2,8 @@ import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions
 
 export type Role = 'user' | 'assistant' | 'system' | 'tool';
 
+export type ProviderType = 'deepseek' | 'qwen' | 'qingyun' | 'openrouter'; 
+
 export interface Message {
   role: Role;
   content: string;
@@ -116,5 +118,3 @@ export interface TokenLimitExceededError {
   message: string;
   summary: string;
 }
-
-export type ProviderType = 'deepseek' | 'qwen' | 'qingyun'; 

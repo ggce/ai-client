@@ -146,22 +146,3 @@ export class UnifiedClient extends BaseClient {
     },
   };
 }
-
-// 创建具名导出的客户端类
-export class DeepseekClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'deepseek' });
-  }
-}
-
-export class QwenClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'qwen' });
-  }
-}
-
-export class QingyunClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'qingyun' });
-  }
-}

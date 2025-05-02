@@ -1,5 +1,5 @@
 import { BaseClient } from './baseClient';
-import { DeepseekClient, QwenClient, QingyunClient } from './openai';
+import { UnifiedClient } from './openai';
 import { ClientOptions } from '../types';
 import { ProviderType } from '../constants';
 
@@ -20,18 +20,6 @@ export class AIProviderFactory {
 
   // 创建新的提供商实例
   private static createProvider(type: ProviderType, options?: ClientOptions): void {
-    switch (type) {
-      case 'deepseek':
-        this.providers[type] = new DeepseekClient(options);
-        break;
-      case 'qwen':
-        this.providers[type] = new QwenClient(options);
-        break;
-      case 'qingyun':
-        this.providers[type] = new QingyunClient(options);
-        break;
-      default:
-        throw new Error(`不支持的提供商类型: ${type}`);
-    }
+    this.providers[type] = new UnifiedClient({ ...options, provider: type });
   }
 } 
