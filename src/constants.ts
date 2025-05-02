@@ -2,65 +2,64 @@
  * API 服务相关常量
  */
 
-export const API_VERSION = 'v0';
+// Provider 配置接口
+export interface ProviderConstantConfig {
+  NAME: string;
+  DEFAULT_URL: string;
+  DEFAULT_MODEL: string;
+  ALL_MODELS: string[];
+}
 
-// OpenAI对应的服务
-export const OPENAI_DEFAULT_URL: string = 'https://api.openai.com/v1';
-export const OPENAI_MODELS = {
-  DEFAULT: 'gpt-4.1',
-  GPT_3_5: 'gpt-3.5-turbo',
-  GPT_4: 'gpt-4',
-  GPT_4_TURBO: 'gpt-4-turbo-preview',
-  GPT_4_1: 'gpt-4.1',
-  GPT_4_1_MINI: 'gpt-4.1-mini',
-  GPT_4_1_NANO: 'gpt-4.1-nano',
-  O3_MINI: 'o3-mini',
-};
+// 所有 Provider 配置
+export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
+  DEEPSEEK: {
+    NAME: 'deepseek',
+    DEFAULT_URL: 'https://api.deepseek.com/v1',
+    DEFAULT_MODEL: 'deepseek-chat',
+    ALL_MODELS: [
+      'deepseek-chat',
+      'deepseek-reasoner'
+    ]
+  },
+  QWEN: {
+    NAME: 'qwen',
+    DEFAULT_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    DEFAULT_MODEL: 'qwen-max-latest',
+    ALL_MODELS: [
+      'qwen-max-latest',
+      'qwen-turbo',
+      'qwen3-32b'
+    ]
+  },
+  QINGYUN: {
+    NAME: 'qingyun',
+    DEFAULT_URL: 'https://api.qingyuntop.top/v1',
+    DEFAULT_MODEL: 'gpt-4.1-2025-04-14',
+    ALL_MODELS: [
+      'gpt-4.1-2025-04-14',
+      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-nano-2025-04-14',
+      'claude-3-7-sonnet-20250219-thinking',
+      'claude-3-7-sonnet-20250219',
+      'gemini-2.0-flash',
+      'gemini-2.5-pro-exp-03-25',
+      'glm-3-turbo',
+      'deepseek-r1-searching',
+      'deepseek-chat',
+      'doubao-1-5-pro-32k-250115'
+    ]
+  }
+} as const;
 
-// DeepSeek对应的服务
-export const DEEPSEEK_DEFAULT_URL: string = 'https://api.deepseek.com/v1';
-export const DEEPSEEK_MODELS = {
-  DEFAULT: 'deepseek-chat',
-  DEEPSEEK_CHAT: 'deepseek-chat',
-  DEEPSEEK_CODER: 'deepseek-coder',
-  DEEPSEEK_REASONER: 'deepseek-reasoner',
-  ALL: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner']
-};
+// 支持的AI提供商
+export const SUPPORTED_PROVIDERS = Object.values(PROVIDER_CONFIGS).map(config => config.NAME);
+export type ProviderType = (typeof SUPPORTED_PROVIDERS)[number];
 
-// Gemini对应的服务
-export const GEMINI_DEFAULT_URL: string = 'https://generativelanguage.googleapis.com/v1beta';
-export const GEMINI_MODELS = {
-  DEFAULT: 'gemini-2.0-flash',
-  GEMINI_PRO: 'gemini-pro',
-  GEMINI_2_0_FLASH: 'gemini-2.0-flash',
-  GEMINI_2_0_PRO: 'gemini-2.0-pro',
-  GEMINI_1_5_PRO: 'gemini-1.5-pro',
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',
-  GEMINI_2_5_PRO_EXP: 'gemini-2.5-pro-exp-03-25',
-  GEMINI_2_5_FLASH_PREVIEW: 'gemini-2.5-flash-preview-04-17',
-  GEMINI_2_0_FLASH_EXP: 'google/gemini-2.0-flash-exp:free',
-  ALL: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-flash-preview-04-17', 'google/gemini-2.0-flash-exp:free']
-};
-
-// Anthropic对应的服务
-export const ANTHROPIC_DEFAULT_URL: string = 'https://api.anthropic.com';
-export const ANTHROPIC_MODELS = {
-  DEFAULT: 'claude-3-7-sonnet-20250219',
-  CLAUDE_OPUS: 'claude-3-opus-20240229',
-  CLAUDE_SONNET: 'claude-3-sonnet-20240229',
-  CLAUDE_HAIKU: 'claude-3-haiku-20240307',
-  CLAUDE_3_7_SONNET: 'claude-3-7-sonnet-20250219',
-  CLAUDE_3_7_SONNET_THINKING: 'claude-3-7-sonnet-20250219-thinking',
-  ALL: ['claude-3-7-sonnet-20250219', 'claude-3-7-sonnet-20250219-thinking']
-};
-
-// Qwen对应的服务
-export const QWEN_DEFAULT_URL: string = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-export const QWEN_MODELS = {
-  DEFAULT: 'qwen-max-latest',
-  QWEN_MAX: 'qwen-max-latest',
-  QWEN_TURBO: 'qwen-turbo',
-  QWEN_3_235B: 'qwen/qwen3-235b-a22b:free',
-  QWEN_3_32B: 'qwen3-32b',
-  ALL: ['qwen-max-latest', 'qwen-turbo', 'qwen/qwen3-235b-a22b:free', 'qwen3-32b']
-}; 
+// 根据提供商类型获取配置
+export function getProviderConfig(provider: ProviderType): ProviderConstantConfig {
+  const config = Object.values(PROVIDER_CONFIGS).find(cfg => cfg.NAME === provider);
+  if (!config) {
+    throw new Error(`未知的provider: ${provider}`);
+  }
+  return config;
+}

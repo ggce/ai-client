@@ -9,25 +9,9 @@
         <div class="settings-section">
           <h3>选择AI模型</h3>
           <div class="radio-group">
-            <label>
-              <input type="radio" v-model="selectedProvider" value="deepseek">
-              Deepseek
-            </label>
-            <label>
-              <input type="radio" v-model="selectedProvider" value="openai">
-              OpenAI
-            </label>
-            <label>
-              <input type="radio" v-model="selectedProvider" value="gemini">
-              Gemini
-            </label>
-            <label>
-              <input type="radio" v-model="selectedProvider" value="anthropic">
-              Anthropic
-            </label>
-            <label>
-              <input type="radio" v-model="selectedProvider" value="qwen">
-              Qwen
+            <label v-for="provider in providerConfigs.providers" :key="provider">
+              <input type="radio" v-model="selectedProvider" :value="provider">
+              {{ providerConfigs.configs[provider].name }}
             </label>
           </div>
         </div>
@@ -35,26 +19,28 @@
         <div class="settings-section">
           <h3>API密钥配置</h3>
           
-          <div class="api-key-section" v-show="selectedProvider === 'deepseek'">
-            <label for="deepseek-api-key">Deepseek API密钥</label>
+          <div v-for="provider in providerConfigs.providers as Provider[]" :key="provider" 
+               class="api-key-section" v-show="selectedProvider === provider">
+            <label :for="`${provider}-api-key`">{{ providerConfigs.configs[provider].name }} API密钥</label>
             <div class="api-key-row">
               <input 
                 type="text" 
-                id="deepseek-api-key"
-                v-model="deepseekApiKey" 
-                placeholder="输入Deepseek API密钥" 
+                :id="`${provider}-api-key`"
+                v-model="apiKeys[provider]" 
+                :placeholder="`输入${providerConfigs.configs[provider].name} API密钥`" 
                 class="api-key-input"
               >
               <button 
+                v-if="provider === 'deepseek'"
                 @click="checkDeepseekBalance" 
                 class="balance-button"
-                :disabled="!deepseekApiKey || isCheckingBalance"
+                :disabled="!apiKeys.deepseek || isCheckingBalance"
               >
                 {{ isCheckingBalance ? '查询中...' : '查询余额' }}
               </button>
             </div>
 
-            <div v-if="balanceInfo" class="balance-info">
+            <div v-if="provider === 'deepseek' && balanceInfo" class="balance-info">
               <div class="balance-status" :class="{ 'balance-available': balanceInfo.is_available }">
                 状态: {{ balanceInfo.is_available ? '可用' : '余额不足' }}
               </div>
@@ -66,143 +52,29 @@
               </div>
             </div>
             
-            <div v-if="balanceError" class="balance-error">
+            <div v-if="provider === 'deepseek' && balanceError" class="balance-error">
               余额查询失败: {{ balanceError }}
             </div>
 
-            <label for="deepseek-base-url">Deepseek 基础URL（可选）</label>
+            <label :for="`${provider}-base-url`">{{ providerConfigs.configs[provider].name }} 基础URL（可选）</label>
             <input 
               type="text" 
-              id="deepseek-base-url"
-              v-model="deepseekBaseUrl"
-              placeholder="默认: https://api.deepseek.com"
+              :id="`${provider}-base-url`"
+              v-model="baseUrls[provider]"
+              :placeholder="`默认: ${providerConfigs.configs[provider].defaultUrl}`"
             >
-            <label for="deepseek-model">Deepseek 模型</label>
+            
+            <label :for="`${provider}-model`">{{ providerConfigs.configs[provider].name }} 模型</label>
             <select 
-              id="deepseek-model"
-              v-model="deepseekModel" 
+              :id="`${provider}-model`"
+              v-model="selectedModels[provider]" 
               class="model-select"
             >
-              <option value="deepseek-chat">DeepSeek V3</option>
-              <option value="deepseek-reasoner">DeepSeek R1</option>
-            </select>
-          </div>
-
-          <div class="api-key-section" v-show="selectedProvider === 'openai'">
-            <label for="openai-api-key">OpenAI API密钥</label>
-            <input 
-              type="text" 
-              id="openai-api-key"
-              v-model="openaiApiKey" 
-              placeholder="输入OpenAI API密钥" 
-              class="api-key-input"
-            >
-            <label for="openai-base-url">OpenAI 基础URL（可选）</label>
-            <input 
-              type="text" 
-              id="openai-base-url"
-              v-model="openaiBaseUrl"
-              placeholder="默认: https://api.openai.com/v1"
-            >
-            <label for="openai-model">OpenAI 模型</label>
-            <select 
-              id="openai-model"
-              v-model="openaiModel" 
-              class="model-select"
-            >
-              <option value="gpt-4.1">GPT-4.1</option>
-              <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-              <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-              <option value="o3-mini">O3 Mini</option>
-            </select>
-          </div>
-          
-          <div class="api-key-section" v-show="selectedProvider === 'gemini'">
-            <label for="gemini-api-key">Gemini API密钥</label>
-            <input 
-              type="text" 
-              id="gemini-api-key"
-              v-model="geminiApiKey" 
-              placeholder="输入Gemini API密钥" 
-              class="api-key-input"
-            >
-            <label for="gemini-base-url">Gemini 基础URL（第三方代理地址）</label>
-            <input 
-              type="text" 
-              id="gemini-base-url"
-              v-model="geminiBaseUrl"
-              placeholder="输入第三方代理的URL（需支持OpenAI格式调用）"
-            >
-            <div class="info-note">
-              <i class="info-icon">ℹ️</i>
-              <span>请使用支持OpenAI方式调用的第三方代理，以使用Gemini</span>
-            </div>
-            <label for="gemini-model">Gemini 模型</label>
-            <select 
-              id="gemini-model"
-              v-model="geminiModel" 
-              class="model-select"
-            >
-              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-              <option value="gemini-2.5-pro-exp-03-25">gemini-2.5-pro-exp-03-25</option>
-              <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview-04-17</option>
-              <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash Exp</option>
-            </select>
-          </div>
-
-          <div class="api-key-section" v-show="selectedProvider === 'anthropic'">
-            <label for="anthropic-api-key">Anthropic API密钥</label>
-            <input 
-              type="text" 
-              id="anthropic-api-key"
-              v-model="anthropicApiKey" 
-              placeholder="输入Anthropic API密钥" 
-              class="api-key-input"
-            >
-            <label for="anthropic-base-url">Anthropic 基础URL（可选）</label>
-            <input 
-              type="text" 
-              id="anthropic-base-url"
-              v-model="anthropicBaseUrl"
-              placeholder="默认: https://api.anthropic.com/v1"
-            >
-            <label for="anthropic-model">Anthropic 模型</label>
-            <select 
-              id="anthropic-model"
-              v-model="anthropicModel" 
-              class="model-select"
-            >
-              <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219</option>
-              <option value="claude-3-7-sonnet-20250219-thinking">claude-3-7-sonnet-20250219-thinking</option>
-            </select>
-          </div>
-
-          <div class="api-key-section" v-show="selectedProvider === 'qwen'">
-            <label for="qwen-api-key">Qwen API密钥</label>
-            <input 
-              type="text" 
-              id="qwen-api-key"
-              v-model="qwenApiKey" 
-              placeholder="输入Qwen API密钥" 
-              class="api-key-input"
-            >
-            <label for="qwen-base-url">Qwen 基础URL（可选）</label>
-            <input 
-              type="text" 
-              id="qwen-base-url"
-              v-model="qwenBaseUrl"
-              placeholder="默认: https://dashscope.aliyuncs.com/compatible-mode/v1"
-            >
-            <label for="qwen-model">Qwen 模型</label>
-            <select
-              id="qwen-model"
-              v-model="qwenModel"
-              class="form-select"
-            >
-              <option value="qwen-max-latest">qwen-max-latest</option>
-              <option value="qwen-turbo">Qwen Turbo</option>
-              <option value="qwen/qwen3-235b-a22b:free">Qwen 3 235B</option>
-              <option value="qwen3-32b">Qwen 3 32B</option>
+              <option v-for="model in (providerConfigs.configs[provider] && providerConfigs.configs[provider].models ? providerConfigs.configs[provider].models : [])" 
+                      :key="model" 
+                      :value="model">
+                {{ model }}
+              </option>
             </select>
           </div>
         </div>
@@ -227,6 +99,8 @@ import { ref, computed, onMounted, onActivated, onDeactivated, watch } from 'vue
 import { useSettingsStore } from '../store/settings'
 import { getDeepSeekBalance, DeepSeekBalanceResponse } from '../api/config'
 import { tips } from '../utils/tips'
+import { Provider } from '../types'
+import type { ProvidersResponse } from '../api/provider'
 
 // 定义组件名称
 defineOptions({
@@ -236,22 +110,15 @@ defineOptions({
 const settingsStore = useSettingsStore()
 
 // 状态
-const selectedProvider = ref<'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen'>('deepseek')
-const deepseekApiKey = ref('')
-const deepseekBaseUrl = ref('')
-const deepseekModel = ref('deepseek-chat')
-const openaiApiKey = ref('')
-const openaiBaseUrl = ref('')
-const openaiModel = ref('gpt-4.1')
-const geminiApiKey = ref('')
-const geminiBaseUrl = ref('')
-const geminiModel = ref('gemini-2.0-flash')
-const anthropicApiKey = ref('')
-const anthropicBaseUrl = ref('')
-const anthropicModel = ref('claude-3-7-sonnet-20250219')
-const qwenApiKey = ref('')
-const qwenBaseUrl = ref('')
-const qwenModel = ref('qwen-max-latest')
+const selectedProvider = ref<Provider>(settingsStore.currentProvider)
+
+// 从 settingsStore 获取 provider 配置
+const providerConfigs = computed(() => settingsStore.providerConfigs as ProvidersResponse)
+
+// 使用 Record 类型来确保类型安全
+const apiKeys = ref<Record<Provider, string>>({} as Record<Provider, string>)
+const baseUrls = ref<Record<Provider, string>>({} as Record<Provider, string>)
+const selectedModels = ref<Record<Provider, string>>({} as Record<Provider, string>)
 const showDebugConfig = ref(false)
 
 // DeepSeek余额查询相关状态
@@ -261,7 +128,7 @@ const isCheckingBalance = ref(false)
 
 // 查询DeepSeek账户余额
 const checkDeepseekBalance = async () => {
-  if (!deepseekApiKey.value) {
+  if (!apiKeys.value.deepseek) {
     balanceError.value = '请先输入API密钥'
     return
   }
@@ -269,7 +136,7 @@ const checkDeepseekBalance = async () => {
   try {
     balanceError.value = null
     isCheckingBalance.value = true
-    balanceInfo.value = await getDeepSeekBalance(deepseekApiKey.value)
+    balanceInfo.value = await getDeepSeekBalance(apiKeys.value.deepseek)
     console.log('DeepSeek余额信息:', balanceInfo.value)
   } catch (error) {
     balanceInfo.value = null
@@ -286,186 +153,81 @@ watch(selectedProvider, async (newValue) => {
 })
 
 // 监听模型选择变化，并立即保存
-watch(deepseekModel, (newValue) => {
-  if (newValue) {
-    settingsStore.setModel('deepseek', newValue)
-  }
-})
-
-watch(openaiModel, (newValue) => {
-  if (newValue) {
-    settingsStore.setModel('openai', newValue)
-  }
-})
-
-watch(geminiModel, (newValue) => {
-  if (newValue) {
-    settingsStore.setModel('gemini', newValue)
-  }
-})
-
-// 监听Anthropic模型选择变化，并立即保存
-watch(anthropicModel, (newValue) => {
-  if (newValue) {
-    settingsStore.setModel('anthropic', newValue)
-  }
-})
-
-// 监听Qwen模型选择变化，并立即保存
-watch(qwenModel, (newValue) => {
-  if (newValue) {
-    settingsStore.setModel('qwen', newValue)
-  }
-})
+watch(selectedModels, (newValue) => {
+  Object.entries(newValue).forEach(([provider, model]) => {
+    if (model) {
+      settingsStore.setModel(provider as Provider, model)
+    }
+  })
+}, { deep: true })
 
 // 配置调试信息
 const configDebug = computed(() => JSON.stringify({
   selectedProvider: selectedProvider.value,
-  providers: {
-    deepseek: {
-      apiKey: deepseekApiKey.value,
-      baseURL: deepseekBaseUrl.value,
-      model: deepseekModel.value
-    },
-    openai: {
-      apiKey: openaiApiKey.value,
-      baseURL: openaiBaseUrl.value,
-      model: openaiModel.value
-    },
-    gemini: {
-      apiKey: geminiApiKey.value,
-      baseURL: geminiBaseUrl.value,
-      model: geminiModel.value
-    },
-    anthropic: {
-      apiKey: anthropicApiKey.value,
-      baseURL: anthropicBaseUrl.value,
-      model: anthropicModel.value
-    },
-    qwen: {
-      apiKey: qwenApiKey.value,
-      baseURL: qwenBaseUrl.value,
-      model: qwenModel.value
-    }
-  }
+  providers: Object.fromEntries(
+    Object.entries(apiKeys.value).map(([provider, apiKey]) => [
+      provider,
+      {
+        apiKey,
+        baseURL: baseUrls.value[provider as Provider],
+        model: selectedModels.value[provider as Provider]
+      }
+    ])
+  )
 }, null, 2))
 
 // 加载当前配置
 const loadSettings = async () => {
-  await settingsStore.loadSettings()
-  
-  selectedProvider.value = settingsStore.currentProvider as 'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen'
-  
-  const deepseekConfig = settingsStore.providers.deepseek
-  if (deepseekConfig) {
-    deepseekApiKey.value = deepseekConfig.apiKey || ''
-    deepseekBaseUrl.value = deepseekConfig.baseURL || ''
-    deepseekModel.value = deepseekConfig.model || 'deepseek-chat'
-  }
-  
-  const openaiConfig = settingsStore.providers.openai
-  if (openaiConfig) {
-    openaiApiKey.value = openaiConfig.apiKey || ''
-    openaiBaseUrl.value = openaiConfig.baseURL || ''
-    openaiModel.value = openaiConfig.model || 'gpt-4.1'
-  }
-  
-  const geminiConfig = settingsStore.providers.gemini
-  if (geminiConfig) {
-    geminiApiKey.value = geminiConfig.apiKey || ''
-    geminiBaseUrl.value = geminiConfig.baseURL || ''
-    geminiModel.value = geminiConfig.model || 'gemini-2.0-flash'
-  }
-
-  const anthropicConfig = settingsStore.providers.anthropic
-  if (anthropicConfig) {
-    anthropicApiKey.value = anthropicConfig.apiKey || ''
-    anthropicBaseUrl.value = anthropicConfig.baseURL || ''
-    anthropicModel.value = anthropicConfig.model || 'claude-3-7-sonnet-20250219'
-  }
-
-  const qwenConfig = settingsStore.providers.qwen
-  if (qwenConfig) {
-    qwenApiKey.value = qwenConfig.apiKey || ''
-    qwenBaseUrl.value = qwenConfig.baseURL || ''
-    qwenModel.value = qwenConfig.model || 'qwen-max-latest'
-  }
-
-  console.log('设置已加载：', {
-    provider: selectedProvider.value,
-    deepseek: {
-      apiKey: deepseekApiKey.value ? '******' : '',
-      model: deepseekModel.value
-    },
-    openai: {
-      apiKey: openaiApiKey.value ? '******' : '',
-      model: openaiModel.value
-    },
-    gemini: {
-      apiKey: geminiApiKey.value ? '******' : '',
-      model: geminiModel.value
-    },
-    anthropic: {
-      apiKey: anthropicApiKey.value ? '******' : '',
-      model: anthropicModel.value
-    },
-    qwen: {
-      apiKey: qwenApiKey.value ? '******' : '',
-      model: qwenModel.value
+  try {
+    // 加载已保存的设置
+    await settingsStore.loadSettings()
+    
+    selectedProvider.value = settingsStore.currentProvider
+    
+    // 初始化每个provider的配置
+    providerConfigs.value.providers.forEach((provider: Provider) => {
+      const config = settingsStore.providers[provider]
+      if (config) {
+        apiKeys.value[provider] = config.apiKey || ''
+        baseUrls.value[provider] = config.baseURL || ''
+        selectedModels.value[provider] = config.model || ''
+      }
+    })
+    
+    // 如果已经配置了DeepSeek API密钥，自动查询余额
+    if (apiKeys.value.deepseek && selectedProvider.value === 'deepseek') {
+      checkDeepseekBalance()
     }
-  })
-  
-  // 如果已经配置了DeepSeek API密钥，自动查询余额
-  if (deepseekApiKey.value && selectedProvider.value === 'deepseek') {
-    checkDeepseekBalance()
+    
+    console.log('设置已加载')
+  } catch (error) {
+    console.error('加载设置失败:', error)
+    tips.error('加载设置失败')
   }
 }
 
 // 保存设置到store
 const saveSettings = async () => {
-  // 保存提供商设置
-  await settingsStore.setProvider(selectedProvider.value)
-  
-  // 设置Deepseek配置
-  if (selectedProvider.value === 'deepseek') {
-    await settingsStore.setApiKey('deepseek', deepseekApiKey.value)
-    settingsStore.setBaseURL('deepseek', deepseekBaseUrl.value)
-    await settingsStore.setModel('deepseek', deepseekModel.value)
+  try {
+    // 保存提供商设置
+    await settingsStore.setProvider(selectedProvider.value)
+    
+    // 保存每个provider的配置
+    for (const provider of providerConfigs.value.providers) {
+      await settingsStore.setApiKey(provider, apiKeys.value[provider])
+      settingsStore.setBaseURL(provider, baseUrls.value[provider])
+      await settingsStore.setModel(provider, selectedModels.value[provider])
+    }
+    
+    // 保存所有设置
+    await settingsStore.saveSettings()
+    
+    // 显示保存成功提示
+    tips.success('设置已保存')
+  } catch (error) {
+    console.error('保存设置失败:', error)
+    tips.error('保存设置失败')
   }
-  
-  // 设置OpenAI配置
-  if (selectedProvider.value === 'openai') {
-    await settingsStore.setApiKey('openai', openaiApiKey.value)
-    settingsStore.setBaseURL('openai', openaiBaseUrl.value)
-    await settingsStore.setModel('openai', openaiModel.value)
-  }
-  
-  // 设置Gemini配置
-  if (selectedProvider.value === 'gemini') {
-    await settingsStore.setApiKey('gemini', geminiApiKey.value)
-    settingsStore.setBaseURL('gemini', geminiBaseUrl.value)
-    await settingsStore.setModel('gemini', geminiModel.value)
-  }
-  
-  // 设置Anthropic配置
-  if (selectedProvider.value === 'anthropic') {
-    await settingsStore.setApiKey('anthropic', anthropicApiKey.value)
-    settingsStore.setBaseURL('anthropic', anthropicBaseUrl.value)
-    await settingsStore.setModel('anthropic', anthropicModel.value)
-  }
-  
-  // 设置Qwen配置
-  if (selectedProvider.value === 'qwen') {
-    await settingsStore.setApiKey('qwen', qwenApiKey.value)
-    settingsStore.setBaseURL('qwen', qwenBaseUrl.value)
-    await settingsStore.setModel('qwen', qwenModel.value)
-  }
-  
-  // 保存所有设置
-  await settingsStore.saveSettings()
-  
-  // 显示保存成功提示
-  tips.success('设置已保存')
 }
 
 // 切换调试配置显示
@@ -719,5 +481,12 @@ onDeactivated(() => {
   white-space: pre-wrap;
   word-break: break-all;
   font-family: monospace;
+}
+
+input, textarea {
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
+  -moz-user-select: auto !important;
+  -ms-user-select: auto !important;
 }
 </style> 

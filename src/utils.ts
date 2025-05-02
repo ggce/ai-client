@@ -1,31 +1,41 @@
 import dotenv from 'dotenv';
 import { ClientOptions } from './types';
-import { DEEPSEEK_DEFAULT_URL, OPENAI_DEFAULT_URL, OPENAI_MODELS, DEEPSEEK_MODELS, GEMINI_MODELS } from './constants';
+import { ProviderType, getProviderConfig as getConfig } from './constants';
+import * as constants from './constants';
 
 // 加载环境变量
 dotenv.config();
 
+// 提供商配置映射
+interface ProviderConfig {
+  defaultUrl?: string;
+  defaultModel: string;
+}
+
+const getProviderConfig = (provider: ProviderType): ProviderConfig => {
+  const providerConfig = getConfig(provider);
+  return {
+    defaultUrl: providerConfig.DEFAULT_URL,
+    defaultModel: providerConfig.DEFAULT_MODEL,
+  };
+};
+
 /**
  * 从环境变量中加载配置
  */
-export function loadConfigFromEnv(provider: string = 'deepseek'): ClientOptions {
+export function loadConfigFromEnv(provider: ProviderType = 'deepseek'): ClientOptions {
   const config: ClientOptions = {
     timeout: 60000,
     maxRetries: 3,
   };
 
-  if (provider === 'deepseek') {
-    config.apiKey = '';
-    config.baseURL = DEEPSEEK_DEFAULT_URL;
-    config.defaultModel = DEEPSEEK_MODELS.DEFAULT;
-  } else if (provider === 'openai') {
-    config.apiKey = '';
-    config.baseURL = OPENAI_DEFAULT_URL;
-    config.defaultModel = OPENAI_MODELS.DEFAULT;
-  } else if (provider === 'gemini') {
-    config.apiKey = '';
-    config.defaultModel = GEMINI_MODELS.DEFAULT;
+  const providerConfig = getProviderConfig(provider);
+  
+  config.apiKey = '';
+  if (providerConfig.defaultUrl) {
+    config.baseURL = providerConfig.defaultUrl;
   }
+  config.defaultModel = providerConfig.defaultModel;
 
   return config;
 }

@@ -1,6 +1,8 @@
 import axios from 'axios'
 import { Provider, ProviderConfig, SettingsState, DeepSeekBalanceInfo, DeepSeekBalanceResponse } from '../types'
 
+export type { DeepSeekBalanceResponse }
+
 // 加载配置
 export const loadConfig = async (): Promise<SettingsState | null> => {
   try {
@@ -11,38 +13,25 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
     if (response.data && typeof response.data === 'object') {
       const config = response.data
       
+      // 获取provider配置
+      const providersResponse = await axios.get('/api/providers/configs')
+      const providersData = providersResponse.data
+      
       // 创建一个完整的配置结构
       const completeConfig: SettingsState = {
-        providers: {
-          deepseek: {
-            apiKey: '',
-            baseURL: '',
-            model: 'deepseek-chat'
-          },
-          openai: {
-            apiKey: '',
-            baseURL: '',
-            model: 'gpt-4.1'
-          },
-          gemini: {
-            apiKey: '',
-            baseURL: '',
-            model: 'gemini-2.0-flash'
-          },
-          anthropic: {
-            apiKey: '',
-            baseURL: '',
-            model: 'claude-3-7-sonnet-20250219'
-          },
-          qwen: {
-            apiKey: '',
-            baseURL: '',
-            model: 'qwen-max-latest'
-          }
-        },
+        providers: {},
         currentProvider: 'deepseek',
         isSidebarCollapsed: false
       }
+      
+      // 初始化所有provider的默认配置
+      providersData.providers.forEach((provider: Provider) => {
+        completeConfig.providers[provider] = {
+          apiKey: '',
+          baseURL: '',
+          model: providersData.configs[provider].defaultModel
+        }
+      })
       
       // 合并返回的数据和默认值
       if (config.providers) {
@@ -52,12 +41,8 @@ export const loadConfig = async (): Promise<SettingsState | null> => {
         }
       }
       
-      if (config.currentProvider && 
-         (config.currentProvider === 'deepseek' || 
-          config.currentProvider === 'openai' || 
-          config.currentProvider === 'gemini' ||
-          config.currentProvider === 'anthropic' ||
-          config.currentProvider === 'qwen')) {
+      // 验证 currentProvider 是否在支持的提供商列表中
+      if (config.currentProvider && providersData.providers.includes(config.currentProvider)) {
         completeConfig.currentProvider = config.currentProvider as Provider
       }
       
@@ -95,10 +80,14 @@ export const saveApiKey = async (provider: Provider, apiKey: string): Promise<bo
     
     // 更新API key
     if (!currentConfig.providers[provider]) {
+      // 获取provider默认配置
+      const providersResponse = await axios.get('/api/providers/configs')
+      const providersData = providersResponse.data
+      
       currentConfig.providers[provider] = {
         apiKey: '',
         baseURL: '',
-        model: provider === 'deepseek' ? 'deepseek-chat' : 'gpt-4.1'
+        model: providersData.configs[provider].defaultModel
       }
     }
     
@@ -121,10 +110,14 @@ export const saveModel = async (provider: Provider, model: string): Promise<bool
     
     // 更新模型
     if (!currentConfig.providers[provider]) {
+      // 获取provider默认配置
+      const providersResponse = await axios.get('/api/providers/configs')
+      const providersData = providersResponse.data
+      
       currentConfig.providers[provider] = {
         apiKey: '',
         baseURL: '',
-        model: model
+        model: model || providersData.configs[provider].defaultModel
       }
     } else {
       currentConfig.providers[provider].model = model
@@ -150,19 +143,13 @@ export const getDeepSeekBalance = async (apiKey: string): Promise<DeepSeekBalanc
 }
 
 // 获取默认模型
-export function getDefaultModel(provider: Provider): string {
-  switch (provider) {
-    case 'deepseek':
-      return 'deepseek-chat';
-    case 'openai':
-      return 'gpt-4.1';
-    case 'gemini':
-      return 'gemini-2.0-flash';
-    case 'anthropic':
-      return 'claude-3-7-sonnet-20250219';
-    case 'qwen':
-      return 'qwen-max-latest';
-    default:
-      return 'deepseek-chat';
+export const getDefaultModel = async (provider: Provider): Promise<string> => {
+  try {
+    const providersResponse = await axios.get('/api/providers/configs')
+    const providersData = providersResponse.data
+    return providersData.configs[provider].defaultModel
+  } catch (error) {
+    console.error('获取默认模型失败:', error)
+    return 'deepseek-chat' // 作为最后的后备选项
   }
 }

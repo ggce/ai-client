@@ -1,51 +1,25 @@
 import { defineStore } from 'pinia'
 import { loadConfig, saveConfig, saveApiKey, saveModel } from '../api/config'
-import router from '../router'
-import { Provider, ProviderConfig, SettingsState } from '../types'
+import { Provider, SettingsState } from '../types'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => {
+    // 初始状态只包含必要的空结构
     const initialState: SettingsState = {
-      providers: {
-        deepseek: {
-          apiKey: '',
-          baseURL: '',
-          model: 'deepseek-chat'
-        },
-        openai: {
-          apiKey: '',
-          baseURL: 'https://api.openai.com/v1',
-          model: 'gpt-4.1'
-        },
-        gemini: {
-          apiKey: '',
-          baseURL: 'https://generativelanguage.googleapis.com',
-          model: 'gemini-2.0-flash'
-        },
-        anthropic: {
-          apiKey: '',
-          baseURL: 'https://api.anthropic.com/v1',
-          model: 'claude-3-7-sonnet-20250219'
-        },
-        qwen: {
-          apiKey: '',
-          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-          model: 'qwen-max-latest'
-        }
-      },
-      currentProvider: 'deepseek',
+      providers: {},
+      currentProvider: 'deepseek', // 这个默认值会在 loadSettings 时被更新
       isSidebarCollapsed: false
     }
     
-    // 扩展状态对象，添加会话侧边栏设置
+    // 扩展状态对象，添加会话侧边栏设置和 providerConfigs
     return {
       ...initialState,
-      isSessionSidebarCollapsed: false
-    } as SettingsState & { isSessionSidebarCollapsed: boolean }
+      isSessionSidebarCollapsed: false,
+      providerConfigs: { providers: [], configs: {} } // 新增
+    } as SettingsState & { isSessionSidebarCollapsed: boolean, providerConfigs: any }
   },
   
   getters: {
-    // 提供一个获取会话侧边栏状态的getter
     sessionSidebarCollapsed: (state) => (state as any).isSessionSidebarCollapsed as boolean
   },
   
@@ -117,46 +91,37 @@ export const useSettingsStore = defineStore('settings', {
     
     async loadSettings() {
       console.log('从Electron加载设置')
-      const config = await loadConfig()
       
-      if (config) {
-        console.log('设置加载成功:', config)
-        if (config.providers && Object.keys(config.providers).length > 0) {
-          for (const provider in config.providers) {
-            if (this.providers[provider]) {
-              this.providers[provider] = {
-                ...this.providers[provider],
-                ...config.providers[provider]
-              }
-            }
-          }
-          
-          if (config.currentProvider && 
-             (config.currentProvider === 'deepseek' || 
-              config.currentProvider === 'openai' || 
-              config.currentProvider === 'gemini' || 
-              config.currentProvider === 'anthropic' ||
-              config.currentProvider === 'qwen')) {
-            this.currentProvider = config.currentProvider as Provider
-          }
-        }
-        
-        if (typeof config.isSidebarCollapsed === 'boolean') {
+      try {
+        // 加载配置（包含provider配置）
+        const config = await loadConfig()
+        // 新增：获取所有 provider 配置
+        const providersResponse = await import('../api/provider')
+        const providerConfigs = await providersResponse.getProviderConfigs()
+        if (config) {
+          console.log('设置加载成功:', config)
+          // 更新状态
+          this.providers = config.providers
+          this.currentProvider = config.currentProvider
           this.isSidebarCollapsed = config.isSidebarCollapsed
+          if (typeof (config as any).isSessionSidebarCollapsed === 'boolean') {
+            (this as any).isSessionSidebarCollapsed = (config as any).isSessionSidebarCollapsed
+          }
+          // 新增：存储 providerConfigs
+          this.providerConfigs = providerConfigs
+          console.log('设置已应用，当前状态:', {
+            providers: this.providers,
+            currentProvider: this.currentProvider,
+            isSidebarCollapsed: this.isSidebarCollapsed ? '收起' : '展开',
+            isSessionSidebarCollapsed: (this as any).isSessionSidebarCollapsed ? '收起' : '展开',
+            providerConfigs: this.providerConfigs
+          })
+        } else {
+          console.log('未找到已保存的设置，使用默认值')
         }
-        
-        if (typeof (config as any).isSessionSidebarCollapsed === 'boolean') {
-          (this as any).isSessionSidebarCollapsed = (config as any).isSessionSidebarCollapsed
-        }
-        
-        console.log('设置已应用，当前状态:', {
-          providers: this.providers,
-          currentProvider: this.currentProvider,
-          isSidebarCollapsed: this.isSidebarCollapsed ? '收起' : '展开',
-          isSessionSidebarCollapsed: (this as any).isSessionSidebarCollapsed ? '收起' : '展开'
-        })
-      } else {
-        console.log('未找到已保存的设置，使用默认值')
+      } catch (error) {
+        console.error('加载设置失败:', error)
+        throw error
       }
     }
   }

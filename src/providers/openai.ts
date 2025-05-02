@@ -1,22 +1,16 @@
 // openai调用风格
-import { ChatCompletionMessageToolCall, ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { 
   ClientOptions, 
   Message,
   MCPTool,
 } from '../types';
 import {
-  OPENAI_DEFAULT_URL,
-  OPENAI_MODELS,
-  DEEPSEEK_DEFAULT_URL,
-  DEEPSEEK_MODELS,
-  GEMINI_DEFAULT_URL,
-  GEMINI_MODELS,
-  ANTHROPIC_DEFAULT_URL,
-  ANTHROPIC_MODELS,
-  QWEN_DEFAULT_URL,
-  QWEN_MODELS
+  ProviderType,
+  SUPPORTED_PROVIDERS,
+  getProviderConfig
 } from '../constants';
+import * as constants from '../constants';
 import logger from '../logger';
 import { BaseClient } from './baseClient';
 
@@ -25,53 +19,23 @@ import { BaseClient } from './baseClient';
  * 支持会话管理和流式API
  */
 export class UnifiedClient extends BaseClient {
-  private provider: 'openai' | 'deepseek' | 'gemini' | 'anthropic' | 'qwen';
+  private provider: ProviderType;
 
-  constructor(options: ClientOptions & { provider?: 'openai' | 'deepseek' | 'gemini' | 'anthropic' | 'qwen' } = {}) {
-    const provider = options.provider || 'openai';
+  constructor(options: ClientOptions & { provider?: ProviderType } = {}) {
+    const provider = options.provider || SUPPORTED_PROVIDERS[0];
     let baseURL = options.baseURL;
     let defaultModel = options.defaultModel;
     
     // 根据提供商选择正确的默认URL和模型
     if (!baseURL) {
-      switch (provider) {
-        case 'openai':
-          baseURL = OPENAI_DEFAULT_URL;
-          break;
-        case 'deepseek':
-          baseURL = DEEPSEEK_DEFAULT_URL;
-          break;
-        case 'gemini':
-          baseURL = GEMINI_DEFAULT_URL;
-          break;
-        case 'anthropic':
-          baseURL = ANTHROPIC_DEFAULT_URL;
-          break;
-        case 'qwen':
-          baseURL = QWEN_DEFAULT_URL;
-          break;
-      }
+      const providerConfig = getProviderConfig(provider);
+      baseURL = providerConfig.DEFAULT_URL;
     }
     
     // 设置默认模型
     if (!defaultModel) {
-      switch (provider) {
-        case 'openai':
-          defaultModel = OPENAI_MODELS.DEFAULT;
-          break;
-        case 'deepseek':
-          defaultModel = DEEPSEEK_MODELS.DEFAULT;
-          break;
-        case 'gemini':
-          defaultModel = GEMINI_MODELS.DEFAULT;
-          break;
-        case 'anthropic':
-          defaultModel = ANTHROPIC_MODELS.DEFAULT;
-          break;
-        case 'qwen':
-          defaultModel = QWEN_MODELS.DEFAULT;
-          break;
-      }
+      const providerConfig = getProviderConfig(provider);
+      defaultModel = providerConfig.DEFAULT_MODEL;
     }
     
     super({
@@ -80,10 +44,7 @@ export class UnifiedClient extends BaseClient {
       defaultModel,
       timeout: options.timeout || 180000,
       maxRetries: options.maxRetries || 5,
-    }, provider === 'openai' ? 'OpenAIClient' : 
-       provider === 'deepseek' ? 'DeepseekClient' : 
-       provider === 'gemini' ? 'GeminiClient' : 
-       provider === 'anthropic' ? 'AnthropicClient' : 'QwenClient');
+    }, `${provider.charAt(0).toUpperCase() + provider.slice(1)}Client`);
     
     this.provider = provider;
     logger.log(this.loggerPrefix, `初始化客户端完成，提供商: ${provider}, baseURL: ${baseURL}, 默认模型: ${defaultModel}`);
@@ -184,52 +145,12 @@ export class UnifiedClient extends BaseClient {
       },
     },
   };
-
-  // 嵌入API
-  public async createEmbedding(input: string | string[]) {
-    if (this.provider !== 'openai') {
-      throw new Error('嵌入API仅在OpenAI提供商中可用');
-    }
-    
-    const textInput = Array.isArray(input) ? input : [input];
-    
-    try {
-      const response = await this.client.embeddings.create({
-        model: 'text-embedding-ada-002',
-        input: textInput,
-      });
-      
-      logger.log(this.loggerPrefix, `嵌入API响应成功`);
-      return response;
-    } catch (error) {
-      logger.error(this.loggerPrefix, `嵌入API请求失败: ${error}`);
-      throw error;
-    }
-  }
 }
 
-// 为了保持向后兼容性，保留原始的类名
-export class OpenAIClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'openai' });
-  }
-}
-
+// 创建具名导出的客户端类
 export class DeepseekClient extends UnifiedClient {
   constructor(options: ClientOptions = {}) {
     super({ ...options, provider: 'deepseek' });
-  }
-}
-
-export class GeminiClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'gemini' });
-  }
-}
-
-export class AnthropicClient extends UnifiedClient {
-  constructor(options: ClientOptions = {}) {
-    super({ ...options, provider: 'anthropic' });
   }
 }
 
@@ -237,4 +158,10 @@ export class QwenClient extends UnifiedClient {
   constructor(options: ClientOptions = {}) {
     super({ ...options, provider: 'qwen' });
   }
-} 
+}
+
+export class QingyunClient extends UnifiedClient {
+  constructor(options: ClientOptions = {}) {
+    super({ ...options, provider: 'qingyun' });
+  }
+}

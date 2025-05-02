@@ -50,10 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, inject, provide } from 'vue'
-import { Ref } from 'vue'
-// 使用类型断言
-import type { PropType } from 'vue'
+import { ref, onMounted, watch, computed, provide } from 'vue'
 
 import MessageList from '../components/MessageList.vue'
 import ChatInput from '../components/ChatInput.vue'

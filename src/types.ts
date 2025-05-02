@@ -115,4 +115,6 @@ export interface TokenLimitExceededError {
   type: 'token_limit_exceeded';
   message: string;
   summary: string;
-} 
+}
+
+export type ProviderType = 'deepseek' | 'qwen' | 'qingyun'; 

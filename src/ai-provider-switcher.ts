@@ -1,14 +1,11 @@
 import { 
   MCPOptions, 
-  CompletionResponse,
-  MCPCompletionRequest,
   ProviderConfig,
-  Message,
-  CompletionRequest 
 } from './types.js';
 import { loadConfigFromEnv } from './utils.js';
-import { AIProviderFactory, ProviderType } from './providers/aiProviderFactory';
+import { AIProviderFactory } from './providers/aiProviderFactory';
 import { BaseClient } from './providers/baseClient';
+import { ProviderType, SUPPORTED_PROVIDERS } from './constants';
 import logger from './logger';
 
 /**
@@ -22,10 +19,17 @@ export class AIProviderSwitcher {
 
   constructor(options: MCPOptions) {
     this.options = options;
-    this.defaultProvider = options.defaultProvider || process.env.DEFAULT_PROVIDER || 'deepseek';
+    this.defaultProvider = options.defaultProvider || process.env.DEFAULT_PROVIDER || SUPPORTED_PROVIDERS[0];
 
     // 初始化提供商
     this.initProviders();
+  }
+
+  /**
+   * 检查提供商是否受支持
+   */
+  private isSupportedProvider(provider: string): provider is ProviderType {
+    return SUPPORTED_PROVIDERS.includes(provider as ProviderType);
   }
 
   /**
@@ -41,13 +45,13 @@ export class AIProviderSwitcher {
         config = configs[provider];
       } else {
         // 从环境变量加载配置
-        config = loadConfigFromEnv(provider) as ProviderConfig;
+        config = loadConfigFromEnv(provider as ProviderType) as ProviderConfig;
       }
 
       try {
-        if (provider === 'deepseek' || provider === 'openai') {
+        if (this.isSupportedProvider(provider)) {
           // 使用工厂创建提供商
-          const client = AIProviderFactory.getProvider(provider as ProviderType, config);
+          const client = AIProviderFactory.getProvider(provider, config);
           this.providers.set(provider, client);
         } else {
           logger.warn('AIProviderSwitcher', `不支持的提供商: ${provider}`);
@@ -100,9 +104,9 @@ export class AIProviderSwitcher {
     }
 
     try {
-      if (name === 'deepseek' || name === 'openai') {
+      if (this.isSupportedProvider(name)) {
         // 使用工厂创建提供商
-        const client = AIProviderFactory.getProvider(name as ProviderType, config);
+        const client = AIProviderFactory.getProvider(name, config);
         this.providers.set(name, client);
       } else {
         throw new Error(`不支持的提供商类型: ${name}`);

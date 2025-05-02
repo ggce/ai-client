@@ -1,8 +1,7 @@
 import { BaseClient } from './baseClient';
-import { DeepseekClient, OpenAIClient, GeminiClient, AnthropicClient, QwenClient } from './openai';
+import { DeepseekClient, QwenClient, QingyunClient } from './openai';
 import { ClientOptions } from '../types';
-
-export type ProviderType = 'deepseek' | 'openai' | 'gemini' | 'anthropic' | 'qwen';
+import { ProviderType } from '../constants';
 
 export class AIProviderFactory {
   private static providers: Record<ProviderType, BaseClient> = {} as any;
@@ -25,17 +24,11 @@ export class AIProviderFactory {
       case 'deepseek':
         this.providers[type] = new DeepseekClient(options);
         break;
-      case 'openai':
-        this.providers[type] = new OpenAIClient(options);
-        break;
-      case 'gemini':
-        this.providers[type] = new GeminiClient(options);
-        break;
-      case 'anthropic':
-        this.providers[type] = new AnthropicClient(options);
-        break;
       case 'qwen':
         this.providers[type] = new QwenClient(options);
+        break;
+      case 'qingyun':
+        this.providers[type] = new QingyunClient(options);
         break;
       default:
         throw new Error(`不支持的提供商类型: ${type}`);

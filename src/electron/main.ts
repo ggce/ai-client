@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Notification } from 'electron';
 import * as path from 'path';
-import express, { Request, Response, Express, Application } from 'express';
+import express, { Request, Response, Application } from 'express';
 import { NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
@@ -8,20 +8,13 @@ import * as fs from 'fs';
 import MCPClient from '../mcpClient';
 import { MCPTool } from '../types';
 import { 
-  DEEPSEEK_DEFAULT_URL, 
-  OPENAI_DEFAULT_URL, 
-  OPENAI_MODELS, 
-  DEEPSEEK_MODELS, 
-  GEMINI_MODELS,
-  GEMINI_DEFAULT_URL,
-  ANTHROPIC_DEFAULT_URL,
-  ANTHROPIC_MODELS,
-  QWEN_DEFAULT_URL,
-  QWEN_MODELS
+  ProviderType,
+  SUPPORTED_PROVIDERS,
+  PROVIDER_CONFIGS
 } from '../constants';
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import logger from '../logger';
-import { AIProviderFactory, ProviderType } from '../providers/aiProviderFactory';
+import { AIProviderFactory } from '../providers/aiProviderFactory';
 
 // 加载环境变量
 dotenv.config();
@@ -69,7 +62,7 @@ const expressApp: Application = express();
 const PORT = process.env.PORT || 3001; // 修改为3001避免与Vue开发服务器冲突
 
 // 默认提供商类型
-let defaultProviderType: ProviderType = 'deepseek';
+let defaultProviderType: ProviderType = SUPPORTED_PROVIDERS[0];
 
 // MCP工具列表
 let mcpTools: Array<MCPTool> = [];
@@ -78,37 +71,23 @@ let mcpTools: Array<MCPTool> = [];
 function initDefaultProviders() {
   // 初始化DeepSeek客户端
   AIProviderFactory.getProvider('deepseek', {
-  apiKey: '',
-    baseURL: DEEPSEEK_DEFAULT_URL,
-    defaultModel: DEEPSEEK_MODELS.DEFAULT
-});
-
-  // 初始化OpenAI客户端
-  AIProviderFactory.getProvider('openai', {
-  apiKey: '',
-    baseURL: OPENAI_DEFAULT_URL,
-    defaultModel: OPENAI_MODELS.DEFAULT
-  });
-  
-  // 初始化Gemini客户端
-  AIProviderFactory.getProvider('gemini', {
     apiKey: '',
-    baseURL: GEMINI_DEFAULT_URL,
-    defaultModel: GEMINI_MODELS.DEFAULT
-  });
-  
-  // 初始化Anthropic客户端
-  AIProviderFactory.getProvider('anthropic', {
-    apiKey: '',
-    baseURL: ANTHROPIC_DEFAULT_URL,
-    defaultModel: ANTHROPIC_MODELS.DEFAULT
+    baseURL: PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_URL,
+    defaultModel: PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_MODEL
   });
   
   // 初始化Qwen客户端
   AIProviderFactory.getProvider('qwen', {
     apiKey: '',
-    baseURL: QWEN_DEFAULT_URL,
-    defaultModel: QWEN_MODELS.DEFAULT
+    baseURL: PROVIDER_CONFIGS.QWEN.DEFAULT_URL,
+    defaultModel: PROVIDER_CONFIGS.QWEN.DEFAULT_MODEL
+  });
+
+  // 初始化Qingyun客户端
+  AIProviderFactory.getProvider('qingyun', {
+    apiKey: '',
+    baseURL: PROVIDER_CONFIGS.QINGYUN.DEFAULT_URL,
+    defaultModel: PROVIDER_CONFIGS.QINGYUN.DEFAULT_MODEL
   });
   
   logger.log('Main', '已初始化默认AI提供商');
@@ -198,7 +177,7 @@ function initClientsFromConfig() {
       
       if (config.providers) {
         // 默认提供商设置
-        if (config.defaultProvider) {
+        if (config.defaultProvider && SUPPORTED_PROVIDERS.includes(config.defaultProvider)) {
           defaultProviderType = config.defaultProvider as ProviderType;
           logger.log('Main', `设置默认提供商: ${defaultProviderType}`);
         }
@@ -207,55 +186,35 @@ function initClientsFromConfig() {
         if (config.providers.deepseek?.apiKey) {
           AIProviderFactory.getProvider('deepseek', {
             apiKey: config.providers.deepseek.apiKey,
-            baseURL: config.providers.deepseek.baseURL || DEEPSEEK_DEFAULT_URL,
-            defaultModel: config.providers.deepseek.model || DEEPSEEK_MODELS.DEFAULT
+            baseURL: config.providers.deepseek.baseURL || PROVIDER_CONFIGS.DEEPSEEK.DEFAULT_URL,
+            defaultModel: config.providers.deepseek.model
           });
           logger.log('Main', '已从配置文件加载DeepSeek API配置');
-        }
-        
-        // 更新OpenAI客户端
-        if (config.providers.openai?.apiKey) {
-          AIProviderFactory.getProvider('openai', {
-            apiKey: config.providers.openai.apiKey,
-            baseURL: config.providers.openai.baseURL || OPENAI_DEFAULT_URL,
-            defaultModel: config.providers.openai.model || OPENAI_MODELS.DEFAULT
-          });
-          logger.log('Main', '已更新OpenAI API配置');
-        }
-        
-        // 更新Gemini客户端
-        if (config.providers.gemini?.apiKey) {
-          AIProviderFactory.getProvider('gemini', {
-            apiKey: config.providers.gemini.apiKey,
-            baseURL: config.providers.gemini.baseURL || GEMINI_DEFAULT_URL,
-            defaultModel: config.providers.gemini.model || GEMINI_MODELS.DEFAULT
-          });
-          logger.log('Main', '已更新Gemini API配置');
-        }
-        
-        // 更新Anthropic客户端
-        if (config.providers.anthropic?.apiKey) {
-          AIProviderFactory.getProvider('anthropic', {
-            apiKey: config.providers.anthropic.apiKey,
-            baseURL: config.providers.anthropic.baseURL || ANTHROPIC_DEFAULT_URL,
-            defaultModel: config.providers.anthropic.model || ANTHROPIC_MODELS.DEFAULT
-          });
-          logger.log('Main', '已更新Anthropic API配置');
         }
         
         // 更新Qwen客户端
         if (config.providers.qwen?.apiKey) {
           AIProviderFactory.getProvider('qwen', {
             apiKey: config.providers.qwen.apiKey,
-            baseURL: config.providers.qwen.baseURL || QWEN_DEFAULT_URL,
-            defaultModel: config.providers.qwen.model || QWEN_MODELS.DEFAULT
+            baseURL: config.providers.qwen.baseURL || PROVIDER_CONFIGS.QWEN.DEFAULT_URL,
+            defaultModel: config.providers.qwen.model
           });
           logger.log('Main', '已更新Qwen API配置');
+        }
+
+        // 更新Qingyun客户端
+        if (config.providers.qingyun?.apiKey) {
+          AIProviderFactory.getProvider('qingyun', {
+            apiKey: config.providers.qingyun.apiKey,
+            baseURL: config.providers.qingyun.baseURL || PROVIDER_CONFIGS.QINGYUN.DEFAULT_URL,
+            defaultModel: config.providers.qingyun.model
+          });
+          logger.log('Main', '已更新Qingyun API配置');
         }
       }
     }
   } catch (error) {
-    logger.error('Main', `从配置文件初始化客户端失败: ${error}`);
+    logger.error('Main', `加载配置文件失败: ${error}`);
   }
 }
 
@@ -379,6 +338,46 @@ router.get('/api/config', routeHandler((req: Request, res: Response) => {
   } catch (error) {
     logger.error('Main', `读取配置失败: ${error}`);
     res.status(500).json({ error: '读取配置失败' });
+  }
+}));
+
+// Provider 配置接口
+interface ProviderConfig {
+  name: string;
+  defaultUrl: string;
+  defaultModel: string;
+  models: readonly string[];
+}
+
+// 获取 provider 配置的 API
+router.get('/api/providers/configs', routeHandler((req: Request, res: Response) => {
+  try {
+    // 从 constants 中获取所有 provider 配置
+    const configs = {
+      providers: SUPPORTED_PROVIDERS,
+      configs: SUPPORTED_PROVIDERS.reduce((acc, provider) => {
+        // 从 PROVIDER_CONFIGS 中获取配置
+        const providerKey = Object.keys(PROVIDER_CONFIGS).find(
+          key => PROVIDER_CONFIGS[key].NAME === provider
+        );
+        
+        if (providerKey) {
+          const providerConfig = PROVIDER_CONFIGS[providerKey];
+          acc[provider] = {
+            name: providerConfig.NAME,
+            defaultUrl: providerConfig.DEFAULT_URL,
+            defaultModel: providerConfig.DEFAULT_MODEL,
+            models: providerConfig.ALL_MODELS
+          };
+        }
+        return acc;
+      }, {} as Record<ProviderType, ProviderConfig>)
+    };
+    
+    res.json(configs);
+  } catch (error) {
+    logger.error('Main', `获取 provider 配置失败: ${error}`);
+    res.status(500).json({ error: '获取 provider 配置失败' });
   }
 }));
 
@@ -746,7 +745,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
 
         // 注册中断检测
         apiController.signal.addEventListener('abort', () => {
-          logger.log('Main', `会话 ${sessionId} 的外部API流请求已触发abort事件`);
+          logger.log('Main', `会话 ${sessionId} 的外部API流处理已中断，停止处理后续块`);
         });
 
         try {
@@ -1085,8 +1084,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // 只有在preload文件存在时才设置
-      ...(preloadExists ? { preload: preloadPath } : {})
+      preload: preloadExists ? preloadPath : undefined
     },
     icon: icon,
     // macOS特定配置 - 使用自定义标题栏
@@ -1123,96 +1121,115 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-}
 
-// 处理IPC通信
-ipcMain.handle('app:version', () => {
-  return app.getVersion();
-});
-
-ipcMain.handle('dialog:openFile', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({});
-  if (!canceled) {
-    return filePaths[0];
-  }
-  return null;
-});
-
-// 切换开发者工具
-ipcMain.handle('window:toggleDevTools', () => {
-  if (mainWindow) {
-    if (mainWindow.webContents.isDevToolsOpened()) {
-      mainWindow.webContents.closeDevTools();
-    } else {
-      mainWindow.webContents.openDevTools();
-    }
-  }
-});
-
-// 处理通知请求
-ipcMain.handle('notification:send', (event, options) => {
-  try {
-    logger.log('Main', `收到通知请求: ${options.title}`);
-    
-    // 应用默认图标路径
-    const defaultIconPath = path.join(__dirname, '../../src/assets/logo.png');
-    const appIcon = nativeImage.createFromPath(defaultIconPath);
-    
-    // 获取当前环境
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    // MacOS平台开发环境下的特殊处理
-    if (isDev && process.platform === 'darwin') {
-      // 使用特殊的通知选项
-      const notification = new Notification({ 
-        title: options.title || '通知',
-        body: options.body || '',
-        icon: appIcon, // 强制使用应用图标
-        silent: options.silent,
-        urgency: options.urgency as ('normal' | 'critical' | 'low' | undefined),
-        subtitle: 'Luna',
-        hasReply: false, // MacOS特有选项
-        timeoutType: 'default'
-      });
-      
-      notification.on('click', () => {
-        if (mainWindow) {
-          if (mainWindow.isMinimized()) mainWindow.restore();
-          mainWindow.focus();
-        }
-      });
-      
-      notification.show();
-      return true;
-    }
-    
-    // 其他平台的正常处理
-    const notification = new Notification({ 
-      title: options.title || '通知',
-      body: options.body || '',
-      icon: options.icon ? nativeImage.createFromPath(options.icon) : appIcon,
-      silent: options.silent,
-      timeoutType: options.timeoutType as ('default' | 'never' | undefined),
-      urgency: options.urgency as ('normal' | 'critical' | 'low' | undefined),
-      subtitle: isDev ? 'Luna' : undefined,
-      actions: options.actions,
-      closeButtonText: options.closeButtonText
-    });
-    
-    notification.on('click', () => {
-      if (mainWindow) {
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.focus();
+  // 注册开发者工具切换处理程序
+  ipcMain.handle('window:toggleDevTools', (event) => {
+    try {
+      // 获取发送请求的窗口
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) {
+        logger.error('Main', '无法找到请求切换开发者工具的窗口');
+        return;
       }
-    });
-    
-    notification.show();
-    return true;
-  } catch (error) {
-    logger.error('Main', `发送通知失败: ${error}`);
-    return false;
-  }
-});
+      
+      if (win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+        logger.log('Main', '已关闭开发者工具');
+      } else {
+        win.webContents.openDevTools();
+        logger.log('Main', '已打开开发者工具');
+      }
+    } catch (error) {
+      logger.error('Main', `切换开发者工具时发生错误: ${error}`);
+    }
+  });
+
+  // 注册快捷键处理
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    try {
+      if (!mainWindow) {
+        logger.warn('Main', '主窗口不存在，无法处理快捷键');
+        return;
+      }
+      
+      // Command+Option+I (Mac) 或 Ctrl+Shift+I (Windows/Linux)
+      const isMac = process.platform === 'darwin';
+      const modifierKey = isMac ? input.meta : input.control;
+      
+      if (modifierKey && input.shift && input.key.toLowerCase() === 'i') {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+          logger.log('Main', '通过快捷键关闭开发者工具');
+        } else {
+          mainWindow.webContents.openDevTools();
+          logger.log('Main', '通过快捷键打开开发者工具');
+        }
+        event.preventDefault();
+      }
+    } catch (error) {
+      logger.error('Main', `处理开发者工具快捷键时发生错误: ${error}`);
+    }
+  });
+
+  // 添加菜单项
+  const { Menu } = require('electron');
+  const isMac = process.platform === 'darwin';
+  const template = [
+    // 编辑菜单，支持复制/粘贴/剪切/全选等
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        ...(isMac ? [
+          { role: 'pasteAndMatchStyle', label: '粘贴并匹配样式' },
+          { role: 'delete', label: '删除' },
+          { role: 'selectAll', label: '全选' },
+          { type: 'separator' },
+          { label: '语音', submenu: [ { role: 'startSpeaking' }, { role: 'stopSpeaking' } ] }
+        ] : [
+          { role: 'delete', label: '删除' },
+          { type: 'separator' },
+          { role: 'selectAll', label: '全选' }
+        ])
+      ]
+    },
+    // 保留原有视图菜单
+    {
+      label: '视图',
+      submenu: [
+        {
+          label: '开发者工具',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Option+I' : 'Ctrl+Shift+I',
+          click: () => {
+            try {
+              if (!mainWindow) {
+                logger.warn('Main', '主窗口不存在，无法切换开发者工具');
+                return;
+              }
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
+                logger.log('Main', '通过菜单关闭开发者工具');
+              } else {
+                mainWindow.webContents.openDevTools();
+                logger.log('Main', '通过菜单打开开发者工具');
+              }
+            } catch (error) {
+              logger.error('Main', `通过菜单切换开发者工具时发生错误: ${error}`);
+            }
+          }
+        }
+      ]
+    }
+  ];
+  
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 // 当Electron初始化完成后调用此方法创建主窗口
 app.on('ready', () => {
