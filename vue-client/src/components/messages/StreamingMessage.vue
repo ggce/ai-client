@@ -8,7 +8,7 @@
         <ReasoningContainer
           v-if="reasoningContent && reasoningContent.trim().length > 0"
           :content="reasoningContent"
-          :is-collapsed="false"
+          :is-collapsed="isCollapsedReasoning"
           is-streaming
         />
         <!-- 回答中 -->
@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, computed } from "vue";
+import { defineProps, computed, ref, watch } from "vue";
 import MessageAvatar from "./MessageAvatar.vue";
 import ReasoningContainer from "./ReasoningContainer.vue";
 import MarkdownIt from "markdown-it";
@@ -33,6 +33,15 @@ const props = defineProps<{
   message?: string;
   reasoningContent?: string;
 }>();
+
+const isCollapsedReasoning = ref(false);
+
+watch(() => props.message, () => {
+  // 如果消息不为空，则收起推理内容
+  if (props.message) {
+    isCollapsedReasoning.value = true;
+  }
+})
 
 // 初始化markdown解析器
 const md = new MarkdownIt({

@@ -42,8 +42,8 @@ const props = defineProps<{
   totalLength?: number;
 }>();
 
-// 添加一个消息中正在被查看的推理内容的索引
-const isCollapsedReasoning = ref(false);
+// 推理内容是否收起
+const isCollapsedReasoning = ref(true);
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
@@ -121,13 +121,6 @@ onMounted(() => {
     isQuestion(props.content)  // 是问题
   ) {
     notify(props.content);
-  }
-
-  // 延迟收起推理内容
-  if (props.reasoningContent) {
-    setTimeout(() => {
-      isCollapsedReasoning.value = true;
-    }, 1000);
   }
 })
 </script>

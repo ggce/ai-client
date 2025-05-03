@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { defineProps, defineEmits, ref, watch, onMounted, computed } from 'vue';
 
-const { content, isCollapsed } = defineProps<{
+const props = defineProps<{
   content: string;
   isCollapsed: boolean;
 }>();
@@ -46,13 +46,13 @@ onMounted(() => {
 });
 
 // 内容变化时更新高度
-watch([() => content, () => isCollapsed], () => {
+watch([() => props.content, () => props.isCollapsed], () => {
   updateContentHeight();
 }, { flush: 'post' });
 
 // 计算容器高度
 const containerHeight = computed(() => {
-  if (isCollapsed) {
+  if (props.isCollapsed) {
     return '0px';
   }
   return contentHeight.value + 'px';
@@ -63,7 +63,7 @@ function updateContentHeight() {
   if (!contentWrapper.value) return;
   
   // 如果处于收起状态，不计算高度
-  if (isCollapsed) {
+  if (props.isCollapsed) {
     contentHeight.value = 0;
     return;
   }

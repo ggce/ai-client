@@ -99,8 +99,8 @@ const isExpanded = ref(false);
 // 初始化markdown解析器
 const md = createMarkdownRenderer();
 
-// 添加一个消息中正在被查看的推理内容的索引
-const isCollapsedReasoning = ref(false);
+// 推理内容是否收起
+const isCollapsedReasoning = ref(true);
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
@@ -309,12 +309,6 @@ function openToolCallResult(toolCallId: string) {
 }
 
 onMounted(() => {
-  // 延迟收起推理内容
-  if (props.reasoningContent) {
-    setTimeout(() => {
-      isCollapsedReasoning.value = true;
-    }, 1000);
-  }
 })
 </script>
 
