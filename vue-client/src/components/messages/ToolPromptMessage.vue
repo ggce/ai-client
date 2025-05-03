@@ -193,9 +193,9 @@ const failSet = computed(() => {
 // 是否所有工具都调用完成
 const isAllToolDone = computed(() => {
   const allLength = processedToolCalls.value.length;
-  const doneLength = finishedSet.value.size + failSet.value.size;
+  const finishedLenght = finishedSet.value.size;
 
-  return allLength === doneLength;
+  return allLength === finishedLenght;
 })
 
 // 格式化工具参数的函数

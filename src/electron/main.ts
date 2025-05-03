@@ -913,10 +913,10 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           });
         } else {
           // 其他错误
-          // 如果会话存在，删除最后一条用户消息及其后的所有消息
+          // 如果会话存在，删除不合法的信息
           const session = client.getSession(sessionId);
           if (session) {
-            const removed = session.removeLastMessageIfUser();
+            const removed = session.removeUnlegalMessages();
             logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
           }
           logger.error('Main', `流式请求失败: ${error}`);
@@ -985,9 +985,9 @@ router.post('/api/sessions/:id/stop-generation', (req: Request, res: Response) =
     const client = AIProviderFactory.getProvider(providerType);
     const session = client.getSession(sessionId);
     
-    // 如果会话存在，删除最后一条用户消息及其后的所有消息
+    // 如果会话存在，删除不合法的信息
     if (session) {
-      const removed = session.removeLastMessageIfUser();
+      const removed = session.removeUnlegalMessages();
       logger.log('Main', `删除会话 ${sessionId} 的最后一条用户消息: ${removed ? '成功' : '没有找到用户消息'}`);
     }
     

@@ -95,34 +95,50 @@ export class Session {
     logger.log(this.loggerPrefix, `会话消息已更新，当前消息数: ${this.messages.length}`);
   }
   
-  // 检查并删除最后一条用户消息，如果存在
-  public removeLastMessageIfUser(): boolean {
+  // 从后往前删除消息，直到最后一条消息不是user且不是带toolCalls的assistant
+  public removeUnlegalMessages(): boolean {
     if (this.messages.length === 0) {
       return false;
     }
     
-    // 从后向前查找最后一条用户消息的索引
-    let lastUserMessageIndex = -1;
+    // 检查最后一条消息是否符合条件：不是user且不是带toolCalls的assistant
+    const lastMessage = this.messages[this.messages.length - 1];
+    const isValidLastMessage = 
+      lastMessage.role !== 'user' && 
+      !(lastMessage.role === 'assistant' && lastMessage.toolCalls && lastMessage.toolCalls.length > 0);
+    
+    if (isValidLastMessage) {
+      return false; // 已符合条件，无需删除
+    }
+    
+    // 从后向前查找符合条件的消息索引
+    let validMessageIndex = -1;
     for (let i = this.messages.length - 1; i >= 0; i--) {
-      if (this.messages[i].role === 'user') {
-        lastUserMessageIndex = i;
+      const message = this.messages[i];
+      if (message.role !== 'user' && 
+         !(message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0)) {
+        validMessageIndex = i;
         break;
       }
     }
     
-    // 如果找到了用户消息
-    if (lastUserMessageIndex !== -1) {
+    if (validMessageIndex !== -1) {
       // 记录删除信息
-      const deletedCount = this.messages.length - lastUserMessageIndex;
+      const deletedCount = this.messages.length - validMessageIndex - 1;
       
-      // 删除该用户消息及其后所有消息
-      this.messages = this.messages.slice(0, lastUserMessageIndex);
+      // 保留到最后一条有效消息
+      this.messages = this.messages.slice(0, validMessageIndex + 1);
       
-      logger.log(this.loggerPrefix, `删除最后一条 [user] message 及其后的所有消息，共 ${deletedCount} 条`);
+      logger.log(this.loggerPrefix, `删除消息直到最后一条不为 [user] 且不为带toolCalls的 [assistant]，共删除 ${deletedCount} 条`);
+      return true;
+    } else {
+      // 如果没有找到有效消息，删除所有消息
+      const deletedCount = this.messages.length;
+      this.messages = [];
+      
+      logger.log(this.loggerPrefix, `未找到符合条件的消息，删除所有消息，共 ${deletedCount} 条`);
       return true;
     }
-    
-    return false;
   }
 }
 
