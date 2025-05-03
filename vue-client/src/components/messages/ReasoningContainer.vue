@@ -1,12 +1,12 @@
 <template>
   <div
     class="reasoning-container"
-    :class="{ 'collapsed': isCollapsed }"
+    :class="{ 'collapsed': props.isCollapsed }"
     @click="toggleCollapse"
   >
     <div class="reasoning-header">
       推理过程
-      <span class="toggle-icon" :class="{ 'rotated': !isCollapsed }">▶</span>
+      <span class="toggle-icon" :class="{ 'rotated': !props.isCollapsed }">▶</span>
     </div>
     <div 
       class="content-outer"
@@ -15,9 +15,9 @@
       <div 
         class="content-wrapper" 
         ref="contentWrapper"
-        :class="{ 'hidden': isCollapsed }"
+        :class="{ 'hidden': props.isCollapsed }"
       >
-        <pre class="reasoning-content">{{ content }}</pre>
+        <pre class="reasoning-content">{{ props.content }}</pre>
       </div>
     </div>
   </div>
@@ -83,22 +83,23 @@ function updateContentHeight() {
 .content-outer {
   position: relative;
   overflow: hidden;
-  transition: height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition: height 0.35s cubic-bezier(0.33, 1, 0.68, 1);
   height: auto;
 }
 
 .content-wrapper {
   opacity: 1;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease;
 }
 
 .content-wrapper.hidden {
   opacity: 0;
+  transition: opacity 0.2s ease-out;
 }
 
 .toggle-icon {
   display: inline-block;
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 .toggle-icon.rotated {
@@ -107,5 +108,27 @@ function updateContentHeight() {
 
 .reasoning-container.collapsed {
   cursor: pointer;
+}
+
+.reasoning-content {
+  scroll-behavior: smooth;
+}
+
+/* 自定义滚动条样式 */
+.reasoning-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.reasoning-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reasoning-content::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 149, 237, 0.15); /* 非常淡的蓝色，与推理容器主题色相近 */
+  border-radius: 6px;
+}
+
+.reasoning-content::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 149, 237, 0.25);
 }
 </style> 

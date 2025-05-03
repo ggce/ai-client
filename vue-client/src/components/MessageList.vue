@@ -136,7 +136,11 @@ const scrollToBottom = async () => {
   if (messagesContainer.value) {
     // 只有当用户没有手动滚动，或者用户已经滚动到接近底部时才自动滚动
     if (!userHasScrolled.value || isNearBottom.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      // 使用平滑滚动效果
+      messagesContainer.value.scrollTo({
+        top: messagesContainer.value.scrollHeight,
+        behavior: 'smooth'
+      });
       // 重置用户滚动标志
       if (isNearBottom.value) {
         userHasScrolled.value = false;
@@ -152,7 +156,10 @@ const scrollReasoningToBottom = async () => {
   const reasoningElements = document.querySelectorAll('.reasoning-content');
   // 对每个元素进行滚动处理
   reasoningElements.forEach(element => {
-    element.scrollTop = element.scrollHeight;
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: 'smooth'
+    });
   });
 };
 
@@ -286,4 +293,26 @@ const handleToolResultClick = (result: string) => {
 
 <style>
 @import '../assets/styles/message.css';
+
+.chat-messages {
+  scroll-behavior: smooth;
+}
+
+/* 自定义滚动条样式 */
+.chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
 </style>
