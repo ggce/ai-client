@@ -31,6 +31,15 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
       'qwen3-32b'
     ]
   },
+  DOUBAO: {
+    NAME: 'doubao',
+    DEFAULT_URL: 'https://ark.cn-beijing.volces.com/api/v3',
+    DEFAULT_MODEL: 'doubao-1-5-pro-32k-250115',
+    ALL_MODELS: [
+      'doubao-1-5-pro-32k-250115',
+      'doubao-1-5-thinking-pro-250415',
+    ]
+  },
   QINGYUN: {
     NAME: 'qingyun',
     DEFAULT_URL: 'https://api.qingyuntop.top/v1',
