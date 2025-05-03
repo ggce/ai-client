@@ -13,6 +13,7 @@ import {
 import * as constants from '../constants';
 import logger from '../logger';
 import { BaseClient } from './baseClient';
+import { pickBy } from 'lodash';
 
 /**
  * 支持OpenAI兼容API的通用客户端实现
@@ -101,14 +102,37 @@ export class UnifiedClient extends BaseClient {
           // 如果是 Reasoner 模型，过滤掉工具调用、响应消息
           const filteredMessages = isReasoner ? messages.filter(msg => !msg.tool_calls && msg.role !== 'tool') : messages;
           // 如果是 Reasoner 模型，过滤掉工具
-          const filteredTools = isReasoner ? undefined : params.mcpTools?.map(tool => ({
-            type: 'function' as const,
-            function: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.parameters
+          const filteredTools = isReasoner ? undefined : params.mcpTools?.map(tool => {
+            const {
+              name,
+              description,
+              parameters
+            } = tool;
+
+            // doubao需删除为空的properties属性
+            let filteredProperties;
+            if (parameters && parameters.properties) {
+              filteredProperties = pickBy(parameters.properties, (value, key) => {
+                if (JSON.stringify(value) === '{}'){
+                  logger.log(this.loggerPrefix, `删除properties属性: ${key}`)
+                  return false;
+                }
+                return true;
+              })
             }
-          }));
+
+            return {
+              type: 'function' as const,
+              function: {
+                name,
+                description,
+                parameters: {
+                  ...parameters,
+                  properties: filteredProperties
+                }
+              }
+            };
+          });
           
           // 准备正确类型的API请求参数
           const requestParams = {

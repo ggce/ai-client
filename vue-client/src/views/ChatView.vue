@@ -194,7 +194,22 @@ const loadSessionMessages = async (sessionId: string) => {
   if (!sessionId) return
   
   try {
-    sessionMessages.value = await getSessionMessages(sessionId)
+    sessionMessages.value = await getSessionMessages(sessionId);
+
+    const messageLength = sessionMessages.value?.length;
+
+    if (messageLength > 0) {
+      // 最后一条消息
+      const lastMessage = sessionMessages.value[messageLength - 1];
+      // 最后一条消息内容和当前loading的一致
+      if (
+        lastMessage.content === streamingMessage.value ||
+        lastMessage.reasoningContent === streamingReasoningContent.value
+      ) {
+        // 清除loading
+        clearStreaming();
+      }
+    }
   } catch (error) {
     console.error('加载会话历史失败:', error)
     sessionMessages.value = []
@@ -256,9 +271,8 @@ const stopGeneration = async () => {
       await loadSessionMessages(activeSessionId.value);
     }
     
-    // 清空流内容
-    streamingMessage.value = ''
-    streamingReasoningContent.value = ''
+    // 清空流式内容
+    clearStreaming();
   }
 }
 
@@ -285,8 +299,8 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
 
   // 开始加载
   isLoading.value = true
-  streamingMessage.value = ''
-  streamingReasoningContent.value = ''
+  // 清空流式内容
+  clearStreaming();
 
   let isUseToolCall = false;
 
@@ -369,18 +383,24 @@ const sendMessage = async function(message?: string, selectedTools?: string[]) {
     // 重新查询最新的对话
     await loadSessionMessages(activeSessionId.value);
 
+    // 结束加载
+    isLoading.value = false
+    // 清空流式内容
+    clearStreaming();
+    activeStreamController.value = null
+
     // 如果调用了工具，则再请求一次
     if (isUseToolCall) {
       sendMessage(undefined, chatInputRef.value?.getSelectedTools());
-    } else {
-      // 结束加载
-      isLoading.value = false
-      streamingMessage.value = ''
-      streamingReasoningContent.value = ''
-      streamingToolCalls.value = []
-      activeStreamController.value = null
     }
   }
+}
+
+// 清空流式内容
+function clearStreaming() {
+  streamingMessage.value = ''
+  streamingReasoningContent.value = ''
+  streamingToolCalls.value = []
 }
 
 // 监听会话变化

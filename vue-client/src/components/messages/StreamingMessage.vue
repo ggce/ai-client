@@ -32,14 +32,20 @@ import MarkdownIt from "markdown-it";
 const props = defineProps<{
   message?: string;
   reasoningContent?: string;
+  toolCalls?: any[];
 }>();
 
 const isCollapsedReasoning = ref(false);
 
-watch(() => props.message, () => {
-  // 如果消息不为空，则收起推理内容
-  if (props.message) {
-    isCollapsedReasoning.value = true;
+watch([() => props.message, () => props.toolCalls], () => {
+  // 如果消息、工具不为空，则收起推理内容
+  if (
+    props.message ||
+    (props.toolCalls && props.toolCalls.length > 0)
+  ) {
+    setTimeout(() => {
+      isCollapsedReasoning.value = true;
+    }, 1000);
   }
 })
 

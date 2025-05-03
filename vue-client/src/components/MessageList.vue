@@ -4,14 +4,6 @@
     <div
       v-for="(message, index) in messages"
       :key="index"
-      v-show="
-        !(
-          isLoading &&
-          streamingMessage &&
-          message.role === 'assistant' &&
-          index === messages.length - 1
-        )
-      "
     >
       <!-- User messages -->
       <UserMessage
@@ -60,6 +52,7 @@
       v-if="isLoading && (streamingReasoningContent || streamingMessage)"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
+      :tool-calls="streamingToolCalls"
     />
 
     <!-- Tool info popup -->
