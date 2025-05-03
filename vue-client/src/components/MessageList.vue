@@ -55,17 +55,9 @@
     <!-- Loading state (no streaming) -->
     <LoadingMessage v-if="isLoading && !streamingReasoningContent && !streamingMessage" />
 
-    <!-- Streaming reasoning state -->
-    <StreamingMessage 
-      v-if="isLoading && streamingReasoningContent && !streamingMessage"
-      :message="''"
-      :reasoning-content="streamingReasoningContent"
-      :is-reasoning-only-mode="true"
-    />
-
     <!-- Streaming message state -->
     <StreamingMessage 
-      v-if="isLoading && streamingMessage"
+      v-if="isLoading && (streamingReasoningContent || streamingMessage)"
       :message="streamingMessage"
       :reasoning-content="streamingReasoningContent"
     />

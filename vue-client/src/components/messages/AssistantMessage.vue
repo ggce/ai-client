@@ -7,7 +7,7 @@
         <ReasoningContainer 
           v-if="reasoningContent"
           :content="reasoningContent"
-          :is-collapsed="expandedReasoningIndex !== index"
+          :is-collapsed="isCollapsedReasoning"
           @toggle="toggleReasoning"
         />
 
@@ -43,18 +43,14 @@ const props = defineProps<{
 }>();
 
 // 添加一个消息中正在被查看的推理内容的索引
-const expandedReasoningIndex = ref<number | null>(null);
+const isCollapsedReasoning = ref(false);
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
   // 防止事件冒泡
   event?.stopPropagation();
   
-  if (expandedReasoningIndex.value === props.index) {
-    expandedReasoningIndex.value = null; // 折叠
-  } else {
-    expandedReasoningIndex.value = props.index; // 展开
-  }
+  isCollapsedReasoning.value = !isCollapsedReasoning.value;
 };
 
 // 初始化markdown解析器
@@ -125,6 +121,13 @@ onMounted(() => {
     isQuestion(props.content)  // 是问题
   ) {
     notify(props.content);
+  }
+
+  // 延迟收起推理内容
+  if (props.reasoningContent) {
+    setTimeout(() => {
+      isCollapsedReasoning.value = true;
+    }, 1000);
   }
 })
 </script>

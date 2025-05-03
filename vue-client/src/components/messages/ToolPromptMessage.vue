@@ -19,7 +19,7 @@
           <ReasoningContainer
             v-if="reasoningContent && reasoningContent.trim().length > 0"
             :content="reasoningContent"
-            :is-collapsed="expandedReasoning"
+            :is-collapsed="isCollapsedReasoning"
             @toggle="toggleReasoning"
           />
           <!-- 正文内容 -->
@@ -78,7 +78,7 @@
 
 <script setup lang="ts">
 import ReasoningContainer from './ReasoningContainer.vue';
-import { defineProps, ref, computed } from 'vue';
+import { defineProps, ref, computed, onMounted } from 'vue';
 import { ToolCall, ChatMessage } from '../../types';
 import { createMarkdownRenderer } from '../../utils/markdown';
 
@@ -100,14 +100,14 @@ const isExpanded = ref(false);
 const md = createMarkdownRenderer();
 
 // 添加一个消息中正在被查看的推理内容的索引
-const expandedReasoning = ref(true);
+const isCollapsedReasoning = ref(false);
 
 // 修改toggleReasoning函数使其更可靠
 const toggleReasoning = () => {
   // 防止事件冒泡
   event?.stopPropagation();
 
-  expandedReasoning.value = !expandedReasoning.value;
+  isCollapsedReasoning.value = !isCollapsedReasoning.value;
 };
 
 // 格式化消息
@@ -307,6 +307,15 @@ function openToolCallResult(toolCallId: string) {
     emit('tool-result-click', toolResult.content);
   }
 }
+
+onMounted(() => {
+  // 延迟收起推理内容
+  if (props.reasoningContent) {
+    setTimeout(() => {
+      isCollapsedReasoning.value = true;
+    }, 1000);
+  }
+})
 </script>
 
 <style scoped>

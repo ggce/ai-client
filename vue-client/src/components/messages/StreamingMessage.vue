@@ -1,47 +1,26 @@
 <template>
-  <template v-if="isReasoningOnlyMode">
-    <!-- 纯推理模式 -->
-    <div class="message assistant">
-      <div class="message-row">
-        <MessageAvatar type="assistant" :is-loading="true" status="thinking" />
-        <div class="message-container typing-container">
-          <div
-            class="streaming-reasoning-container"
-            v-if="reasoningContent && reasoningContent.trim().length > 0"
-          >
-            <div class="reasoning-header">
-              推理中
-            </div>
-            <pre class="reasoning-content">{{ reasoningContent }}</pre>
-          </div>
+  <!-- 标准流式回答模式 -->
+  <div class="message assistant streaming">
+    <div class="message-row">
+      <MessageAvatar type="assistant" :is-loading="true" status="answering" />
+      <div class="message-container">
+        <!-- 先显示推理，再显示回答，保持顺序一致 -->
+        <ReasoningContainer
+          v-if="reasoningContent && reasoningContent.trim().length > 0"
+          :content="reasoningContent"
+          :is-collapsed="false"
+          is-streaming
+        />
+        <!-- 回答中 -->
+        <div class="message-content" v-html="formattedMessage"></div>
+        <div class="streaming-indicator">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
         </div>
       </div>
     </div>
-  </template>
-  <template v-else>
-    <!-- 标准流式回答模式 -->
-    <div class="message assistant streaming">
-      <div class="message-row">
-        <MessageAvatar type="assistant" :is-loading="true" status="answering" />
-        <div class="message-container">
-          <!-- 先显示推理，再显示回答，保持顺序一致 -->
-          <ReasoningContainer
-            v-if="reasoningContent && reasoningContent.trim().length > 0"
-            :content="reasoningContent"
-            :is-collapsed="false"
-            is-streaming
-          />
-          <!-- 回答中 -->
-          <div class="message-content" v-html="formattedMessage"></div>
-          <div class="streaming-indicator">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </template>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -51,9 +30,8 @@ import ReasoningContainer from "./ReasoningContainer.vue";
 import MarkdownIt from "markdown-it";
 
 const props = defineProps<{
-  message: string;
+  message?: string;
   reasoningContent?: string;
-  isReasoningOnlyMode?: boolean;
 }>();
 
 // 初始化markdown解析器
@@ -122,7 +100,6 @@ const formattedMessage = computed(() => {
 
 .reasoning-header {
   font-weight: bold;
-  margin-bottom: 5px;
   color: #4169e1;
   display: flex;
   justify-content: space-between;
