@@ -118,7 +118,7 @@ const currentToolResult = ref('');
 // 滚动控制变量
 const userHasScrolled = ref(false);
 const isNearBottom = ref(true);
-const scrollThreshold = 100; // 距离底部多少像素内视为"接近底部"
+const scrollThreshold = 50; // 距离底部多少像素内视为"接近底部"
 
 // 检查是否在底部附近
 const checkIfNearBottom = (): boolean => {
@@ -154,13 +154,14 @@ const scrollReasoningToBottom = async () => {
   await nextTick();
   // 查找所有包含reasoning-content类的元素
   const reasoningElements = document.querySelectorAll('.reasoning-content');
-  // 对每个元素进行滚动处理
-  reasoningElements.forEach(element => {
-    element.scrollTo({
-      top: element.scrollHeight,
+  // 只对最后一个元素进行滚动处理
+  if (reasoningElements.length > 0) {
+    const lastElement = reasoningElements[reasoningElements.length - 1];
+    lastElement.scrollTo({
+      top: lastElement.scrollHeight,
       behavior: 'smooth'
     });
-  });
+  }
 };
 
 // 处理滚动事件

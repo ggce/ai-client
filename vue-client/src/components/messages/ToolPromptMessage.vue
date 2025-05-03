@@ -1,9 +1,7 @@
 <template>
   <div class="message assistant">
     <div class="message-row">
-      <div class="avatar ai-avatar" :class="{ 'loading': isLoading }">
-        <img src="/assets/logo.png" alt="AI" class="ai-logo" />
-      </div>
+      <MessageAvatar type="assistant" :is-loading="!isAllToolDone" status="calling" />
       
       <div
         class="message-container"
@@ -66,11 +64,6 @@
             <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
           </div>
         </div>
-        <div v-if="isLoading" class="streaming-indicator">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
-        </div>
       </div>
     </div>
   </div>
@@ -81,11 +74,11 @@ import ReasoningContainer from './ReasoningContainer.vue';
 import { defineProps, ref, computed, onMounted } from 'vue';
 import { ToolCall, ChatMessage } from '../../types';
 import { createMarkdownRenderer } from '../../utils/markdown';
+import MessageAvatar from './MessageAvatar.vue';
 
 const props = defineProps<{
   content: string;
   reasoningContent?: string;
-  isLoading?: boolean;
   toolCalls?: Array<ToolCall>;
   nextMessages?: Array<ChatMessage>;
 }>();
@@ -196,6 +189,14 @@ const failSet = computed(() => {
 
   return failSet;
 });
+
+// 是否所有工具都调用完成
+const isAllToolDone = computed(() => {
+  const allLength = processedToolCalls.value.length;
+  const doneLength = finishedSet.value.size + failSet.value.size;
+
+  return allLength === doneLength;
+})
 
 // 格式化工具参数的函数
 const formatToolArguments = (toolArgs: string): string => {

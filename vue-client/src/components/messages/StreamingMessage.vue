@@ -2,14 +2,13 @@
   <!-- 标准流式回答模式 -->
   <div class="message assistant streaming">
     <div class="message-row">
-      <MessageAvatar type="assistant" :is-loading="true" status="answering" />
+      <MessageAvatar type="assistant" :is-loading="true" :status="status" />
       <div class="message-container">
         <!-- 先显示推理，再显示回答，保持顺序一致 -->
         <ReasoningContainer
           v-if="reasoningContent && reasoningContent.trim().length > 0"
           :content="reasoningContent"
           :is-collapsed="isCollapsedReasoning"
-          is-streaming
         />
         <!-- 回答中 -->
         <div class="message-content" v-html="formattedMessage"></div>
@@ -36,6 +35,14 @@ const props = defineProps<{
 }>();
 
 const isCollapsedReasoning = ref(false);
+
+// 状态
+const status = computed(() => {
+  if (props.reasoningContent && !props.message) {
+    return 'thinking'
+  }
+  return 'answering'
+})
 
 watch([() => props.message, () => props.toolCalls], () => {
   // 如果消息、工具不为空，则收起推理内容
