@@ -150,9 +150,6 @@ export abstract class BaseClient {
   protected loggerPrefix: string;
   protected historySummarizer: HistorySummarizer | null = null;
   protected lunaSystemPrompt: string;
-  
-  // token限制相关设置
-  protected tokenLimit: number = 58 * 1024;  // 默认token限制
   protected onTokenLimitExceeded: TokenLimitExceededHandler | null = null;  // token超限处理函数
 
   constructor(options: ClientOptions = {}, loggerPrefix: string) {
@@ -214,8 +211,8 @@ export abstract class BaseClient {
     
     // 检查是否是token超限错误
     const isTokenLimitError = 
-      // 检查状态码是否为400
-      error.status === 400 &&
+      // 检查状态码
+      [400, 500].includes(error.status) &&
       error.message && (
         // 检查错误消息是否包含token超限相关的关键词
         error.message.includes('maximum context length') ||

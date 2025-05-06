@@ -93,6 +93,12 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "PATH": process.env.PATH
     }
   },
+  // 各格式文件转markitdown
+  "markitdown-server": {
+    url: "http://localhost:7011/markitdownServer",
+    command: "markitdown-mcp",
+    args: [],
+  },
   // 百度地图
   "baidu-map-server": {
     url: "http://localhost:7008/baiduMapServer",

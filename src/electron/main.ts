@@ -67,6 +67,9 @@ let defaultProviderType: ProviderType = SUPPORTED_PROVIDERS[0];
 // MCP工具列表
 let mcpTools: Array<MCPTool> = [];
 
+// 标记MCP工具是否正在初始化
+let isMcpToolsInitializing = false;
+
 // 初始化AI提供商
 function initDefaultProviders() {
   for (const provider of SUPPORTED_PROVIDERS) {
@@ -91,12 +94,27 @@ const mcpClient = new MCPClient("Luna", "1.0.0");
 
 // 初始化所有MCP工具
 async function initMcpTools() {
-  // 启动所有服务
-  await mcpClient.startAllServers();
-  // 收集所有工具
-  mcpTools = await mcpClient.collectToolsFromAllServers();
+  // 防止重复初始化
+  if (isMcpToolsInitializing) {
+    logger.log('Main', '已有MCP工具初始化任务正在进行，跳过重复初始化');
+    return;
+  }
+  
+  isMcpToolsInitializing = true;
+  logger.log('Main', '正在初始化MCP工具...');
+  
+  try {
+    // 启动所有服务
+    await mcpClient.startAllServers();
+    // 收集所有工具
+    mcpTools = await mcpClient.collectToolsFromAllServers();
+    logger.log('Main', `MCP工具初始化完成，共 ${mcpTools.length} 个工具`);
+  } catch (error) {
+    logger.error('Main', `MCP工具初始化失败: ${error}`);
+  } finally {
+    isMcpToolsInitializing = false;
+  }
 }
-initMcpTools();
 
 /**
    * 调用mcp工具
@@ -192,9 +210,12 @@ function initClientsFromConfig() {
 }
 
 // 应用准备就绪后初始化
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 从配置文件加载配置
   initClientsFromConfig();
+  
+  // 初始化MCP工具
+  await initMcpTools();
 });
 
 // 设置静态文件夹 - 提供API服务
@@ -213,10 +234,23 @@ const router = express.Router();
 // 获取MCP工具列表
 router.get('/api/tools', routeHandler(async (req: Request, res: Response) => {
   try {
+    // 如果MCP工具正在初始化中，则等待初始化完成
+    if (isMcpToolsInitializing) {
+      logger.log('Main', 'MCP工具正在初始化中，等待完成...');
+      // 简单的等待机制，最多等待30秒
+      for (let i = 0; i < 60; i++) {
+        if (!isMcpToolsInitializing) break;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
     // 确保工具列表已初始化
-    if (mcpTools.length === 0) {
+    if (mcpTools.length === 0 && !isMcpToolsInitializing) {
+      logger.log('Main', 'MCP工具列表为空，正在重新初始化...');
       await initMcpTools();
     }
+    
+    // 即使初始化失败也返回当前的工具列表
     res.json(mcpTools);
   } catch (error) {
     logger.error('Main', `获取MCP工具列表失败: ${error}`);
