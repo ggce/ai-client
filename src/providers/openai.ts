@@ -65,13 +65,32 @@ export class UnifiedClient extends BaseClient {
         mcpTools?: Array<MCPTool>,
         signal?: AbortSignal
       }) => {
-        // 确保消息格式正确
-        const messages = params.messages.map(msg => ({
-          role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-          content: msg.content,
-          tool_calls: msg.toolCalls,
-          tool_call_id: msg.toolCallId,
-        }));
+        // messages转换
+        let messages = [];
+        for (let i = 0; i < params.messages.length; i++) {
+          const msg = params.messages[i];
+          const {
+            role,
+            content,
+            toolCalls,
+            toolCallId
+          } = msg;
+
+          // 工具类，为了节省token，如果后面的消息中有assistant，则删除
+          // if (role === 'tool') {
+          //   const findLastAssistantMsg = params.messages.findLastIndex(innerMsg => innerMsg.role === 'assistant');
+          //   if (findLastAssistantMsg > i) {
+          //     continue;
+          //   }
+          // }
+
+          messages.push({
+            role,
+            content,
+            tool_calls: toolCalls,
+            tool_call_id: toolCallId,
+          });
+        }
 
         try {
           // 检查abort信号是否已被触发
@@ -148,8 +167,8 @@ export class UnifiedClient extends BaseClient {
           };
 
           // 验证流对象 - 更详细的日志
-          logger.log(this.loggerPrefix, `流式请求开始: ${JSON.stringify(requestParams).substring(0, 100)}`);
-          logger.log(this.loggerPrefix, `请求options: ${JSON.stringify(this.options).substring(0, 100)}`);
+          logger.log(this.loggerPrefix, `流式请求开始: ${JSON.stringify(requestParams)}`);
+          logger.log(this.loggerPrefix, `请求options: ${JSON.stringify(this.options)}`);
 
           // 发送请求
           const stream = await this.client.chat.completions.create(requestParams);
