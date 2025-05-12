@@ -76,20 +76,34 @@ export class UnifiedClient extends BaseClient {
             toolCallId
           } = msg;
 
-          // 工具类，为了节省token，如果后面的消息中有assistant，则删除
-          // if (role === 'tool') {
-          //   const findLastAssistantMsg = params.messages.findLastIndex(innerMsg => innerMsg.role === 'assistant');
-          //   if (findLastAssistantMsg > i) {
-          //     continue;
-          //   }
-          // }
-
           messages.push({
             role,
             content,
             tool_calls: toolCalls,
             tool_call_id: toolCallId,
           });
+        }
+
+        // 节省token，对messages进行压缩，只保留最近几次的工具调用及结果
+        const toolCallsMsgArr = messages.filter(msg => msg.tool_calls);
+        const lastFiveToolCallsMsg = toolCallsMsgArr[toolCallsMsgArr.length - 3]
+        if (lastFiveToolCallsMsg) {
+          let findIndex = messages.findIndex(msg => msg === lastFiveToolCallsMsg);
+
+          // 清除工具调用及结果
+          for (let i = 0; i < findIndex; i++) {
+            const msg = messages[i];
+            if (msg.tool_calls) {
+              // 工具调用类消息，删除tool_calls节点
+              Reflect.deleteProperty(msg, 'tool_calls');
+            }
+            if (msg.role === 'tool') {
+              // 工具类消息，直接删除
+              messages.splice(i, 1);
+              i--;
+              findIndex--;
+            }
+          }
         }
 
         try {

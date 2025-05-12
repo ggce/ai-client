@@ -99,6 +99,18 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     command: "markitdown-mcp",
     args: [],
   },
+  // 浏览器自动化
+  "puppeteer-server": {
+    url: "http://localhost:7012/puppeteerServer",
+    command: "npx",
+    args: [
+      '@modelcontextprotocol/server-puppeteer'
+    ],
+    // "env": {
+    //   "PUPPETEER_LAUNCH_OPTIONS": "{ \"headless\": false}",
+    //   "PATH": process.env.PATH
+    // }
+  },
   // 百度地图
   "baidu-map-server": {
     url: "http://localhost:7008/baiduMapServer",
