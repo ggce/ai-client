@@ -2,7 +2,7 @@ import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions
 
 export type Role = 'user' | 'assistant' | 'system' | 'tool';
 
-export type ProviderType = 'deepseek' | 'qwen' | 'doubao' | 'qingyun' | 'openrouter'; 
+export type ProviderType = 'deepseek' | 'qwen' | 'doubao' | 'qingyun' | 'openrouter' | 'wokaai'; 
 
 export interface Message {
   role: Role;

@@ -129,13 +129,10 @@ export class UnifiedClient extends BaseClient {
             });
           }
           
-          // 处理 Reasoner 模型不支持工具调用的情况
-          const isReasoner = this.isReasonerModel(modelName);
-          
           // 如果是 Reasoner 模型，过滤掉工具调用、响应消息
-          const filteredMessages = isReasoner ? messages.filter(msg => !msg.tool_calls && msg.role !== 'tool') : messages;
+          const filteredMessages = messages;
           // 如果是 Reasoner 模型，过滤掉工具
-          const filteredTools = isReasoner ? undefined : params.mcpTools?.map(tool => {
+          const filteredTools = params.mcpTools?.map(tool => {
             const {
               name,
               description,

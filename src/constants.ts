@@ -50,8 +50,11 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
       'gpt-4.1-nano-2025-04-14',
       'claude-3-7-sonnet-20250219-thinking',
       'claude-3-7-sonnet-20250219',
+      'claude-sonnet-4-20250514',
+      'claude-sonnet-4-20250514-thinking',
       'gemini-2.0-flash',
       'gemini-2.5-pro-exp-03-25',
+      'gemini-2.5-flash-preview-05-20',
       'glm-3-turbo',
       'deepseek-r1-searching',
       'deepseek-chat',
@@ -64,9 +67,18 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
     DEFAULT_MODEL: 'google/gemini-2.0-flash-exp:free',
     ALL_MODELS: [
       'google/gemini-2.0-flash-exp:free',
-      'meta-llama/llama-4-maverick:free'
+      'meta-llama/llama-4-maverick:free',
+      'nousresearch/deephermes-3-mistral-24b-preview:free'
     ]
-  }
+  },
+  WOKAAI: {
+    NAME: 'wokaai',
+    DEFAULT_URL: 'https://4.0.wokaai.com/v1',
+    DEFAULT_MODEL: 'claude-sonnet-4-20250514',
+    ALL_MODELS: [
+      'claude-sonnet-4-20250514',
+    ]
+  },
 } as const;
 
 // 支持的AI提供商
