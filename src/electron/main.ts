@@ -143,7 +143,7 @@ async function callMCPTool(
     }
     
     // 从工具名中提取服务器键和实际工具名
-    const [serverKey, actualToolName] = toolCall.function.name.split('_SERVERKEYTONAME_');
+    const [serverKey, actualToolName] = toolCall.function.name.split('_STOM_');
     const result = await mcpClient.callTool(
       {
         name: actualToolName || toolCall.function.name,
@@ -729,7 +729,7 @@ router.get('/api/sessions/:id/messages/stream', (req: Request, res: Response) =>
           options,
           // 根据用户选择过滤工具列表
           mcpTools: selectedTools && selectedTools.length > 0
-            ? mcpTools.filter(tool => selectedTools.find((toolName: string) => tool.name.startsWith(`${toolName}_SERVERKEYTONAME`)))
+            ? mcpTools.filter(tool => selectedTools.find((toolName: string) => tool.name.startsWith(`${toolName}_STOM`)))
             : undefined,
           // 传递AbortSignal以允许取消
           signal: apiController.signal

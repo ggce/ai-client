@@ -129,16 +129,16 @@ const fetchToolsData = async () => {
 
 // Show tool info
 const showTool = async (toolName: string) => {
-  const serverKey = toolName.split('_SERVERKEYTONAME_')[0] || '';
-  const actualToolName = toolName.split('_SERVERKEYTONAME_')[1] || toolName;
+  const serverKey = toolName.split('_STOM_')[0] || '';
+  const actualToolName = toolName.split('_STOM_')[1] || toolName;
   
   // Format display name for popup title
   let displayName = toolName;
   let serverName = '';
   let methodName = '';
   
-  if (toolName.includes('_SERVERKEYTONAME_')) {
-    const parts = toolName.split('_SERVERKEYTONAME_');
+  if (toolName.includes('_STOM_')) {
+    const parts = toolName.split('_STOM_');
     serverName = parts[0];
     methodName = parts[1];
     displayName = `[${parts[0]}] ${parts[1]}()方法`;

@@ -40,12 +40,25 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "/Users/guogangchuan/develop/git-project/ai-client/agent"
     ]
   },
+  // 命令行
   "desktop-commander-server": {
     url: "http://localhost:7003/fileServer",
     "command": "npx",
     "args": [
       "@wonderwhy-er/desktop-commander"
     ]
+  },
+  "python-interpreter-server": {
+    url: "http://localhost:7013/pythonInterpreterServer",
+    "command": "mcp-python-interpreter",
+    "args": [
+      "--dir",
+      "/Users/guogangchuan/develop/git-project/ai-client/agent"
+    ],
+    "env": {
+      "MCP_ALLOW_SYSTEM_ACCESS": 0,
+      "PATH": process.env.PATH
+    }
   },
   // 网络请求操作
   "firecrawl-server": {

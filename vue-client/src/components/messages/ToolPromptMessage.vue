@@ -138,8 +138,8 @@ const processedToolCalls = computed<ProcessedToolCall[]>(() => {
     
     // 提取显示名称（移除服务器前缀）
     let displayName = toolName;
-    if (toolName.includes('_SERVERKEYTONAME_')) {
-      displayName = toolName.split('_SERVERKEYTONAME_')[1];
+    if (toolName.includes('_STOM_')) {
+      displayName = toolName.split('_STOM_')[1];
     }
     
     // 格式化参数

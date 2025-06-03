@@ -533,7 +533,7 @@ export class MCPClient {
         
         // 格式化工具信息并标记来源服务器
         const toolsWithSource = serverTools.map(tool => ({
-          name: `${serverKey}_SERVERKEYTONAME_${tool.name}`,
+          name: `${serverKey}_STOM_${tool.name}`,
           description: tool.description || '',
           parameters: tool.inputSchema || {},
         }));

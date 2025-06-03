@@ -153,7 +153,7 @@ const fetchTools = async () => {
     // 对工具进行分组
     data.forEach((tool: MCPRawTool) => {
       // 从工具名称中提取前缀
-      const parts = tool.name.split('_SERVERKEYTONAME_');
+      const parts = tool.name.split('_STOM_');
       const serverKey = parts[0]; // 服务器键名
       const actualName = parts[1] || tool.name; // 实际工具名
       
