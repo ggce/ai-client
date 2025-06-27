@@ -40,6 +40,17 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
       'doubao-1-5-thinking-pro-250415',
     ]
   },
+  GLM: {
+    NAME: 'glm',
+    DEFAULT_URL: 'https://open.bigmodel.cn/api/paas/v4/',
+    DEFAULT_MODEL: 'glm-4-plus',
+    ALL_MODELS: [
+      'glm-4-plus',
+      'GLM-4-Air-250414',
+      'GLM-4-AirX',
+      'glm-4',
+    ]
+  },
   QINGYUN: {
     NAME: 'qingyun',
     DEFAULT_URL: 'https://api.qingyuntop.top/v1',

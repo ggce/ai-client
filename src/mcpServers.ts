@@ -48,6 +48,7 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "@wonderwhy-er/desktop-commander"
     ]
   },
+  // python代码执行
   "python-interpreter-server": {
     url: "http://localhost:7013/pythonInterpreterServer",
     "command": "mcp-python-interpreter",
@@ -70,6 +71,14 @@ export const mcpServers: Record<string, MCPServerConfig> = {
     "command": "npx",
     "args": [
       "@antv/mcp-server-chart"
+    ]
+  },
+  // 中文热搜
+  "cn-hot-news-server": {
+    url: "http://localhost:7015/cnHotNewsServer",
+    "command": "npx",
+    "args": [
+      "@wopal/mcp-server-hotnews"
     ]
   },
   // 网络请求操作
@@ -148,9 +157,11 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "PATH": process.env.PATH
     }
   },
+  // 百度搜索
   "baidu-search-server": {
     "url": "http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+bce-v3/ALTAK-XrGNJfcENgbHK6Mraj5Yt/3e55298a8b0ddf1a0e56253a1eb3ada499d5225b"
   },
+  // 当前时间
   "time-server": {
     url: "http://localhost:7009/timeServer",
     "command": "python",
@@ -162,11 +173,13 @@ export const mcpServers: Record<string, MCPServerConfig> = {
   //   command: "node",
   //   args: ["./dist/mcpServers/BrowserServer.js"]
   // },
+  // demo，天气
   "(demo-for-test)_weather-server": {
     url: "http://localhost:8002/weatherServer",
     command: "node",
     args: ["./dist/mcpServers/WeatherServer.js"]
   },
+  // demo，联创信息
   "(demo-for-test)_lianchuang-server": {
     url: "http://localhost:8003/lianchuangServer",
     command: "node",
