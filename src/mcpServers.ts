@@ -60,6 +60,18 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "PATH": process.env.PATH
     }
   },
+  // 智谱-网络搜索
+  "zhipu-web-search-server": {
+    url: "https://open.bigmodel.cn/api/mcp/web_search/sse?Authorization=a811e37196c84bf59709a7aceb7f7433.smfEWjixOBmNuqDC",
+  },
+  // 图表生成
+  "antv-chart-server": {
+    url: "http://localhost:7014/antvChartServer",
+    "command": "npx",
+    "args": [
+      "@antv/mcp-server-chart"
+    ]
+  },
   // 网络请求操作
   "firecrawl-server": {
     url: "http://localhost:7010/firecrawlServer",
