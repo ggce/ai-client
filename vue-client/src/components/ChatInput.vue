@@ -60,6 +60,25 @@
                 <span v-if="tool.description" class="tool-description">{{ tool.description }}</span>
               </div>
             </div>
+            
+            <!-- 已选工具栏 - 移到底部 -->
+            <div v-if="selectedTools.length > 0" class="selected-tools-bar">
+              <div class="selected-tools-header">
+                <div class="selected-tools-title">已选工具</div>
+                <button class="clear-tools-btn" @click="clearSelectedTools">清空</button>
+              </div>
+              <div class="selected-tools-list">
+                <div v-for="toolName in selectedTools" :key="toolName" class="selected-tool-item">
+                  {{ toolName }}
+                  <button class="remove-tool-btn" @click.stop="toggleToolSelection({name: toolName})">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -369,6 +388,11 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleGlobalKeyDown)
   document.removeEventListener('click', handleDocumentClick)
 })
+
+// Add this function to clear all selected tools
+const clearSelectedTools = () => {
+  selectedTools.value = [];
+}
 </script>
 
 <style scoped>
@@ -535,7 +559,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #d32f2f;
+  background-color: #f56c6c;
   color: white;
   border: none;
   cursor: pointer;
@@ -543,12 +567,12 @@ onUnmounted(() => {
 }
 
 .stop-button:hover {
-  background-color: #e33e3e;
+  background-color: #f78989;
   transform: scale(1.05);
 }
 
 .stop-button:active {
-  background-color: #b71c1c;
+  background-color: #dd6161;
   transform: scale(0.95);
 }
 
@@ -654,13 +678,26 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
   z-index: 100;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
   overflow-y: auto;
-  animation: fadeInDown 0.2s ease-out;
+  animation: fadeInDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid rgba(0, 0, 0, 0.06);
+  max-height: 500px;
+  transform-origin: top center;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* 加载状态样式 */
@@ -703,60 +740,103 @@ onUnmounted(() => {
 }
 
 .tools-header {
-  padding: 10px 14px;
+  padding: 12px 16px;
   font-weight: 600;
   color: #424242;
   border-bottom: 1px solid #eeeeee;
   background-color: #fafafa;
   position: sticky;
   top: 0;
-  z-index: 2;
-  font-size: 12px;
+  z-index: 3;
+  font-size: 13px;
 }
 
 .tools-list {
-  max-height: 450px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.tools-content {
+  max-height: 370px;
   overflow-y: auto;
+  padding: 4px 0;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #dadce0 #f8f9fa;
+}
+
+.tools-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tools-content::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.tools-content::-webkit-scrollbar-thumb {
+  background-color: #dadce0;
+  border-radius: 6px;
+}
+
+.tools-content::-webkit-scrollbar-thumb:hover {
+  background-color: #bdc1c6;
 }
 
 .tool-item {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 10px 14px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
-  transition: background-color 0.2s;
-  gap: 8px;
+  transition: all 0.2s ease;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
 .tool-item:hover {
-  background-color: #f5f5f5;
+  background-color: #f8f9fa;
 }
 
 .tool-item.selected {
-  background-color: #e8f0fe;
+  background-color: #f0f7ff;
+}
+
+.tool-item.selected:hover {
+  background-color: #e8f3ff;
 }
 
 .tool-checkbox {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 1.5px solid #bdbdbd;
-  border-radius: 3px;
-  margin-right: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .tool-item.selected .tool-checkbox {
   border-color: #1a73e8;
   background-color: #1a73e8;
+  transform: scale(1.05);
 }
 
 .tool-check {
   color: white;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-item.selected .tool-check {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .tool-info {
@@ -765,90 +845,72 @@ onUnmounted(() => {
   align-items: center;
   flex: 1;
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tool-name {
   font-size: 13px;
-  color: #333;
+  color: #202124;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+.tool-item:hover .tool-name {
+  color: #1a73e8;
 }
 
 .tool-type {
   font-size: 11px;
   color: #1a73e8;
   background-color: #e8f0fe;
-  padding: 1px 6px;
-  border-radius: 10px;
+  padding: 2px 8px;
+  border-radius: 12px;
   display: inline-block;
   flex-shrink: 0;
+  border: 1px solid #d2e3fc;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.tool-item:hover .tool-type {
+  background-color: #d2e3fc;
+  border-color: #b8d3fb;
 }
 
 .tool-description {
-  font-size: 11px;
-  color: #666;
+  font-size: 12px;
+  color: #5f6368;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 300px;
   flex-shrink: 0;
+  transition: color 0.2s;
 }
 
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.stop-generating-button {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #f56c6c;
-  color: white;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.stop-generating-button:hover {
-  background-color: #f78989;
-  transform: scale(1.05);
-}
-
-.stop-generating-button:active {
-  background-color: #dd6161;
-  transform: scale(0.95);
+.tool-item:hover .tool-description {
+  color: #3c4043;
 }
 
 /* Add CSS styles for tabs */
 .tools-tabs {
   display: flex;
   overflow-x: auto;
-  padding: 0 4px;
+  padding: 0 10px;
   background-color: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
   position: sticky;
-  top: 30px;
+  top: 42px;
   z-index: 2;
   white-space: nowrap;
   scrollbar-width: thin;
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
+  flex-shrink: 0; /* Prevent tabs from shrinking */
+  min-height: 42px; /* Ensure minimum height for tabs */
 }
 
 .tools-tabs::-webkit-scrollbar {
@@ -865,7 +927,7 @@ onUnmounted(() => {
 }
 
 .tab-item {
-  padding: 6px 10px;
+  padding: 10px 14px;
   font-size: 12px;
   color: #666;
   cursor: pointer;
@@ -889,27 +951,6 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.tools-content {
-  max-height: 350px;
-  overflow-y: auto;
-}
-
-.tools-list {
-  display: flex;
-  flex-direction: column;
-  max-height: 450px;
-}
-
-.tools-empty {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-size: 13px;
-  background-color: #f9f9f9;
-  border-radius: 4px;
-  margin: 10px;
-}
-
 .tab-count {
   font-size: 10px;
   background-color: #e0e0e0;
@@ -927,5 +968,98 @@ onUnmounted(() => {
 .tab-item.active .tab-count {
   background-color: #1a73e8;
   color: white;
+}
+
+/* Add CSS styles for selected tools bar */
+.selected-tools-bar {
+  padding: 10px 12px;
+  border-top: 1px solid #e0e0e0;
+  background-color: #f5f7fa;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.selected-tools-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.selected-tools-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #424242;
+}
+
+.selected-tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.selected-tool-item {
+  background-color: #e8f0fe;
+  color: #1a73e8;
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d2e3fc;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+}
+
+.selected-tool-item:hover {
+  background-color: #d2e3fc;
+}
+
+.remove-tool-btn {
+  background: none;
+  border: none;
+  padding: 1px;
+  cursor: pointer;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+}
+
+.remove-tool-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #d93025;
+}
+
+.clear-tools-btn {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.clear-tools-btn:hover {
+  background-color: rgba(26, 115, 232, 0.08);
+}
+
+.tools-empty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  margin: 10px;
 }
 </style> 
