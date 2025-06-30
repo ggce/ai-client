@@ -23,15 +23,42 @@
             <p>{{ error }}</p>
           </div>
           <div v-else class="tools-list">
-            <div class="tools-header">使用工具</div>
-            <div v-for="(tool, index) in availableTools" :key="index" class="tool-item"
-                 :class="{ 'selected': selectedTools.includes(tool.name) }">
-              <div class="tool-checkbox" @click.stop="toggleToolSelection(tool)">
-                <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+            <div class="tools-header">工具列表</div>
+            
+            <!-- 工具类型标签页 -->
+            <div class="tools-tabs">
+              <div class="tab-item" 
+                   :class="{ 'active': selectedTab === 'all' }" 
+                   @click="selectedTab = 'all'">
+                全部<span class="tab-count">{{ availableTools.length }}</span>
               </div>
-              <span class="tool-name">{{ tool.name }}</span>
+              <div v-for="type in toolTypes" 
+                   :key="type" 
+                   class="tab-item" 
+                   :class="{ 'active': selectedTab === type }" 
+                   @click="selectedTab = type">
+                {{ type }}<span class="tab-count">{{ toolsByType[type]?.length || 0 }}</span>
+              </div>
+            </div>
+            
+            <!-- 工具列表 -->
+            <div class="tools-content">
+              <div v-if="currentTabTools.length === 0" class="tools-empty">
+                当前分类下没有可用工具
+              </div>
+              <div v-for="(tool, index) in currentTabTools" :key="index" class="tool-item"
+                   :class="{ 'selected': selectedTools.includes(tool.name) }">
+                <div class="tool-checkbox" @click.stop="toggleToolSelection(tool)">
+                  <svg v-if="selectedTools.includes(tool.name)" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="tool-check">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <div class="tool-info">
+                  <span class="tool-name">{{ tool.name }}</span>
+                  <span v-if="tool.type" class="tool-type">{{ tool.type }}</span>
+                </div>
+                <span v-if="tool.description" class="tool-description">{{ tool.description }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -86,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted } from 'vue'
 import { tips } from '../utils/tips'
 
 const props = defineProps<{
@@ -98,23 +125,37 @@ const messageInput = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isFullscreen = ref(false)
 const showToolsList = ref(false)
-const availableTools = ref<{ name: string; description: string }[]>([])
+const availableTools = ref<{ name: string; description: string; type?: string }[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const selectedTools = ref<string[]>([])
+const selectedTab = ref<string>('all') // 默认选中全部标签
+const toolTypes = ref<string[]>([]) // 存储所有工具类型
+
+// 按类型分组的工具
+const toolsByType = computed(() => {
+  const result: Record<string, typeof availableTools.value> = { 'all': availableTools.value }
+  
+  // 按类型分组
+  availableTools.value.forEach(tool => {
+    if (tool.type) {
+      if (!result[tool.type]) {
+        result[tool.type] = []
+      }
+      result[tool.type].push(tool)
+    }
+  })
+  
+  return result
+})
+
+// 当前选中标签页的工具
+const currentTabTools = computed(() => {
+  return selectedTab.value === 'all' ? availableTools.value : toolsByType.value[selectedTab.value] || []
+})
 
 // 从父组件注入的isLoading状态
 const isStreamActive = computed(() => props.isStreamActive === true)
-
-interface MCPRawTool {
-  name: string;
-  description: string;
-  parameters: {
-    properties: Record<string, any>;
-    required?: string[];
-    [key: string]: any;
-  };
-}
 
 // 获取工具列表
 const fetchTools = async () => {
@@ -122,55 +163,40 @@ const fetchTools = async () => {
   error.value = null;
   
   try {
-    // 从后端 API 获取工具列表
-    const response = await fetch('/api/tools');
+    // 从后端 API 获取MCP服务器配置
+    const response = await fetch('/api/mcp-servers');
     
     if (!response.ok) {
-      throw new Error(`获取工具列表失败: ${response.status} ${response.statusText}`);
+      throw new Error(`获取服务器配置失败: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json() as MCPRawTool[];
-    
-    // 将工具按前缀分组
-    const toolsByPrefix: Record<string, boolean> = {};
-    
-    // 提取工具前缀
-    data.forEach((tool: MCPRawTool) => {
-      const parts = tool.name.split('_STOM_');
-      const serverKey = parts[0]; // 服务器键名
-      
-      if (!toolsByPrefix[serverKey]) {
-        toolsByPrefix[serverKey] = true;
-      }
-    });
+    const data = await response.json();
+    const { servers, serverTypeMap } = data;
     
     // 转换为工具列表格式
-    availableTools.value = Object.keys(toolsByPrefix).map(key => ({
-      name: key.startsWith('mcp_') ? key.substring(4) : key,
-      description: `工具集合`
+    availableTools.value = Object.keys(servers).map(key => ({
+      name: key,
+      description: servers[key].description || `工具集合`,
+      type: servers[key].type ? serverTypeMap[servers[key].type] : undefined
     }));
+    
+    // 收集所有工具类型
+    const types = new Set<string>();
+    availableTools.value.forEach(tool => {
+      if (tool.type) {
+        types.add(tool.type);
+      }
+    });
+    toolTypes.value = Array.from(types);
     
     isLoading.value = false;
   } catch (err) {
-    console.error('获取工具列表失败:', err);
-    error.value = '获取工具列表失败，请稍后重试';
+    console.error('获取服务器配置失败:', err);
+    error.value = '获取服务器配置失败，请稍后重试';
     isLoading.value = false;
     
-    // 使用备用数据
-    availableTools.value = getBackupToolData();
+    availableTools.value = [];
   }
-};
-
-// 备用工具数据
-const getBackupToolData = () => {
-  return [
-    { name: "smithery-ai-server-sequential-thinking", description: "工具集合" },
-    { name: "smithery-ai-fetch", description: "工具集合" },
-    { name: "files", description: "工具集合" },
-    { name: "playwright", description: "工具集合" },
-    { name: "excel-mcp-server", description: "工具集合" },
-    { name: "mcp-doc", description: "工具集合" }
-  ];
 };
 
 const emit = defineEmits<{
@@ -632,7 +658,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   z-index: 100;
   margin-bottom: 6px;
-  min-height: 450px;
   overflow-y: auto;
   animation: fadeInDown 0.2s ease-out;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -697,10 +722,11 @@ onUnmounted(() => {
 .tool-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background-color 0.2s;
+  gap: 8px;
 }
 
 .tool-item:hover {
@@ -721,6 +747,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .tool-item.selected .tool-checkbox {
@@ -732,10 +759,42 @@ onUnmounted(() => {
   color: white;
 }
 
-.tool-name {
+.tool-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   flex: 1;
-  font-size: 12px;
+  min-width: 0;
+  gap: 6px;
+}
+
+.tool-name {
+  font-size: 13px;
   color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-type {
+  font-size: 11px;
+  color: #1a73e8;
+  background-color: #e8f0fe;
+  padding: 1px 6px;
+  border-radius: 10px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tool-description {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  flex-shrink: 0;
 }
 
 @keyframes fadeInDown {
@@ -774,5 +833,99 @@ onUnmounted(() => {
 .stop-generating-button:active {
   background-color: #dd6161;
   transform: scale(0.95);
+}
+
+/* Add CSS styles for tabs */
+.tools-tabs {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 4px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 30px;
+  z-index: 2;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.tools-tabs::-webkit-scrollbar {
+  height: 3px;
+}
+
+.tools-tabs::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.tools-tabs::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.tab-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-item:hover {
+  color: #1a73e8;
+  background-color: rgba(26, 115, 232, 0.05);
+}
+
+.tab-item.active {
+  color: #1a73e8;
+  border-bottom-color: #1a73e8;
+  font-weight: 500;
+}
+
+.tools-content {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 450px;
+}
+
+.tools-empty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  margin: 10px;
+}
+
+.tab-count {
+  font-size: 10px;
+  background-color: #e0e0e0;
+  color: #666;
+  border-radius: 10px;
+  padding: 0 5px;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+}
+
+.tab-item.active .tab-count {
+  background-color: #1a73e8;
+  color: white;
 }
 </style> 

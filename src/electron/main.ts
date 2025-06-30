@@ -15,6 +15,7 @@ import {
 import { ChatCompletionMessageToolCall } from 'openai/resources/chat/completions';
 import logger from '../logger';
 import { AIProviderFactory } from '../providers/aiProviderFactory';
+import { MCPServerTypeMap, mcpServers } from '../mcpServers';
 
 // 加载环境变量
 dotenv.config();
@@ -255,6 +256,20 @@ router.get('/api/tools', routeHandler(async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Main', `获取MCP工具列表失败: ${error}`);
     res.status(500).json({ error: '获取MCP工具列表失败' });
+  }
+}));
+
+// 获取MCP服务器配置和类型映射
+router.get('/api/mcp-servers', routeHandler((req: Request, res: Response) => {
+  try {
+    logger.log('Main', '获取MCP服务器配置和类型映射');
+    res.json({
+      serverTypeMap: MCPServerTypeMap,
+      servers: mcpServers
+    });
+  } catch (error) {
+    logger.error('Main', `获取MCP服务器配置失败: ${error}`);
+    res.status(500).json({ error: '获取MCP服务器配置失败' });
   }
 }));
 
