@@ -36,6 +36,7 @@
     "@playwright/mcp": "^0.0.15",
     "@wonderwhy-er/desktop-commander": "^0.1.35",
     "@wopal/mcp-server-hotnews": "^0.2.0",
+    "alibabacloud-devops-mcp-server": "^0.1.22",
     "axios": "^1.8.4",
     "body-parser": "^2.2.0",
     "dotenv": "^16.5.0",

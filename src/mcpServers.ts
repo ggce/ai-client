@@ -106,6 +106,19 @@ export const mcpServers: Record<string, MCPServerConfig> = {
       "@wopal/mcp-server-hotnews"
     ]
   },
+  "yunxiao-server": {
+    url: "http://localhost:7016/yunxiaoServer",
+    "command": "npx",
+    type: "code",
+    description: "云效",
+    "args": [
+      "alibabacloud-devops-mcp-server"
+    ],
+    "env": {
+      "YUNXIAO_ACCESS_TOKEN": "pt-rrCbvDOfrz6sSnGapndTc89M_5988ed6d-36be-419a-af90-67f5eb9e7005",
+      "PATH": process.env.PATH
+    }
+  },
   // 网络请求操作
   "firecrawl-server": {
     url: "http://localhost:7010/firecrawlServer",
