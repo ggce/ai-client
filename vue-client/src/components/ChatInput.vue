@@ -1,17 +1,23 @@
 <template>
-  <div class="input-area">
+  <div class="input-area" :class="{ 'fullscreen': isFullscreen }">
     <div class="input-wrapper">
       <div class="textarea-container">
         <textarea 
           ref="textareaRef"
           class="input-textarea"
           v-model="messageInput" 
-          placeholder="问一问Luna吧..." 
+          :placeholder="isFullscreen ? '按Enter键换行，按Ctrl+Enter发送消息...' : '问一问Luna吧...'" 
           rows="2"
           @input="autoResize"
-          @keydown.enter.exact.prevent="handleEnterKey"
+          @keydown.enter="handleEnterKey"
+          @keydown.ctrl.enter="handleSend"
           :disabled="disabled"
         ></textarea>
+        
+        <!-- 全屏模式下的提示 -->
+        <div v-if="isFullscreen" class="fullscreen-tips">
+          <kbd>Enter</kbd> 换行 | <kbd>Ctrl+Enter</kbd> 发送 | <kbd>Esc</kbd> 退出全屏
+        </div>
         
         <!-- 工具列表悬浮面板 -->
         <div v-if="showToolsList" class="tools-panel" @click.stop>
@@ -302,9 +308,16 @@ const handleDocumentClick = (event: MouseEvent) => {
 }
 
 const handleEnterKey = (event: KeyboardEvent) => {
-  // 仅在未按下shift键的情况下按Enter发送
+  // 在全屏模式下，回车键直接换行而不发送消息
+  if (isFullscreen.value) {
+    // 在全屏模式下不阻止默认行为，允许换行
+    return;
+  }
+  
+  // 在非全屏模式下，仅在未按下shift键的情况下按Enter发送
   if (!event.shiftKey) {
-    handleSend()
+    event.preventDefault(); // 阻止默认换行行为
+    handleSend();
   }
 }
 
@@ -613,10 +626,12 @@ const clearSelectedTools = () => {
   height: 100%;
   width: 100%;
   padding: 20px;
+  padding-bottom: 40px; /* 增加底部空间放置提示 */
   margin: 0;
   border: none;
   border-radius: 0;
   box-shadow: none;
+  position: relative;
 }
 
 .input-area.fullscreen .input-textarea {
@@ -629,6 +644,7 @@ const clearSelectedTools = () => {
   margin: 0;
   border: none;
   box-shadow: none;
+  line-height: 1.6;
 }
 
 .tool-badge {
@@ -1061,5 +1077,29 @@ const clearSelectedTools = () => {
   background-color: #f9f9f9;
   border-radius: 4px;
   margin: 10px;
+}
+
+/* Add CSS styles for fullscreen mode */
+.fullscreen-tips {
+  position: absolute;
+  bottom: 32px;
+  left: 0;
+  color: #666;
+  font-size: 12px;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.fullscreen-tips kbd {
+  background-color: #f3f3f3;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+  padding: 2px 4px;
+  margin: 0 2px;
+  font-family: monospace;
+  font-size: 11px;
 }
 </style> 
