@@ -19,8 +19,95 @@
           <kbd>Enter</kbd> 换行 | <kbd>Ctrl+Enter</kbd> 发送 | <kbd>Esc</kbd> 退出全屏
         </div>
         
+        <!-- 修改常用提示语面板，使用共享样式类 -->
+        <div v-if="showPromptsList" class="floating-panel prompts-panel" @click.stop>
+          <div class="panel-header">
+            <span>常用提示语</span>
+            <div class="header-right">
+              <div class="tabs">
+                <div 
+                  class="tab-item" 
+                  :class="{ 'active': selectedPromptTab === 'builtin' }" 
+                  @click="switchPromptTab('builtin')"
+                >
+                  内置
+                </div>
+                <div 
+                  class="tab-item" 
+                  :class="{ 'active': selectedPromptTab === 'custom' }" 
+                  @click="switchPromptTab('custom')"
+                >
+                  自定义
+                </div>
+              </div>
+              <button v-if="selectedPromptTab === 'custom'" class="add-prompt-btn" @click="showAddPromptModal = true">
+                <span class="add-icon">+</span> 添加
+              </button>
+            </div>
+          </div>
+          <div class="panel-content">
+            <div v-if="currentTabPrompts.length === 0" class="empty-prompts">
+              <div class="empty-icon">📝</div>
+              <div class="empty-text">暂无自定义提示语</div>
+              <div v-if="selectedPromptTab === 'custom'" class="empty-subtext">点击上方"添加"按钮添加</div>
+              <div v-else class="empty-subtext">您可以在设置中添加自定义提示语</div>
+            </div>
+            <div v-else v-for="(prompt, index) in currentTabPrompts" 
+                 :key="index" 
+                 class="prompt-item"
+                 @click="usePrompt(prompt.prompt)">
+              <div class="prompt-title">{{ prompt.title }}</div>
+              <div class="prompt-text">{{ prompt.prompt }}</div>
+              <div v-if="selectedPromptTab === 'custom'" class="prompt-actions" @click.stop>
+                <button class="prompt-delete-btn" @click.stop="deleteCustomPrompt(index)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 添加提示语弹窗 -->
+        <div v-if="showAddPromptModal" class="modal-overlay" @click="showAddPromptModal = false">
+          <div class="modal-container" @click.stop>
+            <div class="modal-header">
+              <h3>添加自定义提示语</h3>
+              <button class="modal-close-btn" @click="showAddPromptModal = false">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label for="promptTitle">标题</label>
+                <input 
+                  type="text" 
+                  id="promptTitle" 
+                  v-model="newPrompt.title" 
+                  placeholder="输入提示语标题" 
+                  class="form-input"
+                />
+              </div>
+              <div class="form-group">
+                <label for="promptText">内容</label>
+                <textarea 
+                  id="promptText" 
+                  v-model="newPrompt.prompt" 
+                  placeholder="输入提示语内容" 
+                  class="form-textarea"
+                  rows="4"
+                ></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-cancel-btn" @click="showAddPromptModal = false">取消</button>
+              <button class="modal-save-btn" @click="saveCustomPrompt" :disabled="!newPrompt.title || !newPrompt.prompt">保存</button>
+            </div>
+          </div>
+        </div>
+        
         <!-- 工具列表悬浮面板 -->
-        <div v-if="showToolsList" class="tools-panel" @click.stop>
+        <div v-if="showToolsList" class="floating-panel tools-panel" @click.stop>
           <div v-if="isLoading" class="tools-loading">
             <span class="loader"></span>
             <p>加载工具列表中...</p>
@@ -29,8 +116,8 @@
             <p>{{ error }}</p>
           </div>
           <div v-else class="tools-list">
-            <div class="tools-header">工具列表</div>
-            
+            <div class="panel-header">工具列表</div>
+
             <!-- 工具类型标签页 -->
             <div class="tools-tabs">
               <div class="tab-item" 
@@ -46,9 +133,9 @@
                 {{ type }}<span class="tab-count">{{ toolsByType[type]?.length || 0 }}</span>
               </div>
             </div>
-            
+
             <!-- 工具列表 -->
-            <div class="tools-content">
+            <div class="panel-content">
               <div v-if="currentTabTools.length === 0" class="tools-empty">
                 当前分类下没有可用工具
               </div>
@@ -66,7 +153,7 @@
                 <span v-if="tool.description" class="tool-description">{{ tool.description }}</span>
               </div>
             </div>
-            
+
             <!-- 已选工具栏 - 移到底部 -->
             <div v-if="selectedTools.length > 0" class="selected-tools-bar">
               <div class="selected-tools-header">
@@ -90,11 +177,26 @@
         
         <!-- 工具栏 -->
         <div class="toolbar">
-          <button class="toolbar-btn" title="工具" @click.prevent="toggleToolsList">
+          <button 
+            class="toolbar-btn tools-button" 
+            @click.stop="toggleToolsList"
+            :class="{ 'active': showToolsList }"
+            title="选择工具"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
             </svg>
             <span v-if="selectedTools.length > 0" class="tool-badge">{{ selectedTools.length }}</span>
+          </button>
+          <button 
+            class="toolbar-btn prompts-button" 
+            @click.stop="togglePromptsList"
+            :class="{ 'active': showPromptsList }"
+            title="常用提示语"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
           </button>
           <button class="toolbar-btn" title="文件" @click.prevent="handleFileAction">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -139,7 +241,6 @@
 
 <script setup lang="ts">
 import { ref, computed, defineEmits, defineProps, onMounted, onUnmounted } from 'vue'
-import { tips } from '../utils/tips'
 
 const props = defineProps<{
   disabled?: boolean,
@@ -156,6 +257,38 @@ const error = ref<string | null>(null)
 const selectedTools = ref<string[]>([])
 const selectedTab = ref<string>('all') // 默认选中全部标签
 const toolTypes = ref<string[]>([]) // 存储所有工具类型
+const showPromptsList = ref(false)
+const selectedPromptTab = ref('builtin') // 默认选中内置标签
+const showAddPromptModal = ref(false)
+const newPrompt = ref<CustomPrompt>({ title: '', prompt: '' })
+
+// 修改自定义提示语类型定义
+interface CustomPrompt {
+  title: string;
+  prompt: string;
+}
+
+const builtinPrompts = ref([
+  { title: '翻译为中文', prompt: '请将以下内容翻译为中文：' },
+  { title: '翻译为英文', prompt: '请将以下内容翻译为英文：' },
+  { title: '总结内容', prompt: '请总结以下内容的要点：' },
+  { title: '代码解释', prompt: '请解释以下代码的功能和工作原理：' },
+  { title: '优化代码', prompt: '请优化以下代码，提高其性能和可读性：' },
+  { title: '写邮件', prompt: '请帮我写一封邮件，内容是：' },
+  { title: '润色文本', prompt: '请帮我润色以下文本，使其更加专业和流畅：' },
+  { title: '头脑风暴', prompt: '请围绕以下主题进行头脑风暴，提供多种创意和想法：' },
+  { title: '分析问题', prompt: '请分析以下问题的原因和可能的解决方案：' },
+  { title: '写作建议', prompt: '请针对以下写作内容给出改进建议：' },
+  { title: '创建计划', prompt: '请帮我创建一个详细的计划来实现以下目标：' },
+  { title: '比较异同', prompt: '请比较以下两个概念/产品的异同点：' },
+])
+
+const customPrompts = ref<CustomPrompt[]>([])
+
+// 获取当前选中标签页的提示语
+const currentTabPrompts = computed(() => {
+  return selectedPromptTab.value === 'builtin' ? builtinPrompts.value : customPrompts.value
+})
 
 // 按类型分组的工具
 const toolsByType = computed(() => {
@@ -238,13 +371,13 @@ const toggleToolsList = () => {
   // 添加active类到工具按钮
   if (showToolsList.value) {
     setTimeout(() => {
-      const toolButton = document.querySelector('[title="工具"]')
+      const toolButton = document.querySelector('.tools-button')
       if (toolButton) {
         toolButton.classList.add('active')
       }
     }, 0)
   } else {
-    const toolButton = document.querySelector('[title="工具"]')
+    const toolButton = document.querySelector('.tools-button')
     if (toolButton) {
       toolButton.classList.remove('active')
     }
@@ -291,19 +424,31 @@ const handleStop = () => {
 
 // 点击页面其他位置时关闭工具列表
 const handleDocumentClick = (event: MouseEvent) => {
-  if (showToolsList.value) {
-    const toolsPanel = document.querySelector('.tools-panel')
-    const toolsButton = document.querySelector('[title="工具"]')
-    
-    if (toolsPanel && !toolsPanel.contains(event.target as Node) && 
-        toolsButton && !toolsButton.contains(event.target as Node)) {
-      showToolsList.value = false
-      
-      // 移除active类
-      if (toolsButton) {
-        toolsButton.classList.remove('active')
-      }
-    }
+  // 获取点击的元素
+  const target = event.target as HTMLElement;
+  
+  // 检查点击是否在工具按钮上
+  const toolsButton = document.querySelector('.tools-button');
+  if (toolsButton && toolsButton.contains(target)) {
+    return; // 点击的是工具按钮，不处理
+  }
+  
+  // 检查点击是否在提示语按钮上
+  const promptsButton = document.querySelector('.prompts-button');
+  if (promptsButton && promptsButton.contains(target)) {
+    return; // 点击的是提示语按钮，不处理
+  }
+  
+  // 检查点击是否在工具面板内
+  const toolsPanel = document.querySelector('.tools-panel');
+  if (toolsPanel && !toolsPanel.contains(target) && showToolsList.value) {
+    showToolsList.value = false;
+  }
+  
+  // 检查点击是否在提示语面板内
+  const promptsPanel = document.querySelector('.prompts-panel');
+  if (promptsPanel && !promptsPanel.contains(target) && showPromptsList.value) {
+    showPromptsList.value = false;
   }
 }
 
@@ -324,13 +469,13 @@ const handleEnterKey = (event: KeyboardEvent) => {
 // 图片上传
 const handleImgUpload = () => {
   // 后续可以实现图片上传功能
-  tips.info('图片上传功能即将推出！');
+  console.log('图片上传功能即将推出！');
 }
 
 // 文件按钮操作（暂时为占位函数）
 const handleFileAction = () => {
   // 后续可以实现文件操作功能
-  tips.info('文件操作功能即将推出！');
+  console.log('文件操作功能即将推出！');
 }
 
 // 切换全屏模式
@@ -394,6 +539,9 @@ onMounted(() => {
   setTimeout(() => {
     autoResize();
   }, 0);
+
+  // 加载自定义提示语
+  loadCustomPrompts();
 })
 
 // 组件卸载时移除事件监听器
@@ -405,6 +553,115 @@ onUnmounted(() => {
 // Add this function to clear all selected tools
 const clearSelectedTools = () => {
   selectedTools.value = [];
+}
+
+// 切换提示语列表显示状态
+const togglePromptsList = () => {
+  showPromptsList.value = !showPromptsList.value
+  
+  // 添加active类到提示语按钮
+  if (showPromptsList.value) {
+    setTimeout(() => {
+      const promptButton = document.querySelector('.prompts-button')
+      if (promptButton) {
+        promptButton.classList.add('active')
+      }
+    }, 0)
+  } else {
+    const promptButton = document.querySelector('.prompts-button')
+    if (promptButton) {
+      promptButton.classList.remove('active')
+    }
+  }
+  
+  // 如果打开提示语列表，则关闭工具列表
+  if (showPromptsList.value && showToolsList.value) {
+    showToolsList.value = false
+    const toolButton = document.querySelector('.tools-button')
+    if (toolButton) {
+      toolButton.classList.remove('active')
+    }
+  }
+}
+
+// 使用提示语
+const usePrompt = (promptText: string) => {
+  messageInput.value = promptText
+  showPromptsList.value = false
+}
+
+// 切换提示语标签页
+const switchPromptTab = (tabName: string) => {
+  selectedPromptTab.value = tabName
+}
+
+// 添加自定义提示语
+const saveCustomPrompt = async () => {
+  try {
+    // 先添加到本地状态
+    customPrompts.value.push({...newPrompt.value})
+    
+    // 保存到服务器
+    const response = await fetch('/api/custom-prompts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompts: customPrompts.value
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to save custom prompts')
+    }
+    
+    // 重置表单并关闭弹窗
+    showAddPromptModal.value = false
+    newPrompt.value = { title: '', prompt: '' }
+  } catch (error) {
+    console.error('Error saving custom prompt:', error)
+    // 可以添加错误提示
+  }
+}
+
+// 删除自定义提示语
+const deleteCustomPrompt = async (index: number) => {
+  try {
+    // 先从本地状态删除
+    customPrompts.value.splice(index, 1)
+    
+    // 保存到服务器
+    const response = await fetch('/api/custom-prompts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompts: customPrompts.value
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to save custom prompts after deletion')
+    }
+  } catch (error) {
+    console.error('Error deleting custom prompt:', error)
+    // 可以添加错误提示
+  }
+}
+
+// 加载自定义提示语
+const loadCustomPrompts = async () => {
+  try {
+    const response = await fetch('/api/custom-prompts')
+    if (response.ok) {
+      const data = await response.json()
+      customPrompts.value = data.prompts || []
+    }
+  } catch (error) {
+    console.error('Failed to load custom prompts:', error)
+  }
 }
 </script>
 
@@ -510,13 +767,7 @@ const clearSelectedTools = () => {
   transform: scale(0.95);
 }
 
-/* 特殊样式工具按钮 */
-.toolbar-btn[title="工具"] {
-  color: #5f6368;
-}
-
-.toolbar-btn[title="工具"]:hover,
-.toolbar-btn[title="工具"].active {
+.toolbar-btn.active {
   color: #1a73e8;
   background-color: rgba(26, 115, 232, 0.1);
 }
@@ -649,19 +900,20 @@ const clearSelectedTools = () => {
 
 .tool-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  background-color: #e53935;
+  top: -5px;
+  right: -5px;
+  background-color: #f44336;
   color: white;
-  border-radius: 8px;
-  font-size: 9px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  border-radius: 50%;
+  font-size: 10px;
+  min-width: 15px;
+  height: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 2px;
   font-weight: bold;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 @media (max-width: 600px) {
@@ -687,8 +939,8 @@ const clearSelectedTools = () => {
   }
 }
 
-/* 工具列表面板样式 */
-.tools-panel {
+/* 添加共享的浮动面板样式 */
+.floating-panel {
   position: absolute;
   bottom: 100%;
   left: 0;
@@ -705,15 +957,51 @@ const clearSelectedTools = () => {
   transform-origin: top center;
 }
 
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #eeeeee;
+  font-weight: 600;
+  color: #424242;
+  background-color: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  font-size: 13px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-content {
+  max-height: 370px;
+  overflow-y: auto;
+  padding: 4px 0;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #dadce0 #f8f9fa;
+}
+
+.panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background-color: #dadce0;
+  border-radius: 6px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background-color: #bdc1c6;
 }
 
 /* 加载状态样式 */
@@ -755,54 +1043,115 @@ const clearSelectedTools = () => {
   font-size: 12px;
 }
 
-.tools-header {
-  padding: 12px 16px;
-  font-weight: 600;
-  color: #424242;
-  border-bottom: 1px solid #eeeeee;
-  background-color: #fafafa;
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  font-size: 13px;
-}
-
 .tools-list {
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
-.tools-content {
-  max-height: 370px;
-  overflow-y: auto;
-  padding: 4px 0;
-  flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: #dadce0 #f8f9fa;
+/* 修改提示语样式，与工具样式保持一致 */
+.prompts-list {
+  padding: 0;
 }
 
-.tools-content::-webkit-scrollbar {
-  width: 6px;
+.prompt-item {
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.tools-content::-webkit-scrollbar-track {
-  background: #f8f9fa;
+.prompt-item:hover {
+  background-color: #f8f9fa;
 }
 
-.tools-content::-webkit-scrollbar-thumb {
-  background-color: #dadce0;
-  border-radius: 6px;
+.prompt-item:active {
+  background-color: #f0f7ff;
 }
 
-.tools-content::-webkit-scrollbar-thumb:hover {
-  background-color: #bdc1c6;
+.prompt-item::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.5;
+  transition: all 0.2s;
 }
 
+.prompt-item:hover::after {
+  opacity: 0.8;
+  right: 12px;
+}
+
+.prompt-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #202124;
+  margin-bottom: 1px;
+  padding-right: 20px;
+}
+
+.prompt-text {
+  font-size: 11px;
+  color: #5f6368;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 20px;
+  line-height: 1.2;
+}
+
+/* 保留原有的空状态样式 */
+.empty-prompts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.empty-text {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.empty-subtext {
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+}
+
+/* 添加淡入动画 */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 工具项样式 */
 .tool-item {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -911,7 +1260,7 @@ const clearSelectedTools = () => {
   color: #3c4043;
 }
 
-/* Add CSS styles for tabs */
+/* 标签页样式 */
 .tools-tabs {
   display: flex;
   overflow-x: auto;
@@ -919,14 +1268,14 @@ const clearSelectedTools = () => {
   background-color: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
   position: sticky;
-  top: 42px;
+  top: 34px;
   z-index: 2;
   white-space: nowrap;
   scrollbar-width: thin;
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
   flex-shrink: 0; /* Prevent tabs from shrinking */
-  min-height: 42px; /* Ensure minimum height for tabs */
+  min-height: 36px; /* Ensure minimum height for tabs */
 }
 
 .tools-tabs::-webkit-scrollbar {
@@ -943,7 +1292,7 @@ const clearSelectedTools = () => {
 }
 
 .tab-item {
-  padding: 10px 14px;
+  padding: 8px 14px;
   font-size: 12px;
   color: #666;
   cursor: pointer;
@@ -986,9 +1335,9 @@ const clearSelectedTools = () => {
   color: white;
 }
 
-/* Add CSS styles for selected tools bar */
+/* 已选工具栏样式 */
 .selected-tools-bar {
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-top: 1px solid #e0e0e0;
   background-color: #f5f7fa;
   position: sticky;
@@ -1002,7 +1351,7 @@ const clearSelectedTools = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .selected-tools-title {
@@ -1079,27 +1428,207 @@ const clearSelectedTools = () => {
   margin: 10px;
 }
 
-/* Add CSS styles for fullscreen mode */
-.fullscreen-tips {
-  position: absolute;
-  bottom: 32px;
-  left: 0;
-  color: #666;
-  font-size: 12px;
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 4px 8px;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.tabs {
+  display: flex;
+  gap: 8px;
 }
 
-.fullscreen-tips kbd {
-  background-color: #f3f3f3;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
-  padding: 2px 4px;
-  margin: 0 2px;
-  font-family: monospace;
-  font-size: 11px;
+/* 自定义提示语头部 */
+.custom-prompts-header {
+  display: none;
+}
+
+.add-prompt-btn {
+  background-color: #e8f0fe;
+  color: #1a73e8;
+  border: 1px solid #d2e3fc;
+  border-radius: 16px;
+  padding: 2px 10px;
+  font-size: 12px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.add-prompt-btn:hover {
+  background-color: #d2e3fc;
+  border-color: #b8d3fb;
+}
+
+.add-icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* 提示语操作按钮 */
+.prompt-actions {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+}
+
+.prompt-item:hover .prompt-actions {
+  display: block;
+}
+
+.prompt-item:hover::after {
+  display: none;
+}
+
+.prompt-delete-btn {
+  background: none;
+  border: none;
+  color: #5f6368;
+  padding: 4px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.prompt-delete-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #d93025;
+}
+
+/* 模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-container {
+  background-color: white;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #eeeeee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #202124;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 16px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #5f6368;
+}
+
+.form-input, .form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #202124;
+  box-sizing: border-box;
+}
+
+.form-input:focus, .form-textarea:focus {
+  border-color: #1a73e8;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.form-textarea {
+  resize: vertical;
+}
+
+.modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #eeeeee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-cancel-btn, .modal-save-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-cancel-btn {
+  background-color: transparent;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+}
+
+.modal-cancel-btn:hover {
+  background-color: #f1f3f4;
+}
+
+.modal-save-btn {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+}
+
+.modal-save-btn:hover {
+  background-color: #1967d2;
+}
+
+.modal-save-btn:disabled {
+  background-color: #dadce0;
+  cursor: not-allowed;
 }
 </style> 

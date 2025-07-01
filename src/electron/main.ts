@@ -1050,6 +1050,46 @@ router.post('/api/sessions/:id/stop-generation', (req: Request, res: Response) =
   }
 });
 
+// 自定义提示语API
+router.get('/api/custom-prompts', routeHandler(async (req: Request, res: Response) => {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'custom-prompts.json');
+    
+    // 如果文件不存在，返回空数组
+    if (!fs.existsSync(configPath)) {
+      return res.json({ prompts: [] });
+    }
+    
+    // 读取文件内容
+    const data = fs.readFileSync(configPath, 'utf8');
+    const customPrompts = JSON.parse(data);
+    
+    return res.json({ prompts: customPrompts });
+  } catch (error) {
+    logger.error('Main', `获取自定义提示语失败: ${error}`);
+    return res.status(500).json({ error: '获取自定义提示语失败' });
+  }
+}));
+
+router.post('/api/custom-prompts', routeHandler(async (req: Request, res: Response) => {
+  try {
+    const { prompts } = req.body;
+    
+    if (!Array.isArray(prompts)) {
+      return res.status(400).json({ error: '提示语数据格式不正确' });
+    }
+    
+    // 保存到文件
+    const configPath = path.join(app.getPath('userData'), 'custom-prompts.json');
+    fs.writeFileSync(configPath, JSON.stringify(prompts), 'utf8');
+    
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error('Main', `保存自定义提示语失败: ${error}`);
+    return res.status(500).json({ error: '保存自定义提示语失败' });
+  }
+}));
+
 // 使用路由器
 expressApp.use(router);
 
