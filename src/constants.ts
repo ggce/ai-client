@@ -31,11 +31,24 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConstantConfig> = {
       'qwen3-32b'
     ]
   },
+  ERNIE: {
+    NAME: 'ernie',
+    DEFAULT_URL: 'https://qianfan.baidubce.com/v2',
+    DEFAULT_MODEL: 'ernie-4.5-turbo-128k',
+    ALL_MODELS: [
+      'ernie-4.5-turbo-128k',
+      'ernie-4.5-turbo-32k',
+      'ernie-4.0-turbo-128k',
+      'ernie-4.0-turbo-8k'
+    ]
+  },
   DOUBAO: {
     NAME: 'doubao',
     DEFAULT_URL: 'https://ark.cn-beijing.volces.com/api/v3',
     DEFAULT_MODEL: 'doubao-1-5-pro-32k-250115',
     ALL_MODELS: [
+      'doubao-seed-1-6-250615',
+      'doubao-seed-1-6-flash-250615',
       'doubao-1-5-pro-32k-250115',
       'doubao-1-5-thinking-pro-250415',
     ]
